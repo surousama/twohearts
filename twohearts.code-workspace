@@ -1,0 +1,26 @@
+{
+    "folders": [
+        {
+            "name": "双心印项目",
+            "path": "."
+        }
+    ],
+    "settings": {
+        "files.associations": {
+            "*.uproject": "json",
+            "*.uplugin": "json"
+        },
+        "search.exclude": {
+            "**/Binaries": true,
+            "**/DerivedDataCache": true,
+            "**/Intermediate": true,
+            "**/Saved": true
+        }
+    },
+    "extensions": {
+        "recommendations": [
+            "ms-vscode.cpptools",
+            "ms-vscode.cmake-tools"
+        ]
+    }
+}
