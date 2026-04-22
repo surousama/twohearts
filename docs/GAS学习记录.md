@@ -54,7 +54,11 @@
     https://github.com/tranek/GASDocumentation
     > GAS 社区最权威的文档 + 示例项目。包含详细的 GAS 理论解释和多人游戏示例。几乎所有 GAS 教程都引用这个项目。
 
-12. **ActionRPG 升级版（官方 ARPG 示例）**
+12. **GASDocumentation 中文翻译版**
+    https://blog.csdn.net/pirate310/article/details/106311256
+    > 上面 GASDocumentation 的完整中文翻译，涵盖 ASC、Gameplay Tags、Attributes、GameplayEffects、GameplayAbilities、AbilityTasks、GameplayCues、预测、调试优化等全部章节。阅读英文吃力时的最佳替代。
+
+13. **ActionRPG 升级版（官方 ARPG 示例）**
     https://github.com/topics/gameplay-ability-system
     > 官方动作 RPG 示例项目升级到 UE5.3+，GAS 实战的最佳参考。
 
