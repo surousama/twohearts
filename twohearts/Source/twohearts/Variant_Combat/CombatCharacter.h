@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
 #include "CombatAttacker.h"
 #include "CombatDamageable.h"
@@ -12,6 +13,11 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UAbilitySystemComponent;
+class UGameplayAbility;
+class UAnimMontage;
+class UTHCombatAbilitySystemComponent;
+class UTHCombatAttributeSet;
 struct FInputActionValue;
 class UCombatLifeBar;
 class UWidgetComponent;
@@ -27,7 +33,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogCombatCharacter, Log, All);
  *  - Respawning
  */
 UCLASS(abstract)
-class ACombatCharacter : public ACharacter, public ICombatAttacker, public ICombatDamageable
+class ACombatCharacter : public ACharacter, public IAbilitySystemInterface, public ICombatAttacker, public ICombatDamageable
 {
 	GENERATED_BODY()
 
@@ -42,6 +48,14 @@ class ACombatCharacter : public ACharacter, public ICombatAttacker, public IComb
 	/** Life bar widget component */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UWidgetComponent* LifeBar;
+
+	/** Ability System Component */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UTHCombatAbilitySystemComponent> AbilitySystemComponent;
+
+	/** Attribute Set used by GAS */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UTHCombatAttributeSet> AttributeSet;
 	
 protected:
 
@@ -88,6 +102,24 @@ protected:
 	/** Pointer to the life bar widget */
 	UPROPERTY(EditAnywhere, Category="Damage")
 	TObjectPtr<UCombatLifeBar> LifeBarWidget;
+
+	/** Gameplay Abilities granted on initialization */
+	UPROPERTY(EditAnywhere, Category="GAS|Abilities")
+	TArray<TSubclassOf<UGameplayAbility>> StartupAbilities;
+
+	/** Explicit normal attack ability granted to this character */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GAS|Abilities", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UGameplayAbility> NormalAttackAbilityClass;
+
+	/** Montage used by the normal attack GAS ability */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GAS|Abilities", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAnimMontage> NormalAttackMontage;
+
+	/** Prevent startup abilities from being granted multiple times */
+	bool bStartupAbilitiesGranted = false;
+
+	/** Prevent the explicit normal attack ability from being granted multiple times */
+	bool bNormalAttackAbilityGranted = false;
 
 	/** Max amount of time that may elapse for a non-combo attack input to not be considered stale */
 	UPROPERTY(EditAnywhere, Category="Melee Attack", meta = (ClampMin = 0, ClampMax = 5, Units = "s"))
@@ -221,10 +253,23 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoChargedAttackEnd();
 
+	/** Activates the configured normal attack GAS ability */
+	UFUNCTION(BlueprintCallable, Category="GAS|Abilities")
+	virtual bool TriggerNormalAttackAbility();
+
 protected:
 
 	/** Resets the character's current HP to maximum */
 	void ResetHP();
+
+	/** Initializes Ability Actor Info for GAS */
+	void InitializeAbilityActorInfo();
+
+	/** Grants character startup abilities once authority is available */
+	void GrantStartupAbilities();
+
+	/** Grants the explicit normal attack ability once authority is available */
+	void GrantNormalAttackAbility();
 
 	/** Performs a combo attack */
 	void ComboAttack();
@@ -238,6 +283,15 @@ protected:
 	
 public:
 
+	// ~begin IAbilitySystemInterface interface
+
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+
+	// ~end IAbilitySystemInterface interface
+
+	/** Returns the montage used by the normal attack ability */
+	UAnimMontage* GetNormalAttackMontage() const;
+	
 	// ~begin CombatAttacker interface
 
 	/** Performs the collision check for an attack */
@@ -295,6 +349,9 @@ protected:
 
 	/** Handles input bindings */
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	/** Handles possessed initialization */
+	virtual void PossessedBy(AController* NewController) override;
 
 	/** Handles possessed initialization */
 	virtual void NotifyControllerChanged() override;
