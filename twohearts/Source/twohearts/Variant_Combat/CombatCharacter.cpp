@@ -2,6 +2,8 @@
 
 
 #include "CombatCharacter.h"
+#include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbilityTypes.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/WidgetComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -15,6 +17,8 @@
 #include "TimerManager.h"
 #include "Engine/LocalPlayer.h"
 #include "CombatPlayerController.h"
+#include "THCombatAbilitySystemComponent.h"
+#include "THCombatAttributeSet.h"
 
 ACombatCharacter::ACombatCharacter()
 {
@@ -46,6 +50,12 @@ ACombatCharacter::ACombatCharacter()
 	// create the life bar widget component
 	LifeBar = CreateDefaultSubobject<UWidgetComponent>(TEXT("LifeBar"));
 	LifeBar->SetupAttachment(RootComponent);
+
+	// create the GAS core objects
+	AbilitySystemComponent = CreateDefaultSubobject<UTHCombatAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
+	AbilitySystemComponent->SetIsReplicated(true);
+	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
+	AttributeSet = CreateDefaultSubobject<UTHCombatAttributeSet>(TEXT("AttributeSet"));
 
 	// set the player tag
 	Tags.Add(FName("Player"));
@@ -164,6 +174,16 @@ void ACombatCharacter::DoChargedAttackEnd()
 	}
 }
 
+bool ACombatCharacter::TriggerNormalAttackAbility()
+{
+	if (AbilitySystemComponent == nullptr || NormalAttackAbilityClass == nullptr)
+	{
+		return false;
+	}
+
+	return AbilitySystemComponent->TryActivateAbilityByClass(NormalAttackAbilityClass);
+}
+
 void ACombatCharacter::ResetHP()
 {
 	// reset the current HP total
@@ -171,6 +191,45 @@ void ACombatCharacter::ResetHP()
 
 	// update the life bar
 	LifeBarWidget->SetLifePercentage(1.0f);
+}
+
+void ACombatCharacter::InitializeAbilityActorInfo()
+{
+	if (AbilitySystemComponent == nullptr)
+	{
+		return;
+	}
+
+	AbilitySystemComponent->InitAbilityActorInfo(this, this);
+}
+
+void ACombatCharacter::GrantStartupAbilities()
+{
+	if (!HasAuthority() || bStartupAbilitiesGranted || AbilitySystemComponent == nullptr)
+	{
+		return;
+	}
+
+	for (const TSubclassOf<UGameplayAbility>& AbilityClass : StartupAbilities)
+	{
+		if (AbilityClass)
+		{
+			AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1));
+		}
+	}
+
+	bStartupAbilitiesGranted = true;
+}
+
+void ACombatCharacter::GrantNormalAttackAbility()
+{
+	if (!HasAuthority() || bNormalAttackAbilityGranted || AbilitySystemComponent == nullptr || NormalAttackAbilityClass == nullptr)
+	{
+		return;
+	}
+
+	AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(NormalAttackAbilityClass, 1));
+	bNormalAttackAbilityGranted = true;
 }
 
 void ACombatCharacter::ComboAttack()
@@ -283,6 +342,16 @@ void ACombatCharacter::DoAttackTrace(FName DamageSourceBone)
 			}
 		}
 	}
+}
+
+UAbilitySystemComponent* ACombatCharacter::GetAbilitySystemComponent() const
+{
+	return AbilitySystemComponent;
+}
+
+UAnimMontage* ACombatCharacter::GetNormalAttackMontage() const
+{
+	return NormalAttackMontage;
 }
 
 void ACombatCharacter::CheckCombo()
@@ -425,6 +494,10 @@ void ACombatCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	InitializeAbilityActorInfo();
+	GrantStartupAbilities();
+	GrantNormalAttackAbility();
+
 	// get the life bar from the widget component
 	LifeBarWidget = Cast<UCombatLifeBar>(LifeBar->GetUserWidgetObject());
 	check(LifeBarWidget);
@@ -473,9 +546,20 @@ void ACombatCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	}
 }
 
+void ACombatCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	InitializeAbilityActorInfo();
+	GrantStartupAbilities();
+	GrantNormalAttackAbility();
+}
+
 void ACombatCharacter::NotifyControllerChanged()
 {
 	Super::NotifyControllerChanged();
+
+	InitializeAbilityActorInfo();
 
 	// update the respawn transform on the Player Controller
 	if (ACombatPlayerController* PC = Cast<ACombatPlayerController>(GetController()))
