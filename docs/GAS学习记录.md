@@ -34,9 +34,6 @@
    https://zhuanlan.zhihu.com/p/1944188620769571769
    > 精简版入门笔记，比 GASDocumentation 更易上手。
 
-8. **UE5 GAS 完全指南（2026年3月最新）**
-   https://gzhblog.cn/posts/2026-03/2026-03-30-ue5-gas-system/
-   > 2026年最新的 GAS 系统全面指南。
 
 ### 付费课程
 
@@ -70,9 +67,6 @@
     https://github.com/CNGoSeI/GASAura
     > Udemy 史蒂夫课程的完整跟学项目，UE5.4，中国开发者整理。
 
-15. **B站 - 基于 GAS 框架的 RPG 战斗系统开发（2026年4月最新）**
-    https://www.bilibili.com/video/BV1xSdLB8EZ5/
-    > UE5.7 + GAS，回合/即时战术 RPG，服务器权威架构，商业项目规范。
 
 ## 推荐学习路线
 
