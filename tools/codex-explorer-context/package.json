@@ -1,0 +1,40 @@
+{
+  "name": "codex-explorer-context",
+  "displayName": "Codex Explorer Context",
+  "description": "Adds an Explorer context menu action to send files to the Codex thread.",
+  "version": "0.0.1",
+  "publisher": "twohearts-local",
+  "private": true,
+  "files": [
+    "extension.js",
+    "README.md"
+  ],
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:codexExplorerContext.addFileToCodexThread"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codexExplorerContext.addFileToCodexThread",
+        "title": "添加到 Codex 对话",
+        "category": "Codex"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "codexExplorerContext.addFileToCodexThread",
+          "group": "navigation@100",
+          "when": "resourceScheme == file && !explorerResourceIsFolder"
+        }
+      ]
+    }
+  }
+}
