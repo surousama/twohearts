@@ -1,5 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+using System.IO;
 using UnrealBuildTool;
 
 public class twohearts : ModuleRules
@@ -23,22 +24,31 @@ public class twohearts : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
-		PublicIncludePaths.AddRange(new string[] {
-			"twohearts",
-			"twohearts/Variant_Platforming",
-			"twohearts/Variant_Platforming/Animation",
-			"twohearts/Variant_Combat",
-			"twohearts/Variant_Combat/AI",
-			"twohearts/Variant_Combat/Animation",
-			"twohearts/Variant_Combat/Gameplay",
-			"twohearts/Variant_Combat/Interfaces",
-			"twohearts/Variant_Combat/UI",
-			"twohearts/Variant_SideScrolling",
-			"twohearts/Variant_SideScrolling/AI",
-			"twohearts/Variant_SideScrolling/Gameplay",
-			"twohearts/Variant_SideScrolling/Interfaces",
-			"twohearts/Variant_SideScrolling/UI"
-		});
+		string[] includeDirectories = new string[] {
+			".",
+			"Variant_Platforming",
+			"Variant_Platforming/Animation",
+			"Variant_Combat",
+			"Variant_Combat/AI",
+			"Variant_Combat/Animation",
+			"Variant_Combat/Gameplay",
+			"Variant_Combat/Interfaces",
+			"Variant_Combat/UI",
+			"Variant_SideScrolling",
+			"Variant_SideScrolling/AI",
+			"Variant_SideScrolling/Gameplay",
+			"Variant_SideScrolling/Interfaces",
+			"Variant_SideScrolling/UI"
+		};
+
+		foreach (string includeDirectory in includeDirectories)
+		{
+			string fullPath = Path.GetFullPath(Path.Combine(ModuleDirectory, includeDirectory));
+			if (Directory.Exists(fullPath))
+			{
+				PublicIncludePaths.Add(fullPath);
+			}
+		}
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

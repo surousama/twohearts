@@ -11,4 +11,3 @@
 ## 依赖
 
 - 已安装官方 Codex 扩展：`openai.chatgpt`
-
