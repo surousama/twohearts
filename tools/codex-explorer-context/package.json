@@ -4,7 +4,6 @@
   "description": "Adds an Explorer context menu action to send files to the Codex thread.",
   "version": "0.0.1",
   "publisher": "twohearts-local",
-  "private": true,
   "files": [
     "extension.js",
     "README.md"
@@ -14,9 +13,6 @@
   },
   "categories": [
     "Other"
-  ],
-  "activationEvents": [
-    "onCommand:codexExplorerContext.addFileToCodexThread"
   ],
   "main": "./extension.js",
   "contributes": {

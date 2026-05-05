@@ -1,0 +1,19 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0.0",
+	"FriendlyName": "Blueprint Text Bridge",
+	"Description": "Adds a lightweight AI copy/paste workflow for Unreal Blueprint clipboard text.",
+	"Category": "Editor",
+	"CreatedBy": "OpenAI Codex",
+	"EnabledByDefault": true,
+	"CanContainContent": false,
+	"IsBetaVersion": true,
+	"Modules": [
+		{
+			"Name": "BlueprintTextBridge",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
+		}
+	]
+}
