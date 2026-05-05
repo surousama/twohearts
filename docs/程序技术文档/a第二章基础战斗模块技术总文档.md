@@ -88,4 +88,11 @@
    当前遗留问题
    建议衔接的下一步
 3.当前记录
-   暂无
+   2026-05-05：最小普通攻击闭环第一版 C++ 代码已落地。
+   本次对应的实施文档名称：`a最小普通攻击闭环技术文档.md`
+   本次实际完成的功能点：角色类接收普通攻击输入，维护 1-2-3 普攻段序状态，支持下一段请求缓存，按 Montage Section 播放当前段，并在段落结束后推进或重置。
+   本次新增或修改的核心代码位置：`twohearts/Source/twohearts/twoheartsCharacter.h`、`twohearts/Source/twohearts/twoheartsCharacter.cpp`
+   本次同步更新的技术文档位置：`docs/程序技术文档/a最小普通攻击闭环技术文档.md`
+   与原计划不一致的地方：当前项目尚未接入 GAS Ability 基础代码，因此本次先在 `AtwoheartsCharacter` 中实现本地最小闭环；后续 GAS 接入后可迁移到普通攻击 Ability 或角色战斗组件。
+   当前遗留问题：等待设计师职责侧配置 `IA_NormalAttack`、Input Mapping Context、`AM_Melee_NormalAttackCombo` 与 3 个 Section；尚未做编辑器内播放联调。
+   建议衔接的下一步：完成资产与输入映射配置后，验证单击只播第 1 段、连续点击稳定播出 1-2-3、第 3 段后正确回待机。

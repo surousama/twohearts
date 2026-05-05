@@ -187,6 +187,126 @@ Montage 资源
 2.每一段动画对应的命名和资源引用关系
 3.当前阶段默认按固定 3 段普攻处理，不要求派生和变体
 
+#资产配置清单
+1.推荐资产方案
+   当前第一阶段推荐使用 1 个普通攻击 Montage，内部配置 3 个 Section。
+   推荐 Montage 命名：`AM_Melee_NormalAttackCombo`
+   推荐 Section 命名：
+   `Attack_1`
+   `Attack_2`
+   `Attack_3`
+2.可选源动画资产
+   如果动画资源先以 3 个独立 Animation Sequence 提供，推荐命名：
+   `AS_Melee_NormalAttack_01`
+   `AS_Melee_NormalAttack_02`
+   `AS_Melee_NormalAttack_03`
+   之后由设计师或动画配置人员把它们组装进 `AM_Melee_NormalAttackCombo`。
+3.输入资产
+   需要准备一个 Enhanced Input 的 Input Action。
+   推荐命名：`IA_NormalAttack`
+   用途：玩家按下普通攻击键时触发 C++ 的 `TryStartNormalAttack`。
+4.输入映射资产
+   需要在当前角色使用的 Input Mapping Context 里加入 `IA_NormalAttack`。
+   推荐键位：
+   鼠标左键用于 PC 本地验证；
+   手柄 Face Button Right 或 Right Trigger 可作为后续补充。
+5.角色蓝图配置项
+   在角色蓝图中配置：
+   `NormalAttackAction` = `IA_NormalAttack`
+   `NormalAttackMontage` = `AM_Melee_NormalAttackCombo`
+   `NormalAttackSectionNames[0]` = `Attack_1`
+   `NormalAttackSectionNames[1]` = `Attack_2`
+   `NormalAttackSectionNames[2]` = `Attack_3`
+6.当前阶段暂不强制的资产内容
+   暂不需要命中特效、攻击判定框、受击动画、伤害数据、打断窗口 Notify。
+   动画通知点可以以后补；当前 C++ 会按 Section 时长自动推进或收招。
+
+#当前资产落地记录
+1.当前角色
+   当前用于最小普通攻击闭环联调的角色为 `ChineseWarrior`。
+2.当前普攻 Sequence 资产
+   当前已完成重定向并确认可正常预览的 3 段普攻动画为：
+   `Chinese_Warrior/Animations/Combat_Attack/AS_Melee_NormalAttack_01`
+   `Chinese_Warrior/Animations/Combat_Attack/AS_Melee_NormalAttack_02`
+   `Chinese_Warrior/Animations/Combat_Attack/AS_Melee_NormalAttack_03`
+3.当前保留但不接入本阶段闭环的普攻参考资产
+   `Chinese_Warrior/Animations/Combat_Attack/AS_Melee_NormalAttack_04_Reserved`
+   `Chinese_Warrior/Animations/Combat_Attack/AS_Melee_NormalAttack_FullCombo_Ref`
+   其中第 4 段与整套参考动画暂不进入本阶段 1-2-3 固定连段逻辑。
+4.当前普攻 Montage 资产
+   当前已创建：
+   `Chinese_Warrior/Animations/Combat_Montage/AM_Melee_NormalAttackCombo`
+   当前 Montage 内 Section 命名与顺序为：
+   `Attack_1`
+   `Attack_2`
+   `Attack_3`
+   对应关系为：
+   `Attack_1` -> `AS_Melee_NormalAttack_01`
+   `Attack_2` -> `AS_Melee_NormalAttack_02`
+   `Attack_3` -> `AS_Melee_NormalAttack_03`
+5.当前已入库的闪避预备资产
+   以下资产当前只作为后续闪避开发预备，不接入本次最小普通攻击闭环逻辑：
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_Dodge_F`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_Dodge_B`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_Dodge_L`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_Dodge_R`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_Dodge_FL45`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_Dodge_FR45`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_Dodge_BL45`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_Dodge_BR45`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_DodgeToRun_F`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_DodgeToRun_B`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_DodgeToRun_L`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_DodgeToRun_R`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_DodgeToRun_FL45`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_DodgeToRun_FR45`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_DodgeToRun_BL45`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_DodgeToRun_BR45`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_DodgeToRunFast_F`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_DodgeToRunFast_L`
+   `Chinese_Warrior/Animations/Combat_Dodge/AS_Evade_DodgeToRunFast_R`
+6.当前资产使用约束
+   本文档对应的普通攻击最小闭环只允许程序依赖以下普攻资产：
+   `AM_Melee_NormalAttackCombo`
+   `Attack_1`
+   `Attack_2`
+   `Attack_3`
+   不允许在本阶段直接依赖闪避预备资产，也不允许把第 4 段普攻接入当前最小闭环。
+
+#当前代码实现记录
+1.本次实现日期
+   2026-05-05
+2.本次新增或修改的核心代码位置
+   `twohearts/Source/twohearts/twoheartsCharacter.h`
+   `twohearts/Source/twohearts/twoheartsCharacter.cpp`
+3.本次实际完成的功能点
+   在角色类中新增 `NormalAttackAction`，用于接收 Enhanced Input 的普通攻击输入。
+   在角色类中新增 `NormalAttackMontage` 和 `NormalAttackSectionNames`，用于由蓝图配置 1 个 Montage 与 3 个 Section。
+   在角色类中集中维护最小普攻状态：`bIsNormalAttacking`、`CurrentNormalAttackSegment`、`bHasQueuedNextNormalAttackSegment`。
+   实现 `TryStartNormalAttack`：角色不在普攻中时进入第 1 段；角色正在普攻且未到第 3 段时记录下一段请求；第 3 段时不再继续推进。
+   实现 `PlayNormalAttackSegment`：校验段序、Montage、AnimInstance、Section 名称与 Section 时长后播放对应 Section，并用 Timer 等待当前段结束。
+   实现 `HandleNormalAttackSegmentFinished`：当前段结束时，如果存在下一段请求则进入下一段，否则调用 `ResetNormalAttackCombo` 收招。
+   实现 `ResetNormalAttackCombo`：清理 Timer、停止当前普攻 Montage、重置段序和缓存状态。
+4.本次蓝图配置入口
+   `NormalAttackAction`：配置为 `IA_NormalAttack`。
+   `NormalAttackMontage`：配置为 `AM_Melee_NormalAttackCombo`。
+   `NormalAttackSectionNames`：默认已经填入 `Attack_1`、`Attack_2`、`Attack_3`，蓝图中可按实际 Section 名称覆盖。
+5.与原计划不一致的地方
+   技术总文档提到“普通攻击每一段按独立 Ability 组织”，但当前项目代码中尚未接入 GAS Ability 基础类与 AbilitySystemComponent。
+   为了先完成本地最小闭环，本次把段序状态和播放逻辑暂时集中在 `AtwoheartsCharacter` 中；后续接入 GAS 时，可把这四个核心函数迁移到普通攻击 Ability 或角色战斗组件。
+6.当前保护策略
+   未配置 `NormalAttackAction` 时不会绑定普攻输入。
+   未配置 `NormalAttackMontage`、缺少 AnimInstance、Section 名称不存在、Section 时长异常或 Montage 播放失败时，会打印 Warning 并安全重置，不会因为资产缺失导致编译失败。
+7.当前遗留问题
+   还没有正式接入 GAS Ability。
+   还没有命中、伤害、受击、打断、预输入窗口和动画 Notify。
+   当前依赖 Section 时长推进段落，后续阶段标记文档落地后，应改为动画通知或动作逻辑事件驱动。
+8.本次验证结果
+   已执行 `twoheartsEditor Win64 Development` 编译，结果成功。
+   已完成 `ChineseWarrior` 普攻动画重定向与编辑器内预览检查，当前 `AS_Melee_NormalAttack_01~03` 与 `AM_Melee_NormalAttackCombo` 预览结果正常。
+   已完成 `AM_Melee_NormalAttackCombo` 的 3 段 Section 配置：`Attack_1`、`Attack_2`、`Attack_3`。
+   尚未完成编辑器内完整输入联调，仍需等待 `IA_NormalAttack`、Input Mapping Context 和角色蓝图配置全部接好后验证实际 1-2-3 连段。
+
 #本阶段交付结果
 1.角色具备最小普通攻击能力
 2.普通攻击连段可稳定推进和重置

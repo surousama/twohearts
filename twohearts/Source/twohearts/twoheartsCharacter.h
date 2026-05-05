@@ -10,6 +10,7 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UAnimMontage;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -49,6 +50,30 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
 
+	/** Normal attack Input Action */
+	UPROPERTY(EditAnywhere, Category="Input|Combat")
+	UInputAction* NormalAttackAction;
+
+	/** Montage that contains the three minimum normal attack sections */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UAnimMontage> NormalAttackMontage;
+
+	/** Section names used by the minimum 1-2-3 normal attack combo */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
+	TArray<FName> NormalAttackSectionNames;
+
+	/** Minimum local combo state. Later stages can migrate this into a combat component or GAS Ability. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
+	bool bIsNormalAttacking = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
+	int32 CurrentNormalAttackSegment = 0;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
+	bool bHasQueuedNextNormalAttackSegment = false;
+
+	FTimerHandle NormalAttackSegmentTimerHandle;
+
 public:
 
 	/** Constructor */
@@ -67,6 +92,13 @@ protected:
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
 
+	/** Called for normal attack input */
+	void NormalAttack(const FInputActionValue& Value);
+
+	bool IsValidNormalAttackSegment(int32 Segment) const;
+	FName GetNormalAttackSectionName(int32 Segment) const;
+	float GetNormalAttackSectionLength(int32 Segment) const;
+
 public:
 
 	/** Handles move inputs from either controls or UI interfaces */
@@ -84,6 +116,22 @@ public:
 	/** Handles jump pressed inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
+
+	/** Requests the minimum normal attack combo from input or UI interfaces */
+	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack")
+	virtual bool TryStartNormalAttack();
+
+	/** Plays one segment of the configured normal attack Montage */
+	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack")
+	virtual void PlayNormalAttackSegment(int32 Segment);
+
+	/** Consumes queued input or resets the combo when the current segment has finished */
+	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack")
+	virtual void HandleNormalAttackSegmentFinished();
+
+	/** Clears the minimum normal attack combo state */
+	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack")
+	virtual void ResetNormalAttackCombo();
 
 public:
 

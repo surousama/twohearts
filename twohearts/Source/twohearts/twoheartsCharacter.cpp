@@ -10,7 +10,16 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "TimerManager.h"
 #include "twohearts.h"
+
+namespace
+{
+	constexpr int32 FirstNormalAttackSegment = 1;
+	constexpr int32 LastNormalAttackSegment = 3;
+}
 
 AtwoheartsCharacter::AtwoheartsCharacter()
 {
@@ -48,6 +57,12 @@ AtwoheartsCharacter::AtwoheartsCharacter()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+
+	NormalAttackSectionNames = {
+		TEXT("Attack_1"),
+		TEXT("Attack_2"),
+		TEXT("Attack_3")
+	};
 }
 
 void AtwoheartsCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -65,6 +80,12 @@ void AtwoheartsCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AtwoheartsCharacter::Look);
+
+		// Normal Attack
+		if (NormalAttackAction)
+		{
+			EnhancedInputComponent->BindAction(NormalAttackAction, ETriggerEvent::Started, this, &AtwoheartsCharacter::NormalAttack);
+		}
 	}
 	else
 	{
@@ -88,6 +109,11 @@ void AtwoheartsCharacter::Look(const FInputActionValue& Value)
 
 	// route the input
 	DoLook(LookAxisVector.X, LookAxisVector.Y);
+}
+
+void AtwoheartsCharacter::NormalAttack(const FInputActionValue& Value)
+{
+	TryStartNormalAttack();
 }
 
 void AtwoheartsCharacter::DoMove(float Right, float Forward)
@@ -130,4 +156,137 @@ void AtwoheartsCharacter::DoJumpEnd()
 {
 	// signal the character to stop jumping
 	StopJumping();
+}
+
+bool AtwoheartsCharacter::TryStartNormalAttack()
+{
+	if (!bIsNormalAttacking)
+	{
+		PlayNormalAttackSegment(FirstNormalAttackSegment);
+		return bIsNormalAttacking;
+	}
+
+	if (CurrentNormalAttackSegment >= LastNormalAttackSegment)
+	{
+		return false;
+	}
+
+	bHasQueuedNextNormalAttackSegment = true;
+	return true;
+}
+
+void AtwoheartsCharacter::PlayNormalAttackSegment(int32 Segment)
+{
+	if (!IsValidNormalAttackSegment(Segment))
+	{
+		UE_LOG(Logtwohearts, Warning, TEXT("Invalid normal attack segment: %d."), Segment);
+		ResetNormalAttackCombo();
+		return;
+	}
+
+	if (!NormalAttackMontage)
+	{
+		UE_LOG(Logtwohearts, Warning, TEXT("NormalAttackMontage is not configured on %s."), *GetNameSafe(this));
+		ResetNormalAttackCombo();
+		return;
+	}
+
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!AnimInstance)
+	{
+		UE_LOG(Logtwohearts, Warning, TEXT("No AnimInstance found for normal attack on %s."), *GetNameSafe(this));
+		ResetNormalAttackCombo();
+		return;
+	}
+
+	const FName SectionName = GetNormalAttackSectionName(Segment);
+	if (SectionName.IsNone() || NormalAttackMontage->GetSectionIndex(SectionName) == INDEX_NONE)
+	{
+		UE_LOG(Logtwohearts, Warning, TEXT("Normal attack section %s is missing on %s."), *SectionName.ToString(), *GetNameSafe(NormalAttackMontage));
+		ResetNormalAttackCombo();
+		return;
+	}
+
+	const float SectionLength = GetNormalAttackSectionLength(Segment);
+	if (SectionLength <= 0.0f)
+	{
+		UE_LOG(Logtwohearts, Warning, TEXT("Normal attack section %s has invalid length."), *SectionName.ToString());
+		ResetNormalAttackCombo();
+		return;
+	}
+
+	bIsNormalAttacking = true;
+	CurrentNormalAttackSegment = Segment;
+	bHasQueuedNextNormalAttackSegment = false;
+
+	const float PlayedDuration = PlayAnimMontage(NormalAttackMontage, 1.0f, SectionName);
+	if (PlayedDuration <= 0.0f)
+	{
+		UE_LOG(Logtwohearts, Warning, TEXT("Failed to play normal attack section %s on %s."), *SectionName.ToString(), *GetNameSafe(this));
+		ResetNormalAttackCombo();
+		return;
+	}
+
+	GetWorldTimerManager().ClearTimer(NormalAttackSegmentTimerHandle);
+	GetWorldTimerManager().SetTimer(
+		NormalAttackSegmentTimerHandle,
+		this,
+		&AtwoheartsCharacter::HandleNormalAttackSegmentFinished,
+		SectionLength,
+		false);
+}
+
+void AtwoheartsCharacter::HandleNormalAttackSegmentFinished()
+{
+	GetWorldTimerManager().ClearTimer(NormalAttackSegmentTimerHandle);
+
+	if (!bIsNormalAttacking)
+	{
+		return;
+	}
+
+	const int32 FinishedSegment = CurrentNormalAttackSegment;
+	if (bHasQueuedNextNormalAttackSegment && FinishedSegment < LastNormalAttackSegment)
+	{
+		PlayNormalAttackSegment(FinishedSegment + 1);
+		return;
+	}
+
+	ResetNormalAttackCombo();
+}
+
+void AtwoheartsCharacter::ResetNormalAttackCombo()
+{
+	GetWorldTimerManager().ClearTimer(NormalAttackSegmentTimerHandle);
+
+	if (NormalAttackMontage)
+	{
+		StopAnimMontage(NormalAttackMontage);
+	}
+
+	bIsNormalAttacking = false;
+	CurrentNormalAttackSegment = 0;
+	bHasQueuedNextNormalAttackSegment = false;
+}
+
+bool AtwoheartsCharacter::IsValidNormalAttackSegment(int32 Segment) const
+{
+	return Segment >= FirstNormalAttackSegment && Segment <= LastNormalAttackSegment;
+}
+
+FName AtwoheartsCharacter::GetNormalAttackSectionName(int32 Segment) const
+{
+	const int32 SectionIndex = Segment - 1;
+	return NormalAttackSectionNames.IsValidIndex(SectionIndex) ? NormalAttackSectionNames[SectionIndex] : NAME_None;
+}
+
+float AtwoheartsCharacter::GetNormalAttackSectionLength(int32 Segment) const
+{
+	if (!NormalAttackMontage)
+	{
+		return 0.0f;
+	}
+
+	const int32 SectionIndex = NormalAttackMontage->GetSectionIndex(GetNormalAttackSectionName(Segment));
+	return SectionIndex != INDEX_NONE ? NormalAttackMontage->GetSectionLength(SectionIndex) : 0.0f;
 }
