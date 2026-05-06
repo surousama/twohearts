@@ -38,13 +38,6 @@
 		{
 			"Name": "AnimationLocomotionLibrary",
 			"Enabled": true
-		},
-		{
-			"Name": "BlueprintTextBridge",
-			"Enabled": true,
-			"TargetAllowList": [
-				"Editor"
-			]
 		}
 	]
 }
