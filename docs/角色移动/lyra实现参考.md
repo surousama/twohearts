@@ -1,36 +1,62 @@
 # Lyra 移动系统实现参考
 
-## Pivot 状态
+## 1. Pivot 的整体结构
 
-### Pivot → Cycle 过渡条件（3个，按优先级排列）
+Lyra 的 Pivot 分为两层：
 
-Lyra 使用了 **3 条转换线** 从 Pivot 到 Cycle（通过 State Alias `CycleAlias` 汇聚），优先级从高到低：
+1. **高层状态机 `LocomotionSM`**
+   - 负责决定何时进入 `Pivot`
+   - 负责 `Pivot -> Cycle` 的退出规则
+   - 进入 `Pivot` 时记录本次 Pivot 的初始方向
+   - 维护 `Last Pivot Time` 倒计时，防止 Pivot 刚进入就退出
 
----
+2. **下层动画层 `FullBody_PivotState`**
+   - 负责真正播放 Pivot 动画
+   - 使用 `Sequence Evaluator + OnBecomeRelevant + OnUpdate`
+   - 内部还有 `PivotA / PivotB` 两个状态，专门处理连续 Pivot 时的重入问题
 
-#### 优先级 1：Linked Layer Changed
+## 2. 高层 Pivot 状态
 
-- **Details 面板设置**：Transition Rule Sharing = Use Shared → `Promote To Shared`
-- **含义**：当 Animation Layer（动画层）发生切换时（比如角色切换了武器/姿态集，导致整个动画层被替换），强制退出当前状态回到 Cycle。这是一个"兜底重置"机制，确保动画层切换后不会卡在旧状态里。
-- **对我们的影响**：我们当前没有使用 Linked Anim Layer 系统，**这个条件暂时不需要实现**。
+### 2.1 On Become Relevant
 
----
+高层 `SetUpPivotState` 只做一件事：
 
-#### 优先级 2：动画通知状态（ANS）
+- `Pivot Initial Direction = Local Velocity Direction`
 
-- **节点**：`Was Anim Notify State Active in Source State (Pivot)`
-- **Anim Notify State Type**：`TransitionToLocomotion`（路径：`/Game/Characters/Heroes/Mannequin/Animations/AnimNotifies/TransitionToLocomotion`）
-- **含义**：Pivot 动画上挂了一个名为 `TransitionToLocomotion` 的 ANS（动画通知状态）。这个 ANS 覆盖了动画的某个时间段（比如从第 0.3 秒到动画结束）。当 ANS 激活时（即动画播放到了被 ANS 覆盖的时间段），这个条件返回 true，允许过渡到 Cycle。
-- **作用**：精确控制"Pivot 动画至少要播放多长时间才允许退出"。比如 ANS 从 0.3 秒开始，那前 0.3 秒是不允许退出的（保证回转动画的核心部分播完）。
-- **对我们的影响**：**这是我们要实现的核心机制**，替代当前的"动画自然播放完成"退出方式。
+作用：
+- 记录进入 Pivot 时的初始移动方向
+- 供 `Is Moving Perpendicular to Initial Pivot` 判断使用
 
----
+### 2.2 On Update
 
-#### 优先级 3：复合条件（兜底退出）
+高层 `UpdatePivotState` 只做一件事：
 
-逻辑结构：
-```
-Can Enter Transition = OR(
+- 如果 `Last Pivot Time > 0`，则每帧 `Last Pivot Time -= DeltaTime`
+
+作用：
+- 给 Pivot 一个最短有效持续时间
+- 防止刚进入 Pivot 就因为输入变化或其它条件立刻退出
+- `Last Pivot Time` 不是动画剩余时长，而是 Pivot 的**早期保护窗口/纠偏窗口**
+- 这段时间内：
+  - 高层退出条件不会太早放行
+  - 下层允许重新修正所选 Pivot 动画
+
+## 3. Pivot -> Cycle 退出条件
+
+Lyra 使用 3 条转换线，按优先级从高到低：
+
+1. **Linked Layer Changed**
+   - 动画层切换时强制退出
+   - 我们当前可忽略
+
+2. **ANS：`TransitionToLocomotion`**
+   - `Was Anim Notify State Active in Source State (Pivot)`
+   - 作用不是“播完退出”，而是“播到允许退出的时间段后才退出”
+
+3. **复合兜底条件**
+
+```text
+OR(
     OR(Crouch State Change, ADSState Changed),
     AND(
         Is Moving Perpendicular to Initial Pivot,
@@ -39,25 +65,210 @@ Can Enter Transition = OR(
 )
 ```
 
-各子条件含义：
+对我们最有价值的点：
 
-| 条件 | 含义 |
-|------|------|
-| **Crouch State Change** | 蹲伏状态发生变化（站↔蹲切换），强制退出 Pivot |
-| **ADSState Changed** | 瞄准状态发生变化（进入/退出瞄准），强制退出 Pivot |
-| **Is Moving Perpendicular to Initial Pivot** | 玩家当前的移动方向与 Pivot 初始方向垂直（即不再是反向输入，而是横向输入了），说明玩家意图已经变了 |
-| **Last Pivot Time <= 0.0** | Pivot 计时器归零（Pivot 动画的有效时间已经耗尽）|
+- Lyra 不只靠 ANS 退出
+- 还额外要求 `Last Pivot Time` 已经耗尽
+- 这样可以防止 Pivot 太早退出
 
-- **AND 的含义**：只有当"移动方向已经偏离了 Pivot 方向"**并且**"Pivot 时间已经结束"同时满足，才通过这个条件退出。
-- **OR 的含义**：状态切换（蹲/瞄准）是高优先级打断，无需等待其他条件。
-- **对我们的影响**：Crouch/ADS 我们暂时没有，但 `Is Moving Perpendicular to Initial Pivot` + `Last Pivot Time` 这个组合值得参考——它防止了"Pivot 刚进入就被横向输入踢出去"的问题。
+## 4. FullBody_PivotState 结构
 
----
+`FullBody_PivotState` 不是单一动画节点，而是：
 
-### 状态别名（State Alias）使用
+1. 一个内部状态机 `PivotSM`
+2. 一个单独的 `Sequence Evaluator`
+3. 通过 `Layered Blend per Bone` 混合
 
-- Lyra 使用了 `CycleAlias` 作为 Cycle 状态的别名，多个状态（Pivot、Stop、Start 等）的出口转换线都指向这个别名，而不是直接指向 Cycle 状态节点。
-- **好处**：减少连线混乱，所有"回到 Cycle"的转换只需要连到别名，修改 Cycle 状态时不影响转换线。
+其中：
 
-（待记录我们的实施方案）
+- `PivotSM` 负责下半身/主体 Pivot
+- 额外的 `Sequence Evaluator` 用于上半身 HipFire 覆盖
+- 最终再叠加 `Orientation Warping` 和 `Stride Warping`
 
+## 5. PivotSM：为什么有 PivotA / PivotB
+
+Lyra 用 `PivotA` 和 `PivotB` 两个状态交替承载 Pivot。
+
+原因：
+
+- UE 状态机对“同一 Pivot 状态的连续重入”支持不好
+- 连续反向输入时，单个 Pivot 状态可能无法重新初始化
+- 用两个状态轮流切，可以保证每次都重新触发 `OnBecomeRelevant`
+
+这对我们有启发：
+
+- 如果当前实现只有一个 Pivot 状态，连续反向或快速重入时更容易出问题
+
+## 6. WantsToRePivot 规则
+
+`WantsToRePivot` 的作用不是“进入 Pivot”，而是：
+
+- 当前已经在 `PivotA` 时，是否切去 `PivotB`
+- 当前已经在 `PivotB` 时，是否切去 `PivotA`
+
+核心判断包含 3 点：
+
+1. `LocalVelocity2D · LocalAcceleration2D < 0`
+   - 当前仍然是反向制动语义
+
+2. `NOT IsMovingPerpendicularToInitialPivot`
+   - 当前意图还没有偏成横向
+
+3. `LocalAcceleration2D · PivotStartingAcceleration < 0`
+   - 当前加速度方向和进入 Pivot 时记录的加速度方向又发生反转
+
+作用：
+
+- 玩家在 Pivot 过程中再次反向输入时，允许重新起播一次 Pivot
+
+## 7. PivotA / PivotB 的动画层实现
+
+`PivotA`、`PivotB` 的核心结构一致：
+
+```text
+Sequence Evaluator
+→ Orientation Warping
+→ Stride Warping
+→ Output Pose
+```
+
+并绑定：
+
+- `On Become Relevant = SetUpPivotAnim`
+- `On Update = UpdatePivotAnim`
+
+## 8. SetUpPivotAnim 做了什么
+
+Lyra 在进入 Pivot 动画时，会做以下初始化：
+
+1. 记录 `Pivot Starting Acceleration`
+2. `Convert to Sequence Evaluator`
+3. 根据输入方向 `Get Desired Pivot Sequence`
+4. `Set Sequence`
+5. `Set Explicit Time(0.0)`
+6. `Stride Warping Pivot Alpha = 0.0`
+7. `Time at Pivot Stop = 0.0`
+8. `Last Pivot Time = 0.2`
+
+这里最关键的 3 点：
+
+1. **明确切换到正确的 Pivot 动画**
+2. **明确把 `Explicit Time` 重置到 0**
+3. **明确给 `Last Pivot Time` 一个 0.2 秒保护时间**
+
+变量语义补充：
+
+- `Last Pivot Time`
+  - 含义：本次 Pivot 还剩多少“早期保护时间”
+  - 不是动画播放剩余时间
+  - 主要用于防止刚进入 Pivot 就退出，并允许早期修正 Pivot 动画方向
+- `Time at Pivot Stop`
+  - 含义：角色到达 Pivot 点那一刻，对应的动画时间
+  - 供后半段计算 `Stride Warping Pivot Alpha` 使用
+
+## 9. UpdatePivotAnim 的核心逻辑
+
+### 9.1 开头统一处理
+
+每帧先：
+
+1. `Convert to Sequence Evaluator`
+2. 缓存当前 `Sequence Evaluator`
+3. 读取当前 `Accumulated Time`
+4. 回写 `Explicit Time`
+
+说明：
+
+- Lyra 的 Pivot 动画时间是“受控推进”的，不是完全放任自然播放
+
+### 9.2 进入早期允许短时间切换 Pivot 动画
+
+当 `Last Pivot Time > 0` 时：
+
+1. 重新计算 `Desired Pivot Sequence`
+2. 如果和当前序列不同，则：
+   - `Set Sequence with Inertial Blending`
+   - `Blend Time = 0.2`
+   - 同时更新 `Pivot Starting Acceleration`
+
+作用：
+
+- Pivot 刚进入的短时间内，允许根据最新输入修正所选 Pivot 动画
+- 不是一进来就把方向彻底锁死
+
+### 9.3 速度与加速度反向时
+
+当 `Velocity · Acceleration < 0` 时，说明角色仍在靠近 Pivot 点：
+
+1. `Predict Ground Movement Pivot Location`
+2. 取返回偏移向量的 `Vector Length XY`
+3. `Distance Match to Target`
+4. 并把当前 `Explicit Time` 记录到 `Time at Pivot Stop`
+
+作用：
+
+- 在“急停靠近 Pivot 点”的前半段，用距离匹配把动画准确对齐到回转点
+- 顺便记录“到达 Pivot 点时动画播到了哪”，供后半段继续衔接
+
+### 9.4 速度与加速度同向时
+
+当 `Velocity · Acceleration >= 0` 时，说明角色已经过了 Pivot 点，开始反向加速：
+
+1. 根据 `Explicit Time`、`Time at Pivot Stop` 计算 `Stride Warping Pivot Alpha`
+2. 平滑提高最小 `Play Rate Clamp`
+3. `Advance Time by Distance Matching`
+
+作用：
+
+- 后半段不再用 `Distance Match to Target`
+- 改为按实际位移推进动画
+- 同时逐步把 Stride Warping 混进来，减少后半段滑步
+
+这两个变量的区别：
+
+- `Last Pivot Time`
+  - 管的是状态保护窗口
+  - 决定 Pivot 早期能否退出、能否改判动画
+- `Time at Pivot Stop`
+  - 管的是动画时间分界点
+  - 决定后半段从哪里开始混入 Warping
+
+## 10. 对我们当前 debug 最有价值的结论
+
+1. **Lyra 进入 Pivot 时一定会 `Set Explicit Time(0.0)`**
+   - 如果我们当前实现没有稳定做到这一点，Pivot 可能一进入就从很后面开始
+
+2. **Lyra 有 `Last Pivot Time = 0.2` 的保护**
+   - 即使方向有变化，也不会让 Pivot 刚进来立刻退出
+
+3. **Lyra 前半段和后半段不是同一种时间推进方式**
+   - 前半段：`Distance Match to Target`
+   - 后半段：`Advance Time by Distance Matching`
+
+4. **Lyra 会记录 `Time at Pivot Stop`**
+   - 用来控制后半段 `Stride Warping` 的混入时机
+
+5. **Lyra 支持 Pivot 早期重新选动画**
+   - 通过 `Set Sequence with Inertial Blending`
+   - 可以修正刚进入 Pivot 时方向判断的轻微变化
+
+6. **Lyra 使用 PivotA / PivotB 处理连续 Pivot**
+   - 单个 Pivot 状态在快速重入时更不稳
+
+## 11. 对我们当前 bug 的直接启发
+
+对于“Pivot 只持续极短时间，然后很快进入 Cycle，并产生巨大形变”这个问题，优先对比以下几项：
+
+1. `Pivot OnBecomeRelevant` 是否稳定执行了：
+   - `Set Sequence`
+   - `Set Explicit Time(0.0)`
+
+2. 当前实现是否有类似 `Last Pivot Time = 0.2` 的最短保护时间
+
+3. 当前实现是否像 Lyra 一样：
+   - 前半段用 `Distance Match to Target`
+   - 后半段改用 `Advance Time by Distance Matching`
+
+4. 当前实现是否记录了类似 `Time at Pivot Stop` 的变量，用来决定后半段 Warping 混入时机
+
+5. 当前实现是否只有单一 Pivot 状态，缺少 `PivotA / PivotB` 这种重入保护
