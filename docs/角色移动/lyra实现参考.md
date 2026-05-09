@@ -272,3 +272,34 @@ Lyra 在进入 Pivot 动画时，会做以下初始化：
 4. 当前实现是否记录了类似 `Time at Pivot Stop` 的变量，用来决定后半段 Warping 混入时机
 
 5. 当前实现是否只有单一 Pivot 状态，缺少 `PivotA / PivotB` 这种重入保护
+
+## 12. 本次截图补充：高层状态切换的凝练规律
+
+基于本次查看 `LocomotionSM` 截图，先补 4 条对 debug 最有帮助的高层结论：
+
+1. `Lyra` 的地面状态切换不是只看 `Speed`，而是同时看：
+   - `Acceleration`
+   - `Velocity`
+   - 方向关系
+   - 姿态状态变化（如 `Crouch / ADS`）
+   - 朝向偏差（如 `RootYawOffset`）
+
+2. `Idle -> Start` 的核心语义是“是否有明确起步意图”，不是“角色已经动起来了再切”
+   - 截图可确认规则包含：`HasAcceleration`
+   - 特殊情况下还会参考：`GameplayTag_IsMelee AND HasVelocity`
+
+3. `Start` 在 `Lyra` 里是短过渡态，不是必须播完才进 `Cycle`
+   - 当起步方向与当前速度方向不再匹配
+   - 或 `Crouch / ADS` 等状态变化
+   - 就可以提前退出 `Start`
+
+4. `Lyra` 明确把“高优先级打断条件”单独拿出来处理，而不是全压在普通移动变量上
+   - 例如：`LinkedLayerChanged`
+   - 例如：`ABS(RootYawOffset) > 60`
+   - 说明过渡态退出通常不是单一 `bShouldMove` 这种条件就能覆盖
+
+对我们当前项目最直接的启发：
+
+- `Pivot / Start / Stop` 这类过渡态，退出条件必须比普通移动态更稳
+- 不能直接复用 `bShouldMove / not bShouldMove` 作为唯一核心判定
+- 至少要补“保护时间 / 方向关系 / 动画时机 / 高优先级打断”中的一部分
