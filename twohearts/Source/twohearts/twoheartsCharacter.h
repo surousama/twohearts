@@ -15,6 +15,33 @@ struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
+USTRUCT(BlueprintType)
+struct FNormalAttackDebugEvent
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug")
+	float TimestampSeconds = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug")
+	FString EventName;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug")
+	FString Detail;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug")
+	int32 Segment = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug")
+	bool bIsAttacking = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug")
+	bool bHasQueuedNextSegment = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug")
+	FString SectionName;
+};
+
 /**
  *  A simple player-controllable third person character
  *  Implements a controllable orbiting camera
@@ -71,6 +98,24 @@ protected:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
 	bool bHasQueuedNextNormalAttackSegment = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug", meta=(AllowPrivateAccess="true"))
+	bool bEnableNormalAttackDebugLogging = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug", meta=(AllowPrivateAccess="true"))
+	bool bEnableNormalAttackVerboseLogging = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug", meta=(AllowPrivateAccess="true"))
+	bool bShowNormalAttackDebugPanel = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug", meta=(ClampMin="1", UIMin="1", ClampMax="50", UIMax="50", AllowPrivateAccess="true"))
+	int32 NormalAttackDebugMaxEvents = 12;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack|Debug", meta=(AllowPrivateAccess="true"))
+	TArray<FNormalAttackDebugEvent> NormalAttackDebugEvents;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack|Debug", meta=(AllowPrivateAccess="true"))
+	FString LastNormalAttackDebugFailureReason;
 
 	FTimerHandle NormalAttackSegmentTimerHandle;
 
@@ -133,6 +178,33 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack")
 	virtual void ResetNormalAttackCombo();
 
+	UFUNCTION(BlueprintPure, Category="Combat|Normal Attack|Debug")
+	bool IsNormalAttackDebugPanelEnabled() const { return bShowNormalAttackDebugPanel; }
+
+	UFUNCTION(BlueprintPure, Category="Combat|Normal Attack|Debug")
+	bool IsNormalAttackDebugLoggingEnabled() const { return bEnableNormalAttackDebugLogging; }
+
+	UFUNCTION(BlueprintPure, Category="Combat|Normal Attack|Debug")
+	bool IsNormalAttackVerboseLoggingEnabled() const { return bEnableNormalAttackVerboseLogging; }
+
+	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack|Debug")
+	void SetNormalAttackDebugPanelEnabled(bool bEnabled);
+
+	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack|Debug")
+	void SetNormalAttackDebugLoggingEnabled(bool bEnabled);
+
+	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack|Debug")
+	void SetNormalAttackVerboseLoggingEnabled(bool bEnabled);
+
+	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack|Debug")
+	void ClearNormalAttackDebugEvents();
+
+	bool IsNormalAttackingDebugState() const { return bIsNormalAttacking; }
+	int32 GetCurrentNormalAttackSegmentDebugState() const { return CurrentNormalAttackSegment; }
+	bool HasQueuedNextNormalAttackSegmentDebugState() const { return bHasQueuedNextNormalAttackSegment; }
+	const TArray<FNormalAttackDebugEvent>& GetNormalAttackDebugEvents() const { return NormalAttackDebugEvents; }
+	const FString& GetLastNormalAttackDebugFailureReason() const { return LastNormalAttackDebugFailureReason; }
+
 public:
 
 	/** Returns CameraBoom subobject **/
@@ -140,5 +212,11 @@ public:
 
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+protected:
+
+	void RecordNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false);
+	void RecordNormalAttackFailure(const TCHAR* EventName, const FString& Detail);
+	FString GetCurrentNormalAttackDebugSectionName() const;
 };
 

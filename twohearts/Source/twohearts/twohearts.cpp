@@ -6,3 +6,4 @@
 IMPLEMENT_PRIMARY_GAME_MODULE( FDefaultGameModuleImpl, twohearts, "twohearts" );
 
 DEFINE_LOG_CATEGORY(Logtwohearts)
+DEFINE_LOG_CATEGORY(LogtwoheartsCombatTest)

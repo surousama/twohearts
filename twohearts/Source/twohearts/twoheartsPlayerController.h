@@ -41,4 +41,18 @@ protected:
 	/** Input mapping context setup */
 	virtual void SetupInputComponent() override;
 
+public:
+
+	UFUNCTION(Exec)
+	void NormalAttackDebugPanel(bool bEnabled);
+
+	UFUNCTION(Exec)
+	void NormalAttackDebugLog(bool bEnabled);
+
+	UFUNCTION(Exec)
+	void NormalAttackDebugVerbose(bool bEnabled);
+
+	UFUNCTION(Exec)
+	void NormalAttackDebugClear();
+
 };

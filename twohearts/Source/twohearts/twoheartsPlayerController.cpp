@@ -6,6 +6,7 @@
 #include "Engine/LocalPlayer.h"
 #include "InputMappingContext.h"
 #include "Blueprint/UserWidget.h"
+#include "twoheartsCharacter.h"
 #include "twohearts.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 
@@ -57,5 +58,37 @@ void AtwoheartsPlayerController::SetupInputComponent()
 				}
 			}
 		}
+	}
+}
+
+void AtwoheartsPlayerController::NormalAttackDebugPanel(bool bEnabled)
+{
+	if (AtwoheartsCharacter* DebugCharacter = Cast<AtwoheartsCharacter>(GetPawn()))
+	{
+		DebugCharacter->SetNormalAttackDebugPanelEnabled(bEnabled);
+	}
+}
+
+void AtwoheartsPlayerController::NormalAttackDebugLog(bool bEnabled)
+{
+	if (AtwoheartsCharacter* DebugCharacter = Cast<AtwoheartsCharacter>(GetPawn()))
+	{
+		DebugCharacter->SetNormalAttackDebugLoggingEnabled(bEnabled);
+	}
+}
+
+void AtwoheartsPlayerController::NormalAttackDebugVerbose(bool bEnabled)
+{
+	if (AtwoheartsCharacter* DebugCharacter = Cast<AtwoheartsCharacter>(GetPawn()))
+	{
+		DebugCharacter->SetNormalAttackVerboseLoggingEnabled(bEnabled);
+	}
+}
+
+void AtwoheartsPlayerController::NormalAttackDebugClear()
+{
+	if (AtwoheartsCharacter* DebugCharacter = Cast<AtwoheartsCharacter>(GetPawn()))
+	{
+		DebugCharacter->ClearNormalAttackDebugEvents();
 	}
 }
