@@ -1,4 +1,4 @@
-# VS Code Unreal Workflow
+﻿# VS Code Unreal Workflow
 
 This project is ready to build from VS Code.
 
