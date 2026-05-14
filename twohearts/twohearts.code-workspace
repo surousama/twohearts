@@ -23,6 +23,12 @@
         "C_Cpp.default.intelliSenseMode": "windows-clang-x64",
         "C_Cpp.default.cppStandard": "c++20",
         "C_Cpp.intelliSenseEngineFallback": "Disabled",
+        "C_Cpp.files.exclude": {
+            "**/UE_5.6/Engine/Source/ThirdParty/**": true,
+            "**/UE_5.6/Engine/Intermediate/**": true,
+            "**/UE_5.6/Engine/Plugins/**/Intermediate/**": true,
+            "**/UE_5.6/Engine/Plugins/**/Binaries/**": true
+        },
         "typescript.tsc.autoDetect": "off",
         "npm.autoDetect": "off",
         "terminal.integrated.env.windows": {
