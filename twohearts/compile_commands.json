@@ -1,0 +1,62 @@
+[
+	{
+		"file": "H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/Module.twohearts.gen.cpp",
+		"command": "H:/vs2022/VC/Tools/Llvm/x64/bin/clang-cl.exe @\"H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/Module.twohearts.gen.cpp.obj.rsp\" ",
+		"directory": "H:/UE_5.6/Engine/Source",
+		"output": "H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/Module.twohearts.gen.cpp.obj"
+	},
+	{
+		"file": "H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/PerModuleInline.gen.cpp",
+		"command": "H:/vs2022/VC/Tools/Llvm/x64/bin/clang-cl.exe @\"H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/PerModuleInline.gen.cpp.obj.rsp\" ",
+		"directory": "H:/UE_5.6/Engine/Source",
+		"output": "H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/PerModuleInline.gen.cpp.obj"
+	},
+	{
+		"file": "H:/twohearts/twohearts/Source/twohearts/TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_TestNormalAttack.cpp",
+		"command": "H:/vs2022/VC/Tools/Llvm/x64/bin/clang-cl.exe @\"H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/TwoHeartsGA_TestNormalAttack.cpp.obj.rsp\" ",
+		"directory": "H:/UE_5.6/Engine/Source",
+		"output": "H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/TwoHeartsGA_TestNormalAttack.cpp.obj"
+	},
+	{
+		"file": "H:/twohearts/twohearts/Source/twohearts/TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGameplayAbility.cpp",
+		"command": "H:/vs2022/VC/Tools/Llvm/x64/bin/clang-cl.exe @\"H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/TwoHeartsGameplayAbility.cpp.obj.rsp\" ",
+		"directory": "H:/UE_5.6/Engine/Source",
+		"output": "H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/TwoHeartsGameplayAbility.cpp.obj"
+	},
+	{
+		"file": "H:/twohearts/twohearts/Source/twohearts/TwoHearts/Combat/Gameplay/Tags/TwoHeartsGameplayTags.cpp",
+		"command": "H:/vs2022/VC/Tools/Llvm/x64/bin/clang-cl.exe @\"H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/TwoHeartsGameplayTags.cpp.obj.rsp\" ",
+		"directory": "H:/UE_5.6/Engine/Source",
+		"output": "H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/TwoHeartsGameplayTags.cpp.obj"
+	},
+	{
+		"file": "H:/twohearts/twohearts/Source/twohearts/twohearts.cpp",
+		"command": "H:/vs2022/VC/Tools/Llvm/x64/bin/clang-cl.exe @\"H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/twohearts.cpp.obj.rsp\" ",
+		"directory": "H:/UE_5.6/Engine/Source",
+		"output": "H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/twohearts.cpp.obj"
+	},
+	{
+		"file": "H:/twohearts/twohearts/Source/twohearts/twoheartsCharacter.cpp",
+		"command": "H:/vs2022/VC/Tools/Llvm/x64/bin/clang-cl.exe @\"H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/twoheartsCharacter.cpp.obj.rsp\" ",
+		"directory": "H:/UE_5.6/Engine/Source",
+		"output": "H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/twoheartsCharacter.cpp.obj"
+	},
+	{
+		"file": "H:/twohearts/twohearts/Source/twohearts/twoheartsDebugHUD.cpp",
+		"command": "H:/vs2022/VC/Tools/Llvm/x64/bin/clang-cl.exe @\"H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/twoheartsDebugHUD.cpp.obj.rsp\" ",
+		"directory": "H:/UE_5.6/Engine/Source",
+		"output": "H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/twoheartsDebugHUD.cpp.obj"
+	},
+	{
+		"file": "H:/twohearts/twohearts/Source/twohearts/twoheartsGameMode.cpp",
+		"command": "H:/vs2022/VC/Tools/Llvm/x64/bin/clang-cl.exe @\"H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/twoheartsGameMode.cpp.obj.rsp\" ",
+		"directory": "H:/UE_5.6/Engine/Source",
+		"output": "H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/twoheartsGameMode.cpp.obj"
+	},
+	{
+		"file": "H:/twohearts/twohearts/Source/twohearts/twoheartsPlayerController.cpp",
+		"command": "H:/vs2022/VC/Tools/Llvm/x64/bin/clang-cl.exe @\"H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/twoheartsPlayerController.cpp.obj.rsp\" ",
+		"directory": "H:/UE_5.6/Engine/Source",
+		"output": "H:/twohearts/twohearts/Intermediate/Build/Win64/x64/UnrealEditor/Development/twohearts/twoheartsPlayerController.cpp.obj"
+	}
+]

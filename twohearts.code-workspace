@@ -1,8 +1,16 @@
 {
     "folders": [
         {
-            "name": "双心印项目",
+            "name": "twohearts-root",
             "path": "."
+        },
+        {
+            "name": "twohearts-project",
+            "path": "twohearts"
+        },
+        {
+            "name": "UE5",
+            "path": "H:\\UE_5.6"
         }
     ],
     "settings": {
@@ -10,7 +18,14 @@
             "*.uproject": "json",
             "*.uplugin": "json"
         },
+        "C_Cpp.default.compileCommands": "H:/twohearts/twohearts/compile_commands.json",
         "search.exclude": {
+            "**/Binaries": true,
+            "**/DerivedDataCache": true,
+            "**/Intermediate": true,
+            "**/Saved": true
+        },
+        "files.exclude": {
             "**/Binaries": true,
             "**/DerivedDataCache": true,
             "**/Intermediate": true,
@@ -19,8 +34,7 @@
     },
     "extensions": {
         "recommendations": [
-            "ms-vscode.cpptools",
-            "ms-vscode.cmake-tools"
+            "ms-vscode.cpptools"
         ]
     }
 }
