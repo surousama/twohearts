@@ -5,12 +5,24 @@
             "path": "."
         },
         {
+            "name": "docs",
+            "path": "../docs"
+        },
+        {
+            "name": "design",
+            "path": "../design"
+        },
+        {
             "name": "UE5",
             "path": "H:\\UE_5.6"
         }
     ],
     "settings": {
         "C_Cpp.default.compileCommands": "H:/twohearts/twohearts/compile_commands.json",
+        "C_Cpp.default.compilerPath": "H:/vs2022/VC/Tools/Llvm/x64/bin/clang-cl.exe",
+        "C_Cpp.default.intelliSenseMode": "windows-clang-x64",
+        "C_Cpp.default.cppStandard": "c++20",
+        "C_Cpp.intelliSenseEngineFallback": "Disabled",
         "typescript.tsc.autoDetect": "off",
         "npm.autoDetect": "off",
         "terminal.integrated.env.windows": {
@@ -19,12 +31,28 @@
             "DOTNET_HOST_PATH": "H:\\UE_5.6\\Engine\\Binaries\\ThirdParty\\DotNet\\8.0.300\\win-x64\\dotnet.exe",
             "DOTNET_MULTILEVEL_LOOKUP": "0",
             "DOTNET_ROLL_FORWARD": "LatestMajor"
+        },
+        "files.exclude": {
+            "**/Binaries": true,
+            "**/DerivedDataCache": true,
+            "**/Intermediate": true,
+            "**/Saved": true
+        },
+        "search.exclude": {
+            "**/Binaries": true,
+            "**/DerivedDataCache": true,
+            "**/Intermediate": true,
+            "**/Saved": true
         }
     },
     "extensions": {
         "recommendations": [
-            "ms-vscode.cpptools",
-            "ms-dotnettools.csharp"
+            "ms-vscode.cpptools"
+        ],
+        "unwantedRecommendations": [
+            "ms-dotnettools.csharp",
+            "ms-dotnettools.vscode-dotnet-runtime",
+            "llvm-vs-code-extensions.vscode-clangd"
         ]
     }
 }

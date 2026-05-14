@@ -1,12 +1,16 @@
 {
     "folders": [
         {
-            "name": "twohearts-root",
-            "path": "."
+            "name": "twohearts",
+            "path": "twohearts"
         },
         {
-            "name": "twohearts-project",
-            "path": "twohearts"
+            "name": "docs",
+            "path": "docs"
+        },
+        {
+            "name": "design",
+            "path": "design"
         },
         {
             "name": "UE5",
@@ -19,6 +23,12 @@
             "*.uplugin": "json"
         },
         "C_Cpp.default.compileCommands": "H:/twohearts/twohearts/compile_commands.json",
+        "C_Cpp.default.compilerPath": "H:/vs2022/VC/Tools/Llvm/x64/bin/clang-cl.exe",
+        "C_Cpp.default.intelliSenseMode": "windows-clang-x64",
+        "C_Cpp.default.cppStandard": "c++20",
+        "C_Cpp.intelliSenseEngineFallback": "Disabled",
+        "typescript.tsc.autoDetect": "off",
+        "npm.autoDetect": "off",
         "search.exclude": {
             "**/Binaries": true,
             "**/DerivedDataCache": true,
@@ -30,11 +40,26 @@
             "**/DerivedDataCache": true,
             "**/Intermediate": true,
             "**/Saved": true
+        },
+        "files.watcherExclude": {
+            "**/Binaries/**": true,
+            "**/DerivedDataCache/**": true,
+            "**/Intermediate/**": true,
+            "**/Saved/**": true,
+            "H:/UE_5.6/Engine/Binaries/**": true,
+            "H:/UE_5.6/Engine/DerivedDataCache/**": true,
+            "H:/UE_5.6/Engine/Intermediate/**": true,
+            "H:/UE_5.6/Engine/Saved/**": true
         }
     },
     "extensions": {
         "recommendations": [
             "ms-vscode.cpptools"
+        ],
+        "unwantedRecommendations": [
+            "ms-dotnettools.csharp",
+            "ms-dotnettools.vscode-dotnet-runtime",
+            "llvm-vs-code-extensions.vscode-clangd"
         ]
     }
 }

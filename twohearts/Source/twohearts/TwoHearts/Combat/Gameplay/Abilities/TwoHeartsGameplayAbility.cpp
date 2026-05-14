@@ -29,6 +29,23 @@ UAbilitySystemComponent* UTwoHeartsGameplayAbility::GetTwoHeartsAbilitySystemCom
 	return GetAbilitySystemComponentFromActorInfo();
 }
 
+void UTwoHeartsGameplayAbility::SetDefaultAssetTag(FGameplayTag Tag)
+{
+	FGameplayTagContainer AssetTags;
+	AssetTags.AddTag(Tag);
+	SetAssetTags(AssetTags);
+}
+
+void UTwoHeartsGameplayAbility::AddDefaultActivationOwnedTag(FGameplayTag Tag)
+{
+	ActivationOwnedTags.AddTag(Tag);
+}
+
+void UTwoHeartsGameplayAbility::AddDefaultActivationBlockedTag(FGameplayTag Tag)
+{
+	ActivationBlockedTags.AddTag(Tag);
+}
+
 void UTwoHeartsGameplayAbility::LogAbilityMessage(const FString& Message) const
 {
 	UE_LOG(
