@@ -3,14 +3,18 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsAbilityGrant.h"
 #include "twoheartsCharacter.generated.h"
 
+class UAbilitySystemComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 class UAnimMontage;
+enum class ETwoHeartsAbilityInputID : uint8;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -47,7 +51,7 @@ struct FNormalAttackDebugEvent
  *  Implements a controllable orbiting camera
  */
 UCLASS(abstract)
-class AtwoheartsCharacter : public ACharacter
+class AtwoheartsCharacter : public ACharacter, public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
@@ -58,6 +62,9 @@ class AtwoheartsCharacter : public ACharacter
 	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FollowCamera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
 	
 protected:
 
@@ -80,6 +87,12 @@ protected:
 	/** Normal attack Input Action */
 	UPROPERTY(EditAnywhere, Category="Input|Combat")
 	UInputAction* NormalAttackAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input|Combat", meta=(AllowPrivateAccess="true"))
+	bool bUseAbilitySystemForNormalAttackInput = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat|Ability System", meta=(AllowPrivateAccess="true"))
+	TArray<FTwoHeartsAbilityGrant> DefaultCombatAbilities;
 
 	/** Montage that contains the three minimum normal attack sections */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
@@ -124,7 +137,11 @@ public:
 	/** Constructor */
 	AtwoheartsCharacter();	
 
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+
 protected:
+
+	virtual void BeginPlay() override;
 
 	/** Initialize input action bindings */
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -139,6 +156,10 @@ protected:
 
 	/** Called for normal attack input */
 	void NormalAttack(const FInputActionValue& Value);
+
+	void InitializeAbilitySystem();
+	void GrantDefaultCombatAbilities();
+	bool HandleAbilityInputPressed(ETwoHeartsAbilityInputID InputID);
 
 	bool IsValidNormalAttackSegment(int32 Segment) const;
 	FName GetNormalAttackSectionName(int32 Segment) const;

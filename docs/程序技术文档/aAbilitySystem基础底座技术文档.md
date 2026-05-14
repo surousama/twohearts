@@ -71,7 +71,7 @@
 模块职责：
 提供第二章战斗 Ability 的统一基类，先统一基础引用、Owner 获取、Avatar 获取、基础日志和常用工具接口。
 建议落点：
-`Source/twohearts/Variant_Combat/Gameplay/Abilities/` 或当前项目约定的战斗 Gameplay 目录。
+`Source/twohearts/TwoHearts/Combat/Gameplay/Abilities/` 或当前项目约定的战斗 Gameplay 目录。
 
 4. 模块D：基础战斗 Tag
 模块职责：

@@ -1,18 +1,23 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "twoheartsCharacter.h"
-#include "Engine/LocalPlayer.h"
+#include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbility.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
-#include "GameFramework/CharacterMovementComponent.h"
-#include "GameFramework/SpringArmComponent.h"
-#include "GameFramework/Controller.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/Controller.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
+#include "Engine/LocalPlayer.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "TimerManager.h"
+#include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsAbilityGrant.h"
+#include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_TestNormalAttack.h"
+#include "TwoHearts/Combat/Gameplay/Input/TwoHeartsAbilityInputID.h"
 #include "twohearts.h"
 
 namespace
@@ -55,6 +60,9 @@ AtwoheartsCharacter::AtwoheartsCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 
+	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
+	AbilitySystemComponent->SetIsReplicated(true);
+
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 
@@ -63,6 +71,27 @@ AtwoheartsCharacter::AtwoheartsCharacter()
 		TEXT("Attack_2"),
 		TEXT("Attack_3")
 	};
+
+	if (DefaultCombatAbilities.IsEmpty())
+	{
+		FTwoHeartsAbilityGrant DefaultNormalAttackGrant;
+		DefaultNormalAttackGrant.AbilityClass = UTwoHeartsGA_TestNormalAttack::StaticClass();
+		DefaultNormalAttackGrant.InputID = ETwoHeartsAbilityInputID::NormalAttack;
+		DefaultCombatAbilities.Add(DefaultNormalAttackGrant);
+	}
+}
+
+UAbilitySystemComponent* AtwoheartsCharacter::GetAbilitySystemComponent() const
+{
+	return AbilitySystemComponent;
+}
+
+void AtwoheartsCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	InitializeAbilitySystem();
+	GrantDefaultCombatAbilities();
 }
 
 void AtwoheartsCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -113,7 +142,107 @@ void AtwoheartsCharacter::Look(const FInputActionValue& Value)
 
 void AtwoheartsCharacter::NormalAttack(const FInputActionValue& Value)
 {
+	if (bUseAbilitySystemForNormalAttackInput)
+	{
+		if (HandleAbilityInputPressed(ETwoHeartsAbilityInputID::NormalAttack))
+		{
+			return;
+		}
+
+		UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[AbilityInput] NormalAttack input did not match any granted combat ability on %s."), *GetNameSafe(this));
+		return;
+	}
+
 	TryStartNormalAttack();
+}
+
+void AtwoheartsCharacter::InitializeAbilitySystem()
+{
+	if (!AbilitySystemComponent)
+	{
+		UE_LOG(LogtwoheartsCombatTest, Error, TEXT("[AbilitySystem] %s is missing an AbilitySystemComponent."), *GetNameSafe(this));
+		return;
+	}
+
+	AbilitySystemComponent->InitAbilityActorInfo(this, this);
+
+	UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[AbilitySystem] Initialized ActorInfo for %s."), *GetNameSafe(this));
+}
+
+void AtwoheartsCharacter::GrantDefaultCombatAbilities()
+{
+	if (!AbilitySystemComponent)
+	{
+		return;
+	}
+
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	for (const FTwoHeartsAbilityGrant& AbilityGrant : DefaultCombatAbilities)
+	{
+		if (!AbilityGrant.AbilityClass)
+		{
+			continue;
+		}
+
+		bool bAlreadyGranted = false;
+		for (const FGameplayAbilitySpec& ExistingSpec : AbilitySystemComponent->GetActivatableAbilities())
+		{
+			if (ExistingSpec.Ability && ExistingSpec.Ability->GetClass() == AbilityGrant.AbilityClass)
+			{
+				bAlreadyGranted = true;
+				break;
+			}
+		}
+
+		if (bAlreadyGranted)
+		{
+			continue;
+		}
+
+		FGameplayAbilitySpec AbilitySpec(AbilityGrant.AbilityClass, AbilityGrant.AbilityLevel, static_cast<int32>(AbilityGrant.InputID), this);
+		AbilitySystemComponent->GiveAbility(AbilitySpec);
+
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Display,
+			TEXT("[AbilitySystem] Granted ability %s to %s with InputID=%d."),
+			*GetNameSafe(AbilityGrant.AbilityClass),
+			*GetNameSafe(this),
+			static_cast<int32>(AbilityGrant.InputID));
+	}
+}
+
+bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID InputID)
+{
+	if (!AbilitySystemComponent)
+	{
+		return false;
+	}
+
+	bool bHandledInput = false;
+	const int32 NumericInputID = static_cast<int32>(InputID);
+
+	for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
+	{
+		if (AbilitySpec.InputID != NumericInputID)
+		{
+			continue;
+		}
+
+		bHandledInput = true;
+		AbilitySystemComponent->AbilitySpecInputPressed(AbilitySpec);
+
+		if (!AbilitySpec.IsActive())
+		{
+			AbilitySystemComponent->TryActivateAbility(AbilitySpec.Handle);
+		}
+	}
+
+	return bHandledInput;
 }
 
 void AtwoheartsCharacter::DoMove(float Right, float Forward)
