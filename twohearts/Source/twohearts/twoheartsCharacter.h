@@ -88,9 +88,6 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input|Combat")
 	UInputAction* NormalAttackAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Input|Combat", meta=(AllowPrivateAccess="true"))
-	bool bUseAbilitySystemForNormalAttackInput = true;
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat|Ability System", meta=(AllowPrivateAccess="true"))
 	TArray<FTwoHeartsAbilityGrant> DefaultCombatAbilities;
 
@@ -102,15 +99,18 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
 	TArray<FName> NormalAttackSectionNames;
 
-	/** Minimum local combo state. Later stages can migrate this into a combat component or GAS Ability. */
+	/** Debug snapshot for the currently running normal attack Ability state. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
-	bool bIsNormalAttacking = false;
+	bool bIsNormalAttackAbilityActive = false;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
-	int32 CurrentNormalAttackSegment = 0;
+	int32 CurrentNormalAttackAbilitySegment = 0;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
-	bool bHasQueuedNextNormalAttackSegment = false;
+	bool bHasQueuedNextNormalAttackAbilitySegment = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
+	FString CurrentNormalAttackAbilitySectionName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug", meta=(AllowPrivateAccess="true"))
 	bool bEnableNormalAttackDebugLogging = true;
@@ -129,8 +129,6 @@ protected:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack|Debug", meta=(AllowPrivateAccess="true"))
 	FString LastNormalAttackDebugFailureReason;
-
-	FTimerHandle NormalAttackSegmentTimerHandle;
 
 public:
 
@@ -161,10 +159,6 @@ protected:
 	void GrantDefaultCombatAbilities();
 	bool HandleAbilityInputPressed(ETwoHeartsAbilityInputID InputID);
 
-	bool IsValidNormalAttackSegment(int32 Segment) const;
-	FName GetNormalAttackSectionName(int32 Segment) const;
-	float GetNormalAttackSectionLength(int32 Segment) const;
-
 public:
 
 	/** Handles move inputs from either controls or UI interfaces */
@@ -183,21 +177,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
 
-	/** Requests the minimum normal attack combo from input or UI interfaces */
-	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack")
-	virtual bool TryStartNormalAttack();
+	UFUNCTION(BlueprintPure, Category="Combat|Normal Attack")
+	UAnimMontage* GetNormalAttackMontage() const { return NormalAttackMontage; }
 
-	/** Plays one segment of the configured normal attack Montage */
-	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack")
-	virtual void PlayNormalAttackSegment(int32 Segment);
+	UFUNCTION(BlueprintPure, Category="Combat|Normal Attack")
+	bool IsValidNormalAttackSegment(int32 Segment) const;
 
-	/** Consumes queued input or resets the combo when the current segment has finished */
-	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack")
-	virtual void HandleNormalAttackSegmentFinished();
+	UFUNCTION(BlueprintPure, Category="Combat|Normal Attack")
+	FName GetNormalAttackSectionName(int32 Segment) const;
 
-	/** Clears the minimum normal attack combo state */
-	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack")
-	virtual void ResetNormalAttackCombo();
+	UFUNCTION(BlueprintPure, Category="Combat|Normal Attack")
+	float GetNormalAttackSectionLength(int32 Segment) const;
 
 	UFUNCTION(BlueprintPure, Category="Combat|Normal Attack|Debug")
 	bool IsNormalAttackDebugPanelEnabled() const { return bShowNormalAttackDebugPanel; }
@@ -220,9 +210,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack|Debug")
 	void ClearNormalAttackDebugEvents();
 
-	bool IsNormalAttackingDebugState() const { return bIsNormalAttacking; }
-	int32 GetCurrentNormalAttackSegmentDebugState() const { return CurrentNormalAttackSegment; }
-	bool HasQueuedNextNormalAttackSegmentDebugState() const { return bHasQueuedNextNormalAttackSegment; }
+	void SetNormalAttackDebugRuntimeState(bool bIsActive, int32 Segment, bool bHasQueuedNextSegment, const FString& SectionName);
+	void SetLastNormalAttackDebugFailureReason(const FString& FailureReason);
+	void PushNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false);
+	void PushNormalAttackDebugFailure(const TCHAR* EventName, const FString& Detail);
+
+	bool IsNormalAttackingDebugState() const { return bIsNormalAttackAbilityActive; }
+	int32 GetCurrentNormalAttackSegmentDebugState() const { return CurrentNormalAttackAbilitySegment; }
+	bool HasQueuedNextNormalAttackSegmentDebugState() const { return bHasQueuedNextNormalAttackAbilitySegment; }
+	const FString& GetCurrentNormalAttackSectionDebugState() const { return CurrentNormalAttackAbilitySectionName; }
 	const TArray<FNormalAttackDebugEvent>& GetNormalAttackDebugEvents() const { return NormalAttackDebugEvents; }
 	const FString& GetLastNormalAttackDebugFailureReason() const { return LastNormalAttackDebugFailureReason; }
 
@@ -238,6 +234,5 @@ protected:
 
 	void RecordNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false);
 	void RecordNormalAttackFailure(const TCHAR* EventName, const FString& Detail);
-	FString GetCurrentNormalAttackDebugSectionName() const;
 };
 

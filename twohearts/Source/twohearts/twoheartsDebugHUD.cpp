@@ -67,14 +67,13 @@ void ATwoheartsDebugHUD::DrawHUD()
 	CurrentY += LineHeight;
 
 	const TArray<FNormalAttackDebugEvent>& Events = Character->GetNormalAttackDebugEvents();
-	const FNormalAttackDebugEvent* LatestEvent = Events.Num() > 0 ? &Events.Last() : nullptr;
 	DrawDebugLine(
 		FString::Printf(
 			TEXT("Current State: attacking=%s segment=%d queued_next=%s latest_section=%s"),
 			Character->IsNormalAttackingDebugState() ? TEXT("true") : TEXT("false"),
 			Character->GetCurrentNormalAttackSegmentDebugState(),
 			Character->HasQueuedNextNormalAttackSegmentDebugState() ? TEXT("true") : TEXT("false"),
-			LatestEvent ? *LatestEvent->SectionName : TEXT("None")),
+			*Character->GetCurrentNormalAttackSectionDebugState()),
 		PanelX + 12.0f,
 		CurrentY,
 		TextColor);

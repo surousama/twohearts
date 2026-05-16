@@ -22,6 +22,7 @@ protected:
 	ACharacter* GetAbilityCharacter() const;
 	UAbilitySystemComponent* GetTwoHeartsAbilitySystemComponent() const;
 	void SetDefaultAssetTag(FGameplayTag Tag);
+	void AddDefaultAssetTag(FGameplayTag Tag);
 	void AddDefaultActivationOwnedTag(FGameplayTag Tag);
 	void AddDefaultActivationBlockedTag(FGameplayTag Tag);
 	void LogAbilityMessage(const FString& Message) const;

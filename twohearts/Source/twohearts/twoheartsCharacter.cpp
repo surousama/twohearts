@@ -14,17 +14,12 @@
 #include "Engine/LocalPlayer.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
-#include "TimerManager.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsAbilityGrant.h"
-#include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_TestNormalAttack.h"
+#include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_NormalAttack_1.h"
+#include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_NormalAttack_2.h"
+#include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_NormalAttack_3.h"
 #include "TwoHearts/Combat/Gameplay/Input/TwoHeartsAbilityInputID.h"
 #include "twohearts.h"
-
-namespace
-{
-	constexpr int32 FirstNormalAttackSegment = 1;
-	constexpr int32 LastNormalAttackSegment = 3;
-}
 
 AtwoheartsCharacter::AtwoheartsCharacter()
 {
@@ -74,10 +69,20 @@ AtwoheartsCharacter::AtwoheartsCharacter()
 
 	if (DefaultCombatAbilities.IsEmpty())
 	{
-		FTwoHeartsAbilityGrant DefaultNormalAttackGrant;
-		DefaultNormalAttackGrant.AbilityClass = UTwoHeartsGA_TestNormalAttack::StaticClass();
-		DefaultNormalAttackGrant.InputID = ETwoHeartsAbilityInputID::NormalAttack;
-		DefaultCombatAbilities.Add(DefaultNormalAttackGrant);
+		FTwoHeartsAbilityGrant NormalAttackSegment1Grant;
+		NormalAttackSegment1Grant.AbilityClass = UTwoHeartsGA_NormalAttack_1::StaticClass();
+		NormalAttackSegment1Grant.InputID = ETwoHeartsAbilityInputID::NormalAttack;
+		DefaultCombatAbilities.Add(NormalAttackSegment1Grant);
+
+		FTwoHeartsAbilityGrant NormalAttackSegment2Grant;
+		NormalAttackSegment2Grant.AbilityClass = UTwoHeartsGA_NormalAttack_2::StaticClass();
+		NormalAttackSegment2Grant.InputID = ETwoHeartsAbilityInputID::NormalAttack;
+		DefaultCombatAbilities.Add(NormalAttackSegment2Grant);
+
+		FTwoHeartsAbilityGrant NormalAttackSegment3Grant;
+		NormalAttackSegment3Grant.AbilityClass = UTwoHeartsGA_NormalAttack_3::StaticClass();
+		NormalAttackSegment3Grant.InputID = ETwoHeartsAbilityInputID::NormalAttack;
+		DefaultCombatAbilities.Add(NormalAttackSegment3Grant);
 	}
 }
 
@@ -142,18 +147,12 @@ void AtwoheartsCharacter::Look(const FInputActionValue& Value)
 
 void AtwoheartsCharacter::NormalAttack(const FInputActionValue& Value)
 {
-	if (bUseAbilitySystemForNormalAttackInput)
+	if (HandleAbilityInputPressed(ETwoHeartsAbilityInputID::NormalAttack))
 	{
-		if (HandleAbilityInputPressed(ETwoHeartsAbilityInputID::NormalAttack))
-		{
-			return;
-		}
-
-		UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[AbilityInput] NormalAttack input did not match any granted combat ability on %s."), *GetNameSafe(this));
 		return;
 	}
 
-	TryStartNormalAttack();
+	UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[AbilityInput] NormalAttack input did not match any granted combat ability on %s."), *GetNameSafe(this));
 }
 
 void AtwoheartsCharacter::InitializeAbilitySystem()
@@ -228,6 +227,22 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 
 	for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
 	{
+		if (AbilitySpec.InputID != NumericInputID || !AbilitySpec.IsActive())
+		{
+			continue;
+		}
+
+		bHandledInput = true;
+		AbilitySystemComponent->AbilitySpecInputPressed(AbilitySpec);
+	}
+
+	if (bHandledInput)
+	{
+		return true;
+	}
+
+	for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
+	{
 		if (AbilitySpec.InputID != NumericInputID)
 		{
 			continue;
@@ -236,9 +251,9 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 		bHandledInput = true;
 		AbilitySystemComponent->AbilitySpecInputPressed(AbilitySpec);
 
-		if (!AbilitySpec.IsActive())
+		if (!AbilitySpec.IsActive() && AbilitySystemComponent->TryActivateAbility(AbilitySpec.Handle))
 		{
-			AbilitySystemComponent->TryActivateAbility(AbilitySpec.Handle);
+			return true;
 		}
 	}
 
@@ -287,144 +302,9 @@ void AtwoheartsCharacter::DoJumpEnd()
 	StopJumping();
 }
 
-bool AtwoheartsCharacter::TryStartNormalAttack()
-{
-	RecordNormalAttackDebugEvent(TEXT("InputPressed"), TEXT("TryStartNormalAttack called."), true);
-
-	if (!bIsNormalAttacking)
-	{
-		RecordNormalAttackDebugEvent(TEXT("ComboStartRequested"), TEXT("Character is idle. Requesting segment 1."), true);
-		PlayNormalAttackSegment(FirstNormalAttackSegment);
-		return bIsNormalAttacking;
-	}
-
-	if (CurrentNormalAttackSegment >= LastNormalAttackSegment)
-	{
-		RecordNormalAttackDebugEvent(TEXT("InputIgnored"), TEXT("Already at final segment; input ignored."), true);
-		return false;
-	}
-
-	bHasQueuedNextNormalAttackSegment = true;
-	RecordNormalAttackDebugEvent(TEXT("QueueNextSegment"), FString::Printf(TEXT("Queued next segment after %d."), CurrentNormalAttackSegment), true);
-	return true;
-}
-
-void AtwoheartsCharacter::PlayNormalAttackSegment(int32 Segment)
-{
-	if (!IsValidNormalAttackSegment(Segment))
-	{
-		RecordNormalAttackFailure(TEXT("PlaySegmentFailed"), FString::Printf(TEXT("Invalid normal attack segment: %d."), Segment));
-		ResetNormalAttackCombo();
-		return;
-	}
-
-	if (!NormalAttackMontage)
-	{
-		RecordNormalAttackFailure(TEXT("PlaySegmentFailed"), FString::Printf(TEXT("NormalAttackMontage is not configured on %s."), *GetNameSafe(this)));
-		ResetNormalAttackCombo();
-		return;
-	}
-
-	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-	if (!AnimInstance)
-	{
-		RecordNormalAttackFailure(TEXT("PlaySegmentFailed"), FString::Printf(TEXT("No AnimInstance found for normal attack on %s."), *GetNameSafe(this)));
-		ResetNormalAttackCombo();
-		return;
-	}
-
-	const FName SectionName = GetNormalAttackSectionName(Segment);
-	if (SectionName.IsNone() || NormalAttackMontage->GetSectionIndex(SectionName) == INDEX_NONE)
-	{
-		RecordNormalAttackFailure(TEXT("PlaySegmentFailed"), FString::Printf(TEXT("Normal attack section %s is missing on %s."), *SectionName.ToString(), *GetNameSafe(NormalAttackMontage)));
-		ResetNormalAttackCombo();
-		return;
-	}
-
-	const float SectionLength = GetNormalAttackSectionLength(Segment);
-	if (SectionLength <= 0.0f)
-	{
-		RecordNormalAttackFailure(TEXT("PlaySegmentFailed"), FString::Printf(TEXT("Normal attack section %s has invalid length."), *SectionName.ToString()));
-		ResetNormalAttackCombo();
-		return;
-	}
-
-	bIsNormalAttacking = true;
-	CurrentNormalAttackSegment = Segment;
-	bHasQueuedNextNormalAttackSegment = false;
-	LastNormalAttackDebugFailureReason.Reset();
-
-	const float PlayedDuration = PlayAnimMontage(NormalAttackMontage, 1.0f, SectionName);
-	if (PlayedDuration <= 0.0f)
-	{
-		RecordNormalAttackFailure(TEXT("PlaySegmentFailed"), FString::Printf(TEXT("Failed to play normal attack section %s on %s."), *SectionName.ToString(), *GetNameSafe(this)));
-		ResetNormalAttackCombo();
-		return;
-	}
-
-	GetWorldTimerManager().ClearTimer(NormalAttackSegmentTimerHandle);
-	GetWorldTimerManager().SetTimer(
-		NormalAttackSegmentTimerHandle,
-		this,
-		&AtwoheartsCharacter::HandleNormalAttackSegmentFinished,
-		SectionLength,
-		false);
-
-	RecordNormalAttackDebugEvent(
-		TEXT("PlaySegment"),
-		FString::Printf(TEXT("Started segment %d with section %s for %.3f seconds."), Segment, *SectionName.ToString(), SectionLength));
-}
-
-void AtwoheartsCharacter::HandleNormalAttackSegmentFinished()
-{
-	GetWorldTimerManager().ClearTimer(NormalAttackSegmentTimerHandle);
-
-	if (!bIsNormalAttacking)
-	{
-		RecordNormalAttackDebugEvent(TEXT("SegmentFinishedIgnored"), TEXT("Timer fired after combo had already ended."), true);
-		return;
-	}
-
-	const int32 FinishedSegment = CurrentNormalAttackSegment;
-	RecordNormalAttackDebugEvent(
-		TEXT("SegmentFinished"),
-		FString::Printf(TEXT("Segment %d finished. QueuedNext=%s."), FinishedSegment, bHasQueuedNextNormalAttackSegment ? TEXT("true") : TEXT("false")));
-
-	if (bHasQueuedNextNormalAttackSegment && FinishedSegment < LastNormalAttackSegment)
-	{
-		RecordNormalAttackDebugEvent(TEXT("AdvanceSegment"), FString::Printf(TEXT("Advancing from segment %d to %d."), FinishedSegment, FinishedSegment + 1), true);
-		PlayNormalAttackSegment(FinishedSegment + 1);
-		return;
-	}
-
-	ResetNormalAttackCombo();
-}
-
-void AtwoheartsCharacter::ResetNormalAttackCombo()
-{
-	const FString ResetDetail = FString::Printf(
-		TEXT("Resetting combo from segment=%d queuedNext=%s isAttacking=%s."),
-		CurrentNormalAttackSegment,
-		bHasQueuedNextNormalAttackSegment ? TEXT("true") : TEXT("false"),
-		bIsNormalAttacking ? TEXT("true") : TEXT("false"));
-
-	GetWorldTimerManager().ClearTimer(NormalAttackSegmentTimerHandle);
-
-	if (NormalAttackMontage)
-	{
-		StopAnimMontage(NormalAttackMontage);
-	}
-
-	bIsNormalAttacking = false;
-	CurrentNormalAttackSegment = 0;
-	bHasQueuedNextNormalAttackSegment = false;
-
-	RecordNormalAttackDebugEvent(TEXT("ResetCombo"), ResetDetail);
-}
-
 bool AtwoheartsCharacter::IsValidNormalAttackSegment(int32 Segment) const
 {
-	return Segment >= FirstNormalAttackSegment && Segment <= LastNormalAttackSegment;
+	return Segment >= 1 && Segment <= 3;
 }
 
 FName AtwoheartsCharacter::GetNormalAttackSectionName(int32 Segment) const
@@ -466,7 +346,31 @@ void AtwoheartsCharacter::ClearNormalAttackDebugEvents()
 {
 	NormalAttackDebugEvents.Reset();
 	LastNormalAttackDebugFailureReason.Reset();
+	SetNormalAttackDebugRuntimeState(false, 0, false, TEXT("None"));
 	RecordNormalAttackDebugEvent(TEXT("DebugEventsCleared"), TEXT("Cleared normal attack debug event history."));
+}
+
+void AtwoheartsCharacter::SetNormalAttackDebugRuntimeState(bool bIsActive, int32 Segment, bool bHasQueuedNextSegment, const FString& SectionName)
+{
+	bIsNormalAttackAbilityActive = bIsActive;
+	CurrentNormalAttackAbilitySegment = Segment;
+	bHasQueuedNextNormalAttackAbilitySegment = bHasQueuedNextSegment;
+	CurrentNormalAttackAbilitySectionName = SectionName;
+}
+
+void AtwoheartsCharacter::SetLastNormalAttackDebugFailureReason(const FString& FailureReason)
+{
+	LastNormalAttackDebugFailureReason = FailureReason;
+}
+
+void AtwoheartsCharacter::PushNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly)
+{
+	RecordNormalAttackDebugEvent(EventName, Detail, bVerboseOnly);
+}
+
+void AtwoheartsCharacter::PushNormalAttackDebugFailure(const TCHAR* EventName, const FString& Detail)
+{
+	RecordNormalAttackFailure(EventName, Detail);
 }
 
 void AtwoheartsCharacter::RecordNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly)
@@ -475,10 +379,10 @@ void AtwoheartsCharacter::RecordNormalAttackDebugEvent(const TCHAR* EventName, c
 	Event.TimestampSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 	Event.EventName = EventName;
 	Event.Detail = Detail;
-	Event.Segment = CurrentNormalAttackSegment;
-	Event.bIsAttacking = bIsNormalAttacking;
-	Event.bHasQueuedNextSegment = bHasQueuedNextNormalAttackSegment;
-	Event.SectionName = GetCurrentNormalAttackDebugSectionName();
+	Event.Segment = CurrentNormalAttackAbilitySegment;
+	Event.bIsAttacking = bIsNormalAttackAbilityActive;
+	Event.bHasQueuedNextSegment = bHasQueuedNextNormalAttackAbilitySegment;
+	Event.SectionName = CurrentNormalAttackAbilitySectionName.IsEmpty() ? TEXT("None") : CurrentNormalAttackAbilitySectionName;
 
 	NormalAttackDebugEvents.Add(MoveTemp(Event));
 	const int32 ExcessEvents = NormalAttackDebugEvents.Num() - FMath::Max(1, NormalAttackDebugMaxEvents);
@@ -521,14 +425,4 @@ void AtwoheartsCharacter::RecordNormalAttackFailure(const TCHAR* EventName, cons
 	{
 		UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[NormalAttackFailure] actor=%s detail=\"%s\""), *GetNameSafe(this), *Detail);
 	}
-}
-
-FString AtwoheartsCharacter::GetCurrentNormalAttackDebugSectionName() const
-{
-	if (!IsValidNormalAttackSegment(CurrentNormalAttackSegment))
-	{
-		return TEXT("None");
-	}
-
-	return GetNormalAttackSectionName(CurrentNormalAttackSegment).ToString();
 }

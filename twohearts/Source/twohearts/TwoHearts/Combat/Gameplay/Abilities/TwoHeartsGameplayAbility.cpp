@@ -36,6 +36,13 @@ void UTwoHeartsGameplayAbility::SetDefaultAssetTag(FGameplayTag Tag)
 	SetAssetTags(AssetTags);
 }
 
+void UTwoHeartsGameplayAbility::AddDefaultAssetTag(FGameplayTag Tag)
+{
+	FGameplayTagContainer AssetTags = GetAssetTags();
+	AssetTags.AddTag(Tag);
+	SetAssetTags(AssetTags);
+}
+
 void UTwoHeartsGameplayAbility::AddDefaultActivationOwnedTag(FGameplayTag Tag)
 {
 	ActivationOwnedTags.AddTag(Tag);
