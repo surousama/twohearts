@@ -124,6 +124,8 @@ void AtwoheartsCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 
 		// Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AtwoheartsCharacter::Move);
+		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &AtwoheartsCharacter::ClearMoveInput);
+		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Canceled, this, &AtwoheartsCharacter::ClearMoveInput);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AtwoheartsCharacter::Look);
 
 		// Looking
@@ -153,6 +155,11 @@ void AtwoheartsCharacter::Move(const FInputActionValue& Value)
 
 	// route the input
 	DoMove(MovementVector.X, MovementVector.Y);
+}
+
+void AtwoheartsCharacter::ClearMoveInput(const FInputActionValue& Value)
+{
+	CachedMoveInput = FVector2D::ZeroVector;
 }
 
 void AtwoheartsCharacter::Look(const FInputActionValue& Value)
@@ -499,6 +506,51 @@ FString AtwoheartsCharacter::GetDesiredDodgeDirectionName() const
 	}
 
 	return TEXT("ForwardLeft");
+}
+
+UAnimMontage* AtwoheartsCharacter::GetDodgeMontageForDirection(const FString& DirectionName) const
+{
+	if (DirectionName == TEXT("Forward"))
+	{
+		return DodgeConfig.DodgeMontageForward ? DodgeConfig.DodgeMontageForward : DodgeConfig.DodgeMontageFallback;
+	}
+
+	if (DirectionName == TEXT("ForwardRight"))
+	{
+		return DodgeConfig.DodgeMontageForwardRight ? DodgeConfig.DodgeMontageForwardRight : DodgeConfig.DodgeMontageFallback;
+	}
+
+	if (DirectionName == TEXT("Right"))
+	{
+		return DodgeConfig.DodgeMontageRight ? DodgeConfig.DodgeMontageRight : DodgeConfig.DodgeMontageFallback;
+	}
+
+	if (DirectionName == TEXT("BackwardRight"))
+	{
+		return DodgeConfig.DodgeMontageBackwardRight ? DodgeConfig.DodgeMontageBackwardRight : DodgeConfig.DodgeMontageFallback;
+	}
+
+	if (DirectionName == TEXT("Backward"))
+	{
+		return DodgeConfig.DodgeMontageBackward ? DodgeConfig.DodgeMontageBackward : DodgeConfig.DodgeMontageFallback;
+	}
+
+	if (DirectionName == TEXT("BackwardLeft"))
+	{
+		return DodgeConfig.DodgeMontageBackwardLeft ? DodgeConfig.DodgeMontageBackwardLeft : DodgeConfig.DodgeMontageFallback;
+	}
+
+	if (DirectionName == TEXT("Left"))
+	{
+		return DodgeConfig.DodgeMontageLeft ? DodgeConfig.DodgeMontageLeft : DodgeConfig.DodgeMontageFallback;
+	}
+
+	if (DirectionName == TEXT("ForwardLeft"))
+	{
+		return DodgeConfig.DodgeMontageForwardLeft ? DodgeConfig.DodgeMontageForwardLeft : DodgeConfig.DodgeMontageFallback;
+	}
+
+	return DodgeConfig.DodgeMontageFallback;
 }
 
 void AtwoheartsCharacter::SetNormalAttackDebugPanelEnabled(bool bEnabled)

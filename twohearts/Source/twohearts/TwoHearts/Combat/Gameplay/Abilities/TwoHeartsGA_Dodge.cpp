@@ -1,6 +1,7 @@
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_Dodge.h"
 
 #include "AbilitySystemComponent.h"
+#include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -26,15 +27,19 @@ void UTwoHeartsGA_Dodge::ActivateAbility(
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
+	CachedAbilitySystemComponent.Reset();
+	ActiveMontageTask = nullptr;
+	BoundAnimInstance = nullptr;
+	ActiveDodgeMontage = nullptr;
 	DodgeDirection = FVector::ForwardVector;
-	DodgeStartLocation = FVector::ZeroVector;
-	DodgeTargetLocation = FVector::ZeroVector;
 	DodgeDirectionName = TEXT("None");
-	DodgeDurationSeconds = 0.0f;
-	DodgeElapsedSeconds = 0.0f;
 	bDodgeStarted = false;
 	bDodgeFinished = false;
+	bHasAppliedCleanup = false;
 	bInvulnerabilityActive = false;
+	bHasReceivedInvulnerabilityBeginNotify = false;
+	bHasReceivedInvulnerabilityEndNotify = false;
+	bShouldRestoreCharacterState = false;
 
 	if (UTwoHeartsGA_NormalAttackBase* ActiveNormalAttack = FindActiveNormalAttackAbility())
 	{
@@ -75,17 +80,7 @@ void UTwoHeartsGA_Dodge::EndAbility(
 	bool bReplicateEndAbility,
 	bool bWasCancelled)
 {
-	if (UWorld* World = GetWorld())
-	{
-		FTimerManager& TimerManager = World->GetTimerManager();
-		TimerManager.ClearTimer(DodgeTickTimerHandle);
-		TimerManager.ClearTimer(DodgeFinishTimerHandle);
-		TimerManager.ClearTimer(InvulnerabilityBeginTimerHandle);
-		TimerManager.ClearTimer(InvulnerabilityEndTimerHandle);
-	}
-
-	EndInvulnerabilityWindow();
-	UpdateDodgeDebugState();
+	CleanupDodgeExecution(bWasCancelled);
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
@@ -132,17 +127,35 @@ bool UTwoHeartsGA_Dodge::StartDodgeExecution()
 	AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter());
 	UAbilitySystemComponent* AbilitySystemComponent = GetTwoHeartsAbilitySystemComponent();
 	const FTwoHeartsDodgeConfig* DodgeConfig = GetDodgeConfig();
+	UAnimMontage* DodgeMontage = ResolveDodgeMontage();
 	if (!Character || !AbilitySystemComponent || !DodgeConfig)
 	{
 		RecordDodgeEvent(TEXT("DodgeRejected"), TEXT("Character, ability system component, or dodge config is invalid."), true);
 		return false;
 	}
 
-	DodgeDurationSeconds = FMath::Max(DodgeConfig->DodgeDurationSeconds, 0.05f);
-	DodgeElapsedSeconds = 0.0f;
-	DodgeStartLocation = Character->GetActorLocation();
-	DodgeTargetLocation = DodgeStartLocation + (DodgeDirection * FMath::Max(0.0f, DodgeConfig->DodgeDistance));
+	CachedAbilitySystemComponent = AbilitySystemComponent;
+	ActiveDodgeMontage = DodgeMontage;
 	bDodgeStarted = true;
+	bDodgeFinished = false;
+	bHasAppliedCleanup = false;
+	bHasReceivedInvulnerabilityBeginNotify = false;
+	bHasReceivedInvulnerabilityEndNotify = false;
+
+	if (!ActiveDodgeMontage)
+	{
+		RecordDodgeEvent(TEXT("DodgeRejected"), TEXT("No dodge montage was configured for the resolved direction."), true);
+		return false;
+	}
+
+	if (!ActiveDodgeMontage->HasRootMotion())
+	{
+		RecordDodgeEvent(
+			TEXT("DodgeRejected"),
+			FString::Printf(TEXT("Selected dodge montage %s does not have Root Motion enabled."), *GetNameSafe(ActiveDodgeMontage)),
+			true);
+		return false;
+	}
 
 	ApplyDodgeCooldown();
 	UpdateDodgeDebugState();
@@ -150,52 +163,59 @@ bool UTwoHeartsGA_Dodge::StartDodgeExecution()
 	RecordDodgeEvent(
 		TEXT("DodgeActivate"),
 		FString::Printf(
-			TEXT("direction=%s duration=%.2f distance=%.1f"),
+			TEXT("direction=%s montage=%s root_motion=true"),
 			*DodgeDirectionName,
-			DodgeDurationSeconds,
-			DodgeConfig->DodgeDistance));
+			*GetNameSafe(ActiveDodgeMontage)));
 	RecordDodgeEvent(
 		TEXT("DodgeDirectionResolved"),
 		FString::Printf(TEXT("Resolved dodge direction as %s."), *DodgeDirectionName));
 
 	if (Character->GetCharacterMovement())
 	{
+		bCachedOrientRotationToMovement = Character->GetCharacterMovement()->bOrientRotationToMovement;
+		bCachedUseControllerDesiredRotation = Character->GetCharacterMovement()->bUseControllerDesiredRotation;
 		Character->GetCharacterMovement()->StopMovementImmediately();
 		Character->GetCharacterMovement()->bOrientRotationToMovement = false;
 	}
 
+	bCachedUseControllerRotationYaw = Character->bUseControllerRotationYaw;
+	bShouldRestoreCharacterState = true;
+	Character->bUseControllerRotationYaw = false;
 	Character->SetActorRotation(DodgeDirection.Rotation());
 
-	if (UAnimMontage* DodgeMontage = DodgeConfig->DodgeMontage)
+	if (UAnimInstance* AnimInstance = Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr)
 	{
-		if (UAnimInstance* AnimInstance = Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr)
-		{
-			AnimInstance->Montage_Play(DodgeMontage, 1.0f);
-		}
+		BindMontageNotifyDelegates(AnimInstance);
 	}
 
-	if (UWorld* World = GetWorld())
+	ActiveMontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
+		this,
+		NAME_None,
+		ActiveDodgeMontage,
+		1.0f,
+		NAME_None,
+		false,
+		1.0f);
+
+	if (!ActiveMontageTask)
 	{
-		FTimerManager& TimerManager = World->GetTimerManager();
-		TimerManager.SetTimer(DodgeTickTimerHandle, this, &UTwoHeartsGA_Dodge::HandleDodgeTick, 0.016f, true);
-		TimerManager.SetTimer(DodgeFinishTimerHandle, this, &UTwoHeartsGA_Dodge::HandleDodgeFinished, DodgeDurationSeconds, false);
-
-		const float InvulnerabilityStart = FMath::Max(0.0f, DodgeConfig->DodgeInvulnerableStartSeconds);
-		const float InvulnerabilityDuration = FMath::Max(0.0f, DodgeConfig->DodgeInvulnerableDurationSeconds);
-		if (InvulnerabilityStart <= 0.0f)
-		{
-			BeginInvulnerabilityWindow();
-		}
-		else
-		{
-			TimerManager.SetTimer(InvulnerabilityBeginTimerHandle, this, &UTwoHeartsGA_Dodge::HandleInvulnerabilityWindowBegin, InvulnerabilityStart, false);
-		}
-
-		if (InvulnerabilityDuration > 0.0f)
-		{
-			TimerManager.SetTimer(InvulnerabilityEndTimerHandle, this, &UTwoHeartsGA_Dodge::HandleInvulnerabilityWindowEnd, InvulnerabilityStart + InvulnerabilityDuration, false);
-		}
+		RecordDodgeEvent(TEXT("DodgeRejected"), TEXT("Failed to create dodge montage task."), true);
+		return false;
 	}
+
+	ActiveMontageTask->OnCompleted.AddDynamic(this, &UTwoHeartsGA_Dodge::HandleMontageCompleted);
+	ActiveMontageTask->OnInterrupted.AddDynamic(this, &UTwoHeartsGA_Dodge::HandleMontageInterrupted);
+	ActiveMontageTask->OnCancelled.AddDynamic(this, &UTwoHeartsGA_Dodge::HandleMontageCancelled);
+	ActiveMontageTask->ReadyForActivation();
+
+	RecordDodgeEvent(
+		TEXT("DodgeMontageSelected"),
+		FString::Printf(
+			TEXT("Selected dodge montage %s for direction %s."),
+			*GetNameSafe(ActiveDodgeMontage),
+			*DodgeDirectionName));
+
+	ScheduleFallbackInvulnerabilityTimers();
 
 	return true;
 }
@@ -207,7 +227,7 @@ void UTwoHeartsGA_Dodge::BeginInvulnerabilityWindow()
 		return;
 	}
 
-	if (UAbilitySystemComponent* AbilitySystemComponent = GetTwoHeartsAbilitySystemComponent())
+	if (UAbilitySystemComponent* AbilitySystemComponent = CachedAbilitySystemComponent.Get())
 	{
 		AbilitySystemComponent->AddLooseGameplayTag(TAG_TwoHearts_State_Dodge_Invulnerable);
 	}
@@ -224,7 +244,7 @@ void UTwoHeartsGA_Dodge::EndInvulnerabilityWindow()
 		return;
 	}
 
-	if (UAbilitySystemComponent* AbilitySystemComponent = GetTwoHeartsAbilitySystemComponent())
+	if (UAbilitySystemComponent* AbilitySystemComponent = CachedAbilitySystemComponent.Get())
 	{
 		AbilitySystemComponent->RemoveLooseGameplayTag(TAG_TwoHearts_State_Dodge_Invulnerable);
 	}
@@ -243,27 +263,6 @@ void UTwoHeartsGA_Dodge::FinishDodge(bool bWasCancelled)
 
 	bDodgeFinished = true;
 	bDodgeStarted = false;
-
-	AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter());
-	if (Character)
-	{
-		if (Character->GetCharacterMovement())
-		{
-			Character->GetCharacterMovement()->bOrientRotationToMovement = true;
-		}
-
-		const FTwoHeartsDodgeConfig* DodgeConfig = GetDodgeConfig();
-		if (DodgeConfig && DodgeConfig->DodgeMontage)
-		{
-			if (UAnimInstance* AnimInstance = Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr)
-			{
-				AnimInstance->Montage_Stop(0.08f, DodgeConfig->DodgeMontage);
-			}
-		}
-	}
-
-	EndInvulnerabilityWindow();
-	UpdateDodgeDebugState();
 	RecordDodgeEvent(TEXT("DodgeFinished"), bWasCancelled ? TEXT("Dodge was cancelled.") : TEXT("Dodge finished and can chain into follow-up actions."));
 
 	EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, bWasCancelled);
@@ -289,6 +288,7 @@ void UTwoHeartsGA_Dodge::ApplyDodgeCooldown()
 	AbilitySystemComponent->AddLooseGameplayTag(TAG_TwoHearts_Cooldown_Dodge);
 	bCooldownActive = true;
 	UpdateDodgeDebugState();
+	RecordDodgeEvent(TEXT("DodgeCooldownBegin"), FString::Printf(TEXT("Dodge cooldown started for %.2f seconds."), CooldownSeconds));
 
 	if (UWorld* World = GetWorld())
 	{
@@ -299,9 +299,13 @@ void UTwoHeartsGA_Dodge::ApplyDodgeCooldown()
 
 void UTwoHeartsGA_Dodge::ClearDodgeCooldown()
 {
-	if (UAbilitySystemComponent* AbilitySystemComponent = GetTwoHeartsAbilitySystemComponent())
+	if (UAbilitySystemComponent* AbilitySystemComponent = CachedAbilitySystemComponent.Get())
 	{
 		AbilitySystemComponent->RemoveLooseGameplayTag(TAG_TwoHearts_Cooldown_Dodge);
+	}
+	else
+	{
+		RecordDodgeEvent(TEXT("DodgeCooldownClearFailed"), TEXT("Cached ASC was invalid when clearing dodge cooldown."), true);
 	}
 
 	bCooldownActive = false;
@@ -313,9 +317,13 @@ void UTwoHeartsGA_Dodge::UpdateDodgeDebugState() const
 	if (AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter()))
 	{
 		bool bIsCooldownReady = !bCooldownActive;
-		if (const UAbilitySystemComponent* AbilitySystemComponent = GetTwoHeartsAbilitySystemComponent())
+		if (const UAbilitySystemComponent* CachedASC = CachedAbilitySystemComponent.Get())
 		{
-			bIsCooldownReady = !AbilitySystemComponent->HasMatchingGameplayTag(TAG_TwoHearts_Cooldown_Dodge);
+			bIsCooldownReady = !CachedASC->HasMatchingGameplayTag(TAG_TwoHearts_Cooldown_Dodge);
+		}
+		else if (const UAbilitySystemComponent* LiveASC = GetTwoHeartsAbilitySystemComponent())
+		{
+			bIsCooldownReady = !LiveASC->HasMatchingGameplayTag(TAG_TwoHearts_Cooldown_Dodge);
 		}
 
 		Character->SetDodgeDebugRuntimeState(bDodgeStarted && !bDodgeFinished, bInvulnerabilityActive, bIsCooldownReady, DodgeDirectionName);
@@ -364,31 +372,114 @@ const FTwoHeartsDodgeConfig* UTwoHeartsGA_Dodge::GetDodgeConfig() const
 	return nullptr;
 }
 
-void UTwoHeartsGA_Dodge::HandleDodgeTick()
+UAnimMontage* UTwoHeartsGA_Dodge::ResolveDodgeMontage() const
 {
-	AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter());
-	if (!Character || DodgeDurationSeconds <= 0.0f)
+	if (const AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter()))
+	{
+		return Character->GetDodgeMontageForDirection(DodgeDirectionName);
+	}
+
+	return nullptr;
+}
+
+void UTwoHeartsGA_Dodge::BindMontageNotifyDelegates(UAnimInstance* AnimInstance)
+{
+	if (!AnimInstance || BoundAnimInstance == AnimInstance)
 	{
 		return;
 	}
 
-	const UWorld* World = GetWorld();
-	const float DeltaSeconds = World ? World->GetDeltaSeconds() : 0.016f;
-	DodgeElapsedSeconds = FMath::Min(DodgeElapsedSeconds + DeltaSeconds, DodgeDurationSeconds);
+	UnbindMontageNotifyDelegates();
+	BoundAnimInstance = AnimInstance;
+	BoundAnimInstance->OnPlayMontageNotifyBegin.AddDynamic(this, &UTwoHeartsGA_Dodge::HandleMontageNotifyBegin);
+}
 
-	const float Alpha = FMath::Clamp(DodgeElapsedSeconds / DodgeDurationSeconds, 0.0f, 1.0f);
-	const FVector NewLocation = FMath::Lerp(DodgeStartLocation, DodgeTargetLocation, Alpha);
-	Character->SetActorLocation(NewLocation, true);
+void UTwoHeartsGA_Dodge::UnbindMontageNotifyDelegates()
+{
+	if (!BoundAnimInstance)
+	{
+		return;
+	}
+
+	BoundAnimInstance->OnPlayMontageNotifyBegin.RemoveDynamic(this, &UTwoHeartsGA_Dodge::HandleMontageNotifyBegin);
+	BoundAnimInstance = nullptr;
+}
+
+void UTwoHeartsGA_Dodge::ScheduleFallbackInvulnerabilityTimers()
+{
+	const FTwoHeartsDodgeConfig* DodgeConfig = GetDodgeConfig();
+	if (!DodgeConfig)
+	{
+		return;
+	}
+
+	ClearInvulnerabilityFallbackTimers();
+
+	if (UWorld* World = GetWorld())
+	{
+		FTimerManager& TimerManager = World->GetTimerManager();
+		const float InvulnerabilityStart = FMath::Max(0.0f, DodgeConfig->DodgeInvulnerableStartSeconds);
+		const float InvulnerabilityDuration = FMath::Max(0.0f, DodgeConfig->DodgeInvulnerableDurationSeconds);
+
+		if (InvulnerabilityStart <= 0.0f)
+		{
+			HandleInvulnerabilityWindowBegin();
+		}
+		else
+		{
+			TimerManager.SetTimer(InvulnerabilityBeginTimerHandle, this, &UTwoHeartsGA_Dodge::HandleInvulnerabilityWindowBegin, InvulnerabilityStart, false);
+		}
+
+		if (InvulnerabilityDuration > 0.0f)
+		{
+			TimerManager.SetTimer(InvulnerabilityEndTimerHandle, this, &UTwoHeartsGA_Dodge::HandleInvulnerabilityWindowEnd, InvulnerabilityStart + InvulnerabilityDuration, false);
+		}
+	}
+}
+
+void UTwoHeartsGA_Dodge::ClearInvulnerabilityFallbackTimers()
+{
+	if (UWorld* World = GetWorld())
+	{
+		FTimerManager& TimerManager = World->GetTimerManager();
+		TimerManager.ClearTimer(InvulnerabilityBeginTimerHandle);
+		TimerManager.ClearTimer(InvulnerabilityEndTimerHandle);
+	}
 }
 
 void UTwoHeartsGA_Dodge::HandleInvulnerabilityWindowBegin()
 {
+	if (bHasReceivedInvulnerabilityBeginNotify)
+	{
+		return;
+	}
+
 	BeginInvulnerabilityWindow();
 }
 
 void UTwoHeartsGA_Dodge::HandleInvulnerabilityWindowEnd()
 {
+	if (bHasReceivedInvulnerabilityEndNotify)
+	{
+		return;
+	}
+
 	EndInvulnerabilityWindow();
+}
+
+void UTwoHeartsGA_Dodge::HandleMontageCompleted()
+{
+	FinishDodge(false);
+}
+
+void UTwoHeartsGA_Dodge::HandleMontageInterrupted()
+{
+	FinishDodge(true);
+}
+
+void UTwoHeartsGA_Dodge::HandleMontageCancelled()
+{
+	FinishDodge(true);
 }
 
 void UTwoHeartsGA_Dodge::HandleDodgeFinished()
@@ -396,8 +487,89 @@ void UTwoHeartsGA_Dodge::HandleDodgeFinished()
 	FinishDodge(false);
 }
 
+void UTwoHeartsGA_Dodge::HandleMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointNotifyPayload)
+{
+	if (NotifyName == InvulnerabilityBeginNotifyName)
+	{
+		bHasReceivedInvulnerabilityBeginNotify = true;
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(InvulnerabilityBeginTimerHandle);
+		}
+
+		BeginInvulnerabilityWindow();
+		return;
+	}
+
+	if (NotifyName == InvulnerabilityEndNotifyName)
+	{
+		bHasReceivedInvulnerabilityEndNotify = true;
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(InvulnerabilityEndTimerHandle);
+		}
+
+		EndInvulnerabilityWindow();
+		return;
+	}
+
+	if (NotifyName == DodgeFinishedNotifyName)
+	{
+		FinishDodge(false);
+	}
+}
+
 void UTwoHeartsGA_Dodge::HandleDodgeCooldownFinished()
 {
 	ClearDodgeCooldown();
 	RecordDodgeEvent(TEXT("DodgeCooldownReady"), TEXT("Dodge cooldown finished."));
+}
+
+void UTwoHeartsGA_Dodge::RestoreCharacterState()
+{
+	if (!bShouldRestoreCharacterState)
+	{
+		return;
+	}
+
+	if (AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter()))
+	{
+		Character->bUseControllerRotationYaw = bCachedUseControllerRotationYaw;
+		if (UCharacterMovementComponent* CharacterMovement = Character->GetCharacterMovement())
+		{
+			CharacterMovement->bOrientRotationToMovement = bCachedOrientRotationToMovement;
+			CharacterMovement->bUseControllerDesiredRotation = bCachedUseControllerDesiredRotation;
+		}
+	}
+
+	bShouldRestoreCharacterState = false;
+}
+
+void UTwoHeartsGA_Dodge::CleanupDodgeExecution(bool bWasCancelled)
+{
+	if (bHasAppliedCleanup)
+	{
+		return;
+	}
+
+	bHasAppliedCleanup = true;
+	ClearInvulnerabilityFallbackTimers();
+	UnbindMontageNotifyDelegates();
+	ActiveMontageTask = nullptr;
+
+	if (bWasCancelled && ActiveDodgeMontage)
+	{
+		if (AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter()))
+		{
+			if (UAnimInstance* AnimInstance = Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr)
+			{
+				AnimInstance->Montage_Stop(0.08f, ActiveDodgeMontage);
+			}
+		}
+	}
+
+	EndInvulnerabilityWindow();
+	RestoreCharacterState();
+	bDodgeStarted = false;
+	UpdateDodgeDebugState();
 }

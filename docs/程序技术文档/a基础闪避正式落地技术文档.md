@@ -71,6 +71,11 @@
    `Dodge` 输入可以通过 `HandleAbilityInputPressed(ETwoHeartsAbilityInputID::Dodge)` 进入 GAS；
    最小 Dodge 可以查询当前普攻阶段并正确拒绝 `Startup / Active` 阶段的打断请求；
    当前若缺少正式闪避资源，可能只看到普攻被允许或拒绝打断，而看不到完整闪避表现。
+7. 当前最新正式口径：
+   基础闪避正式版按 `Root Motion` 承载；
+   闪避位移不再以 `SetActorLocation` 硬推为正式主路径；
+   无敌帧开始、无敌帧结束和动作逻辑结束，优先由 Montage Notify 驱动；
+   配置时间窗仅作为未补齐 Notify 时的最小兜底。
 
 # 当前阶段正式承载结论
 
@@ -83,6 +88,7 @@
 3. 闪避方向判定、闪避执行、冷却判定、无敌帧状态写入、动作结束收尾，应由 Dodge Ability 承载。
 4. 本阶段允许“角色持有闪避配置，Ability 持有闪避逻辑”的最小分工。
 5. 本阶段不建议为闪避单独提前抽公共动作组件；统一收束留到公共语义层阶段。
+6. 在当前正式口径下，`Root Motion` 驱动的位移表现属于闪避动作本体的一部分，应由方向 Montage 资源承载。
 
 # 建议实现结构
 
@@ -111,7 +117,7 @@
    闪避激活条件校验；
    读取角色输入与方向；
    决定本次闪避方向；
-   发起闪避动画与最小位移；
+   发起方向对应的 Root Motion 闪避 Montage；
    写入闪避动作状态；
    写入和清理无敌帧状态；
    处理普攻打断；
@@ -182,7 +188,7 @@
    输出本次闪避使用的世界方向或局部方向。
 3. 函数名：`StartDodgeExecution`
    作用：
-   启动闪避动画、最小位移和调试状态；
+   启动方向对应的 Root Motion 闪避 Montage 和调试状态；
    写入 `State.Action.Dodge`。
 4. 函数名：`BeginInvulnerabilityWindow`
    作用：
@@ -209,9 +215,9 @@
    不可打断则拒绝本次闪避。
 5. 通过 `ResolveDodgeDirection` 计算本次闪避方向。
 6. 通过 `StartDodgeExecution` 发起闪避表现与最小位移。
-7. 按配置时机进入 `BeginInvulnerabilityWindow`。
-8. 无敌帧结束后执行 `EndInvulnerabilityWindow`。
-9. 闪避动作完成后执行 `FinishDodge`，结束当前 Ability。
+7. Montage Notify `Dodge_InvulnerableBegin` 或兜底时间窗触发 `BeginInvulnerabilityWindow`。
+8. Montage Notify `Dodge_InvulnerableEnd` 或兜底时间窗触发 `EndInvulnerabilityWindow`。
+9. Montage Notify `Dodge_Finished` 或 Montage 自然完成后执行 `FinishDodge`，结束当前 Ability。
 
 # 蓝图与 C++ 分工
 
@@ -239,12 +245,19 @@
    联调注意：
    若测试键位占用了 `Jump`，需要先在 `Input Mapping Context` 中移除 `IA_Jump` 的同键位映射，避免把输入冲突误判成 Dodge 逻辑异常。
 2. Dodge 动画资源：
-   本阶段至少需要一套可用的基础 Dodge Montage；
-   若暂时没有 `8` 个独立方向资源，可先用一套基础资源配合方向位移验证。
+   当前正式口径为 `8` 向独立或半独立 Dodge Montage；
+   正式资源应启用 Root Motion；
+   若个别方向资源暂未补齐，可临时回退到 `Fallback Montage`，但不建议作为最终验收状态。
 3. 方向与位移参数：
-   建议允许通过角色侧配置或 Ability 内配置读取。
+   方向由角色输入决定；
+   正式位移距离以 Root Motion 资源为主，不再以代码距离硬推为正式主路径。
 4. 无敌帧时机：
-   优先支持通过 Notify 或配置时间窗口驱动。
+   当前正式口径优先通过 Notify 驱动；
+   时间窗口仅保留为未补齐 Notify 时的兜底。
+5. 当前建议 Notify 名称：
+   `Dodge_InvulnerableBegin`
+   `Dodge_InvulnerableEnd`
+   `Dodge_Finished`
 
 # 联调与验收口径
 
@@ -284,7 +297,9 @@
    `UTwoHeartsGA_Dodge` 是否被正确授予；
    是否被限制 Tag 或冷却挡住；
    当前普攻是否错误阻断了闪避；
-   Dodge Montage、位移和通知资源是否已配置。
+   当前方向 Dodge Montage 是否已配置；
+   当前方向 Montage 是否启用 Root Motion；
+   `Dodge_InvulnerableBegin / Dodge_InvulnerableEnd / Dodge_Finished` 是否已正确配置。
 
 # 风险点
 

@@ -1,11 +1,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGameplayAbility.h"
 #include "TwoHeartsGA_Dodge.generated.h"
 
 class UTwoHeartsGA_NormalAttackBase;
 struct FTwoHeartsDodgeConfig;
+class UAbilitySystemComponent;
+class UAnimMontage;
+class UAnimInstance;
+class UAbilityTask_PlayMontageAndWait;
+struct FBranchingPointNotifyPayload;
 
 UCLASS()
 class UTwoHeartsGA_Dodge : public UTwoHeartsGameplayAbility
@@ -37,12 +43,16 @@ private:
 	void FinishDodge(bool bWasCancelled = false);
 	void ApplyDodgeCooldown();
 	void ClearDodgeCooldown();
+	void RestoreCharacterState();
+	void CleanupDodgeExecution(bool bWasCancelled);
+	void BindMontageNotifyDelegates(UAnimInstance* AnimInstance);
+	void UnbindMontageNotifyDelegates();
+	void ScheduleFallbackInvulnerabilityTimers();
+	void ClearInvulnerabilityFallbackTimers();
 	void UpdateDodgeDebugState() const;
 	void RecordDodgeEvent(const TCHAR* EventName, const FString& Detail, bool bWarning = false) const;
 	const FTwoHeartsDodgeConfig* GetDodgeConfig() const;
-
-	UFUNCTION()
-	void HandleDodgeTick();
+	UAnimMontage* ResolveDodgeMontage() const;
 
 	UFUNCTION()
 	void HandleInvulnerabilityWindowBegin();
@@ -56,19 +66,39 @@ private:
 	UFUNCTION()
 	void HandleDodgeCooldownFinished();
 
+	UFUNCTION()
+	void HandleMontageCompleted();
+
+	UFUNCTION()
+	void HandleMontageInterrupted();
+
+	UFUNCTION()
+	void HandleMontageCancelled();
+
+	UFUNCTION()
+	void HandleMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointNotifyPayload);
+
 	FVector DodgeDirection = FVector::ForwardVector;
-	FVector DodgeStartLocation = FVector::ZeroVector;
-	FVector DodgeTargetLocation = FVector::ZeroVector;
 	FString DodgeDirectionName = TEXT("None");
-	float DodgeDurationSeconds = 0.0f;
-	float DodgeElapsedSeconds = 0.0f;
 	bool bDodgeStarted = false;
 	bool bDodgeFinished = false;
+	bool bHasAppliedCleanup = false;
 	bool bInvulnerabilityActive = false;
 	bool bCooldownActive = false;
-	FTimerHandle DodgeTickTimerHandle;
-	FTimerHandle DodgeFinishTimerHandle;
+	bool bHasReceivedInvulnerabilityBeginNotify = false;
+	bool bHasReceivedInvulnerabilityEndNotify = false;
+	bool bCachedOrientRotationToMovement = false;
+	bool bCachedUseControllerDesiredRotation = false;
+	bool bCachedUseControllerRotationYaw = false;
+	bool bShouldRestoreCharacterState = false;
+	TWeakObjectPtr<UAbilitySystemComponent> CachedAbilitySystemComponent;
+	TObjectPtr<UAbilityTask_PlayMontageAndWait> ActiveMontageTask;
+	TObjectPtr<UAnimInstance> BoundAnimInstance;
+	TObjectPtr<UAnimMontage> ActiveDodgeMontage = nullptr;
 	FTimerHandle InvulnerabilityBeginTimerHandle;
 	FTimerHandle InvulnerabilityEndTimerHandle;
 	FTimerHandle DodgeCooldownTimerHandle;
+	FName InvulnerabilityBeginNotifyName = TEXT("Dodge_InvulnerableBegin");
+	FName InvulnerabilityEndNotifyName = TEXT("Dodge_InvulnerableEnd");
+	FName DodgeFinishedNotifyName = TEXT("Dodge_Finished");
 };

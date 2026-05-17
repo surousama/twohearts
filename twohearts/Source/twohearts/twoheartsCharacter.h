@@ -65,7 +65,31 @@ struct FTwoHeartsDodgeConfig
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge")
-	TObjectPtr<UAnimMontage> DodgeMontage = nullptr;
+	TObjectPtr<UAnimMontage> DodgeMontageFallback = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge|Directional")
+	TObjectPtr<UAnimMontage> DodgeMontageForward = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge|Directional")
+	TObjectPtr<UAnimMontage> DodgeMontageForwardRight = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge|Directional")
+	TObjectPtr<UAnimMontage> DodgeMontageRight = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge|Directional")
+	TObjectPtr<UAnimMontage> DodgeMontageBackwardRight = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge|Directional")
+	TObjectPtr<UAnimMontage> DodgeMontageBackward = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge|Directional")
+	TObjectPtr<UAnimMontage> DodgeMontageBackwardLeft = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge|Directional")
+	TObjectPtr<UAnimMontage> DodgeMontageLeft = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge|Directional")
+	TObjectPtr<UAnimMontage> DodgeMontageForwardLeft = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge", meta=(ClampMin="0.05", UIMin="0.05"))
 	float DodgeDurationSeconds = 0.45f;
@@ -226,6 +250,7 @@ protected:
 
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
+	void ClearMoveInput(const FInputActionValue& Value);
 
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
@@ -278,6 +303,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Combat|Dodge")
 	FString GetDesiredDodgeDirectionName() const;
+
+	UFUNCTION(BlueprintPure, Category="Combat|Dodge")
+	UAnimMontage* GetDodgeMontageForDirection(const FString& DirectionName) const;
 
 	UFUNCTION(BlueprintPure, Category="Combat|Normal Attack|Debug")
 	bool IsNormalAttackDebugPanelEnabled() const { return bShowNormalAttackDebugPanel; }

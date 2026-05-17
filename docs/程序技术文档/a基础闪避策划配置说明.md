@@ -11,7 +11,7 @@
    正式输入链路；
    普攻阶段打断衔接；
    方向解析；
-   基础位移执行；
+   Root Motion 动作承载；
    冷却状态；
    无敌帧状态出口；
    调试日志与 HUD 字段。
@@ -19,13 +19,11 @@
 
 # 你现在需要配置的内容
 
-1. 给角色配置一套可播放的 `Dodge Montage`。
+1. 给角色配置 `8` 向闪避 `Montage`。
 2. 给角色配置基础闪避参数：
-   闪避时长；
-   闪避距离；
    闪避冷却；
-   无敌帧开始时间；
-   无敌帧持续时间。
+   无敌帧兜底时间；
+   动画通知。
 3. 检查 `Dodge` 输入是否真的映射到当前测试按键。
 4. 进场景按本文档验收口径逐项验证。
 
@@ -35,56 +33,50 @@
 2. 当前建议直接在玩家角色蓝图上配置，例如：
    `BP_ThirdPersonCharacter`
 3. 当前程序字段名为：
-   `DodgeConfig.DodgeMontage`
-   `DodgeConfig.DodgeDurationSeconds`
-   `DodgeConfig.DodgeDistance`
+   `DodgeConfig.DodgeMontageFallback`
+   `DodgeConfig.DodgeMontageForward`
+   `DodgeConfig.DodgeMontageForwardRight`
+   `DodgeConfig.DodgeMontageRight`
+   `DodgeConfig.DodgeMontageBackwardRight`
+   `DodgeConfig.DodgeMontageBackward`
+   `DodgeConfig.DodgeMontageBackwardLeft`
+   `DodgeConfig.DodgeMontageLeft`
+   `DodgeConfig.DodgeMontageForwardLeft`
    `DodgeConfig.DodgeCooldownSeconds`
    `DodgeConfig.DodgeInvulnerableStartSeconds`
    `DodgeConfig.DodgeInvulnerableDurationSeconds`
 
 # 每个字段怎么配
 
-## 1. DodgeMontage
+## 1. 8 向 Dodge Montage
 
 1. 含义：
-   本次闪避动作播放的蒙太奇资源。
+   按当前闪避方向播放对应的闪避蒙太奇资源。
 2. 当前要求：
-   至少配置一套能完整播放的基础闪避 Montage。
-3. 当前可接受方案：
-   先只用一套通用闪避动画，配合方向位移验证；
-   暂时不要求一次就做出 8 套独立方向动画。
-4. 如果不配：
-   闪避逻辑仍会执行；
-   方向、位移、冷却、无敌帧也会生效；
-   但角色看起来会像“滑出去”，不满足正式体验验收。
+   当前程序已支持 `8` 向独立资源配置。
+3. 当前推荐配置：
+   `Forward`
+   `ForwardRight`
+   `Right`
+   `BackwardRight`
+   `Backward`
+   `BackwardLeft`
+   `Left`
+   `ForwardLeft`
+4. 当前回退位：
+   `DodgeMontageFallback`
+   作用：
+   当某一方向槽位没填时，回退到这套 Montage，避免直接放不出来。
+5. 如果方向槽位和回退位都不配：
+   当前闪避会被程序直接拒绝，不会进入正式闪避。
+6. 当前正式要求：
+   所有正式使用的 Dodge Montage 都应启用 `Root Motion`。
+7. 当前建议 Notify 名称：
+   `Dodge_InvulnerableBegin`
+   `Dodge_InvulnerableEnd`
+   `Dodge_Finished`
 
-## 2. DodgeDurationSeconds
-
-1. 含义：
-   一次闪避动作从开始到结束的总时长。
-2. 它影响：
-   位移推进总时长；
-   闪避动作结束时间；
-   何时允许后续动作继续衔接。
-3. 当前建议起配：
-   `0.45`
-4. 调整建议：
-   如果角色闪得太拖，可以适当减小；
-   如果角色闪得太急、动作表现跟不上，可以适当增大。
-
-## 3. DodgeDistance
-
-1. 含义：
-   一次闪避总位移距离。
-2. 当前建议起配：
-   `420`
-3. 调整建议：
-   如果角色看起来原地小碎步，适当增大；
-   如果角色看起来像瞬移，适当减小。
-4. 当前注意：
-   本阶段核心规则仍然是“无敌帧闪避”，不是“靠位移离开命中盒才算闪掉”。
-
-## 4. DodgeCooldownSeconds
+## 2. DodgeCooldownSeconds
 
 1. 含义：
    两次闪避之间的最小间隔。
@@ -95,20 +87,20 @@
 4. 当前调试观察：
    HUD 上的 `dodge_cooldown_ready` 会反映当前是否恢复可释放。
 
-## 5. DodgeInvulnerableStartSeconds
+## 3. DodgeInvulnerableStartSeconds
 
 1. 含义：
-   闪避开始后，延迟多久进入无敌帧。
+   当对应 Montage 还没补 `Dodge_InvulnerableBegin` Notify 时，用于兜底进入无敌帧的时间。
 2. 当前建议起配：
    `0.0`
 3. 当前建议：
    第一轮联调优先从 `0.0` 开始；
    先确认基础逻辑稳定，再微调无敌帧起点。
 
-## 6. DodgeInvulnerableDurationSeconds
+## 4. DodgeInvulnerableDurationSeconds
 
 1. 含义：
-   无敌帧持续多久。
+   当对应 Montage 还没补 `Dodge_InvulnerableEnd` Notify 时，用于兜底结束无敌帧的持续时间。
 2. 当前建议起配：
    `0.22`
 3. 当前调试观察：
@@ -132,7 +124,7 @@
    闪避方向跟随当前移动输入。
 2. 没有移动输入时：
    闪避方向默认沿角色当前面朝方向。
-3. 当前程序已经支持基础 `8` 方向命名输出：
+3. 当前程序已经支持基础 `8` 方向命名输出，并会按方向选择对应 Montage：
    `Forward`
    `ForwardRight`
    `Right`
@@ -141,8 +133,8 @@
    `BackwardLeft`
    `Left`
    `ForwardLeft`
-4. 当前阶段不要求策划现在就做 8 套独立动画；
-   但需要按这个方向口径去验“方向判定是否正确”。
+4. 当前如果某一方向 Montage 没配，会回退到 `DodgeMontageFallback`。
+5. 当前如果方向 Montage 已配但没有启用 `Root Motion`，程序会拒绝本次正式闪避并输出黄色警告日志。
 
 # 当前打断规则
 
@@ -156,7 +148,7 @@
 # 当前你在游戏里应该看到什么
 
 1. 待机时按闪避：
-   角色会进入闪避动作，并向当前方向位移。
+   角色会进入闪避动作，并由 Root Motion 带出位移。
 2. 有方向输入时按闪避：
    角色会朝输入方向闪。
 3. 没方向输入时按闪避：
@@ -184,28 +176,31 @@
    `DodgeInvulnerableEnd`
    `DodgeFinished`
    `DodgeCooldownReady`
+   `DodgeMontageSelected`
 3. 当前如果看到：
    `dodging=YES`
    `direction` 正常变化
    `invulnerable` 会开关
    `cooldown_ready` 会从 `NO` 再回到 `YES`
    但角色动作不对
-   优先排查 Montage 和参数配置，不要先怀疑程序链路断了。
+   优先排查当前方向 Montage 是否启用 Root Motion，以及 Notify 是否已补齐。
 
 # 建议的第一轮默认配置
 
-1. `DodgeMontage`
-   先配一套可用的基础闪避 Montage。
-2. `DodgeDurationSeconds`
-   `0.45`
-3. `DodgeDistance`
-   `420`
-4. `DodgeCooldownSeconds`
+1. `DodgeMontageFallback`
+   建议先配一套通用可用的基础闪避 Montage，作为兜底。
+2. `DodgeMontageForward / ForwardRight / Right / BackwardRight / Backward / BackwardLeft / Left / ForwardLeft`
+   按你现有 8 向资源分别填入。
+3. `DodgeCooldownSeconds`
    `0.8`
-5. `DodgeInvulnerableStartSeconds`
+4. `DodgeInvulnerableStartSeconds`
    `0.0`
-6. `DodgeInvulnerableDurationSeconds`
+5. `DodgeInvulnerableDurationSeconds`
    `0.22`
+6. 每个方向 Montage 补齐：
+   `Dodge_InvulnerableBegin`
+   `Dodge_InvulnerableEnd`
+   `Dodge_Finished`
 
 # 第一轮验收清单
 
@@ -222,9 +217,9 @@
 # 当前常见问题
 
 1. 问题：
-   按了闪避，角色只滑动不翻滚。
+   按了闪避直接被拒绝，黄色日志提示 Root Motion 问题。
    先查：
-   `DodgeMontage` 没配，或配错资源。
+   当前方向对应的 Montage 是否已启用 `Root Motion`。
 2. 问题：
    闪避方向不对。
    先查：
@@ -240,7 +235,7 @@
 4. 问题：
    闪避看起来太长或太短。
    先查：
-   `DodgeDurationSeconds` 和 `DodgeDistance` 是否匹配当前 Montage 节奏。
+   当前方向 Montage 的实际时长、Root Motion 节奏和 `Dodge_Finished` Notify 落点是否合理。
 
 # 当前边界
 

@@ -265,6 +265,20 @@
    普攻 `Recovery / LogicEnded` 可被闪避打断，`Startup / Active` 默认仍不可被闪避直接打断；
    `AtwoheartsCharacter` 已补角色侧闪避配置入口和调试承载，`HUD` 已可显示 `dodging / dodge_direction / dodge_invulnerable / dodge_cooldown_ready`；
    当前 `UnrealBuildTool` 编译通过，但仍待蓝图资源配置与场景联调后再做阶段验收结论。
+7. 2026-05-17：基础闪避资源承载升级为 `8` 向 Montage 配置。
+   结果：
+   角色侧 `DodgeConfig` 已支持 `Forward / ForwardRight / Right / BackwardRight / Backward / BackwardLeft / Left / ForwardLeft` 八方向独立 Montage 槽位；
+   同时保留 `DodgeMontageFallback` 作为未补齐方向资源时的兜底；
+   `UTwoHeartsGA_Dodge` 会按当前解析出的方向名自动选择对应 Montage 播放。
+8. 2026-05-17：基础闪避第一轮 Bug 修复与 Root Motion / Notify 正式化完成。
+   结果：
+   闪避冷却清理改为依赖缓存 ASC，不再依赖 Ability 结束后的 `ActorInfo` 临时取值；
+   移动输入已补 `Completed / Canceled` 清零，站定闪避不会再错误沿用旧方向；
+   闪避开始前会缓存角色原本旋转/移动模式，结束时统一恢复，不再写死回默认模式；
+   收尾逻辑已统一收束到 `EndAbility` 清理路径，正常结束和取消结束共用同一套恢复流程；
+   正式闪避位移承载已统一收束为 `Root Motion` 主路径，若方向 Montage 未启用 Root Motion，程序会直接拒绝本次正式闪避；
+   无敌帧开始、无敌帧结束和动作逻辑结束已升级为 Notify 主驱动，并保留时间窗作为未补齐 Notify 时的最小兜底；
+   `UnrealBuildTool` 编译通过，当前可进入下一轮游戏内跑测。
 
 # 当前实际代码落点
 
@@ -318,13 +332,13 @@
    应优先怀疑资源表现和 Section 落点，而不是先怀疑 Ability 段切换逻辑。
 3. 当前代码虽已支持 Notify 驱动，但仍保留最小时序兜底；
    后续联调应逐步补齐动画通知，避免长期依赖纯时长推断。
-4. 当前 `Dodge` 的正式 `C++` 生命周期已落地，但具体表现仍依赖角色蓝图补齐 `Dodge Montage` 和参数配置。
-5. 当前若看到 `Dodge` 输入已进入日志、普攻可在允许阶段被截断、`dodging / invulnerable / cooldown` 调试状态也已变化，但角色表现仍不理想，优先排查资源配置与位移动画匹配，而不是先怀疑 `GAS` 链路断开。
+4. 当前正式闪避已经按 `Root Motion + Notify` 口径收束；若某个方向资源未启用 Root Motion，程序会直接拒绝该次闪避并输出黄色日志。
+5. 当前若看到 `Dodge` 输入已进入日志、普攻可在允许阶段被截断，但闪避未正式触发，优先排查当前方向 Montage 是否已配置 Root Motion，以及 `Dodge_InvulnerableBegin / Dodge_InvulnerableEnd / Dodge_Finished` 是否已正确配置。
 6. 后续如继续扩战斗规则，应优先复用当前 Ability 承载与阶段语义出口，不要新开 Character 级临时状态机。
 
 # 当前未完成项与技术债
 
-1. 基础闪避资源配置与本地联调验收尚未完成。
+1. 基础闪避第二轮本地联调验收尚未完成。
 2. 正式通用预输入尚未完成。
 3. 公共战斗语义层尚未完成。
 4. 受击、伤害、格挡联动尚未完成。
