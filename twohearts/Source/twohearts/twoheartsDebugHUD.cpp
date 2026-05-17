@@ -32,12 +32,7 @@ void ATwoheartsDebugHUD::DrawHUD()
 	const float PanelX = 40.0f;
 	const float PanelY = 40.0f;
 	const float LineHeight = 18.0f;
-	const float PanelWidth = 720.0f;
-	const float PanelHeight = 220.0f + (Character->GetNormalAttackDebugEvents().Num() * LineHeight);
-
-	FCanvasTileItem Background(FVector2D(PanelX, PanelY), FVector2D(PanelWidth, PanelHeight), FLinearColor(0.02f, 0.02f, 0.02f, 0.78f));
-	Background.BlendMode = SE_BLEND_Translucent;
-	Canvas->DrawItem(Background);
+	const float PanelWidth = 600.0f;
 
 	float CurrentY = PanelY + 12.0f;
 	const FLinearColor HeaderColor(0.90f, 0.90f, 0.25f, 1.0f);
@@ -52,13 +47,28 @@ void ATwoheartsDebugHUD::DrawHUD()
 		Canvas->DrawItem(TextItem);
 	};
 
-	DrawDebugLine(TEXT("Normal Attack Test Panel"), PanelX + 12.0f, CurrentY, HeaderColor);
+	TArray<const FNormalAttackDebugEvent*> VisibleEvents;
+	const TArray<FNormalAttackDebugEvent>& Events = Character->GetNormalAttackDebugEvents();
+	for (int32 EventIndex = Events.Num() - 1; EventIndex >= 0 && VisibleEvents.Num() < 4; --EventIndex)
+	{
+		const FNormalAttackDebugEvent& Event = Events[EventIndex];
+		if (Character->ShouldDisplayNormalAttackDebugEvent(Event))
+		{
+			VisibleEvents.Add(&Event);
+		}
+	}
+
+	const float PanelHeight = 210.0f + (VisibleEvents.Num() * LineHeight);
+	FCanvasTileItem Background(FVector2D(PanelX, PanelY), FVector2D(PanelWidth, PanelHeight), FLinearColor(0.02f, 0.02f, 0.02f, 0.78f));
+	Background.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(Background);
+
+	DrawDebugLine(TEXT("Combat Debug"), PanelX + 12.0f, CurrentY, HeaderColor);
 	CurrentY += LineHeight * 1.4f;
 
 	DrawDebugLine(
 		FString::Printf(
-			TEXT("Panel=%s   Log=%s   Verbose=%s"),
-			Character->IsNormalAttackDebugPanelEnabled() ? TEXT("On") : TEXT("Off"),
+			TEXT("Log=%s   Verbose=%s"),
 			Character->IsNormalAttackDebugLoggingEnabled() ? TEXT("On") : TEXT("Off"),
 			Character->IsNormalAttackVerboseLoggingEnabled() ? TEXT("On") : TEXT("Off")),
 		PanelX + 12.0f,
@@ -66,17 +76,24 @@ void ATwoheartsDebugHUD::DrawHUD()
 		MutedColor);
 	CurrentY += LineHeight;
 
-	const TArray<FNormalAttackDebugEvent>& Events = Character->GetNormalAttackDebugEvents();
 	DrawDebugLine(
 		FString::Printf(
-			TEXT("Current State: attacking=%s segment=%d queued_next=%s phase=%s dodge_interrupt=%s logic_ended=%s latest_section=%s"),
-			Character->IsNormalAttackingDebugState() ? TEXT("true") : TEXT("false"),
+			TEXT("state=%s   seg=%d   phase=%s   dodge=%s   logic_end=%s"),
+			Character->IsNormalAttackingDebugState() ? TEXT("Attack") : TEXT("Idle"),
 			Character->GetCurrentNormalAttackSegmentDebugState(),
-			Character->HasQueuedNextNormalAttackSegmentDebugState() ? TEXT("true") : TEXT("false"),
 			*Character->GetCombatPhaseDebugName(Character->GetCurrentNormalAttackCombatPhaseDebugState()),
-			Character->IsNormalAttackInterruptibleByDodgeDebugState() ? TEXT("true") : TEXT("false"),
-			Character->IsNormalAttackLogicEndedDebugState() ? TEXT("true") : TEXT("false"),
-			*Character->GetCurrentNormalAttackSectionDebugState()),
+			Character->IsNormalAttackInterruptibleByDodgeDebugState() ? TEXT("YES") : TEXT("NO"),
+			Character->IsNormalAttackLogicEndedDebugState() ? TEXT("YES") : TEXT("NO")),
+		PanelX + 12.0f,
+		CurrentY,
+		TextColor);
+	CurrentY += LineHeight;
+
+	DrawDebugLine(
+		FString::Printf(
+			TEXT("section=%s   queued_next=%s"),
+			*Character->GetCurrentNormalAttackSectionDebugState(),
+			Character->HasQueuedNextNormalAttackSegmentDebugState() ? TEXT("YES") : TEXT("NO")),
 		PanelX + 12.0f,
 		CurrentY,
 		TextColor);
@@ -84,31 +101,50 @@ void ATwoheartsDebugHUD::DrawHUD()
 
 	const FString FailureReason = Character->GetLastNormalAttackDebugFailureReason();
 	DrawDebugLine(
-		FString::Printf(TEXT("Last Failure: %s"), FailureReason.IsEmpty() ? TEXT("None") : *FailureReason),
+		FString::Printf(TEXT("last_failure=%s"), FailureReason.IsEmpty() ? TEXT("None") : *FailureReason),
 		PanelX + 12.0f,
 		CurrentY,
 		FailureReason.IsEmpty() ? MutedColor : FailureColor);
 	CurrentY += LineHeight * 1.5f;
 
-	DrawDebugLine(TEXT("Recent Events"), PanelX + 12.0f, CurrentY, HeaderColor);
+	DrawDebugLine(TEXT("Dodge"), PanelX + 12.0f, CurrentY, HeaderColor);
 	CurrentY += LineHeight;
 
-	for (int32 EventIndex = Events.Num() - 1; EventIndex >= 0; --EventIndex)
+	DrawDebugLine(
+		FString::Printf(
+			TEXT("dodging=%s   direction=%s   invulnerable=%s   cooldown_ready=%s"),
+			Character->IsDodgingDebugState() ? TEXT("YES") : TEXT("NO"),
+			*Character->GetCurrentDodgeDirectionDebugState(),
+			Character->IsDodgeInvulnerableDebugState() ? TEXT("YES") : TEXT("NO"),
+			Character->IsDodgeCooldownReadyDebugState() ? TEXT("YES") : TEXT("NO")),
+		PanelX + 12.0f,
+		CurrentY,
+		TextColor);
+	CurrentY += LineHeight;
+
+	DrawDebugLine(
+		FString::Printf(
+			TEXT("last_dodge_event=[%.2f] %s | %s"),
+			Character->GetLastDodgeEventTimeSeconds(),
+			*Character->GetLastDodgeDebugEventName(),
+			Character->GetLastDodgeDebugDetail().IsEmpty() ? TEXT("None") : *Character->GetLastDodgeDebugDetail()),
+		PanelX + 12.0f,
+		CurrentY,
+		Character->GetLastDodgeDebugDetail().IsEmpty() ? MutedColor : TextColor);
+	CurrentY += LineHeight * 1.5f;
+
+	DrawDebugLine(TEXT("Recent Key Events"), PanelX + 12.0f, CurrentY, HeaderColor);
+	CurrentY += LineHeight;
+
+	for (const FNormalAttackDebugEvent* Event : VisibleEvents)
 	{
-		const FNormalAttackDebugEvent& Event = Events[EventIndex];
 		DrawDebugLine(
 			FString::Printf(
-				TEXT("[%.3f] %s | seg=%d | phase=%s | interruptible=%s | logic_ended=%s | attacking=%s | queued=%s | section=%s | %s"),
-				Event.TimestampSeconds,
-				*Event.EventName,
-				Event.Segment,
-				*Event.PhaseName,
-				Event.bInterruptibleByDodge ? TEXT("true") : TEXT("false"),
-				Event.bLogicEnded ? TEXT("true") : TEXT("false"),
-				Event.bIsAttacking ? TEXT("true") : TEXT("false"),
-				Event.bHasQueuedNextSegment ? TEXT("true") : TEXT("false"),
-				*Event.SectionName,
-				*Event.Detail),
+				TEXT("[%.2f] %s | phase=%s | dodge=%s"),
+				Event->TimestampSeconds,
+				*Event->EventName,
+				*Event->PhaseName,
+				Event->bInterruptibleByDodge ? TEXT("YES") : TEXT("NO")),
 			PanelX + 12.0f,
 			CurrentY,
 			TextColor);

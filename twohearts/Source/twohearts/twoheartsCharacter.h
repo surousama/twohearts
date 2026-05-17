@@ -54,6 +54,33 @@ struct FNormalAttackDebugEvent
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug")
 	bool bLogicEnded = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug")
+	bool bVerboseOnly = false;
+};
+
+USTRUCT(BlueprintType)
+struct FTwoHeartsDodgeConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge")
+	TObjectPtr<UAnimMontage> DodgeMontage = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge", meta=(ClampMin="0.05", UIMin="0.05"))
+	float DodgeDurationSeconds = 0.45f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge", meta=(ClampMin="0.0", UIMin="0.0"))
+	float DodgeDistance = 420.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge", meta=(ClampMin="0.0", UIMin="0.0"))
+	float DodgeCooldownSeconds = 0.8f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge", meta=(ClampMin="0.0", UIMin="0.0"))
+	float DodgeInvulnerableStartSeconds = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge", meta=(ClampMin="0.0", UIMin="0.0"))
+	float DodgeInvulnerableDurationSeconds = 0.22f;
 };
 
 /**
@@ -139,19 +166,46 @@ protected:
 	bool bEnableNormalAttackDebugLogging = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug", meta=(AllowPrivateAccess="true"))
-	bool bEnableNormalAttackVerboseLogging = true;
+	bool bEnableNormalAttackVerboseLogging = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug", meta=(AllowPrivateAccess="true"))
 	bool bShowNormalAttackDebugPanel = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug", meta=(ClampMin="1", UIMin="1", ClampMax="50", UIMax="50", AllowPrivateAccess="true"))
-	int32 NormalAttackDebugMaxEvents = 12;
+	int32 NormalAttackDebugMaxEvents = 6;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack|Debug", meta=(AllowPrivateAccess="true"))
 	TArray<FNormalAttackDebugEvent> NormalAttackDebugEvents;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack|Debug", meta=(AllowPrivateAccess="true"))
 	FString LastNormalAttackDebugFailureReason;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge", meta=(AllowPrivateAccess="true"))
+	FTwoHeartsDodgeConfig DodgeConfig;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Dodge|Debug", meta=(AllowPrivateAccess="true"))
+	bool bIsDodgeAbilityActive = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Dodge|Debug", meta=(AllowPrivateAccess="true"))
+	bool bIsDodgeInvulnerable = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Dodge|Debug", meta=(AllowPrivateAccess="true"))
+	bool bIsDodgeCooldownReady = true;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Dodge|Debug", meta=(AllowPrivateAccess="true"))
+	FString CurrentDodgeDirectionName = TEXT("None");
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Dodge|Debug", meta=(AllowPrivateAccess="true"))
+	FString LastDodgeDebugEventName = TEXT("None");
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Dodge|Debug", meta=(AllowPrivateAccess="true"))
+	FString LastDodgeDebugDetail;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Dodge|Debug", meta=(AllowPrivateAccess="true"))
+	float LastDodgeEventTimeSeconds = 0.0f;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Input", meta=(AllowPrivateAccess="true"))
+	FVector2D CachedMoveInput = FVector2D::ZeroVector;
 
 public:
 
@@ -216,6 +270,15 @@ public:
 	UFUNCTION(BlueprintPure, Category="Combat|Normal Attack")
 	float GetNormalAttackSectionLength(int32 Segment) const;
 
+	UFUNCTION(BlueprintPure, Category="Combat|Dodge")
+	const FTwoHeartsDodgeConfig& GetDodgeConfig() const { return DodgeConfig; }
+
+	UFUNCTION(BlueprintPure, Category="Combat|Dodge")
+	FVector GetDesiredDodgeDirectionWorld() const;
+
+	UFUNCTION(BlueprintPure, Category="Combat|Dodge")
+	FString GetDesiredDodgeDirectionName() const;
+
 	UFUNCTION(BlueprintPure, Category="Combat|Normal Attack|Debug")
 	bool IsNormalAttackDebugPanelEnabled() const { return bShowNormalAttackDebugPanel; }
 
@@ -241,6 +304,8 @@ public:
 	void SetLastNormalAttackDebugFailureReason(const FString& FailureReason);
 	void PushNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false);
 	void PushNormalAttackDebugFailure(const TCHAR* EventName, const FString& Detail);
+	void SetDodgeDebugRuntimeState(bool bIsActive, bool bIsInvulnerable, bool bIsCooldownReady, const FString& DirectionName);
+	void PushDodgeDebugEvent(const TCHAR* EventName, const FString& Detail);
 
 	bool IsNormalAttackingDebugState() const { return bIsNormalAttackAbilityActive; }
 	int32 GetCurrentNormalAttackSegmentDebugState() const { return CurrentNormalAttackAbilitySegment; }
@@ -252,6 +317,14 @@ public:
 	const TArray<FNormalAttackDebugEvent>& GetNormalAttackDebugEvents() const { return NormalAttackDebugEvents; }
 	const FString& GetLastNormalAttackDebugFailureReason() const { return LastNormalAttackDebugFailureReason; }
 	FString GetCombatPhaseDebugName(ETwoHeartsCombatPhase CombatPhase) const;
+	bool ShouldDisplayNormalAttackDebugEvent(const FNormalAttackDebugEvent& Event) const;
+	bool IsDodgingDebugState() const { return bIsDodgeAbilityActive; }
+	bool IsDodgeInvulnerableDebugState() const { return bIsDodgeInvulnerable; }
+	bool IsDodgeCooldownReadyDebugState() const { return bIsDodgeCooldownReady; }
+	const FString& GetCurrentDodgeDirectionDebugState() const { return CurrentDodgeDirectionName; }
+	const FString& GetLastDodgeDebugEventName() const { return LastDodgeDebugEventName; }
+	const FString& GetLastDodgeDebugDetail() const { return LastDodgeDebugDetail; }
+	float GetLastDodgeEventTimeSeconds() const { return LastDodgeEventTimeSeconds; }
 
 public:
 
@@ -265,6 +338,7 @@ protected:
 
 	void RecordNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false);
 	void RecordNormalAttackFailure(const TCHAR* EventName, const FString& Detail);
+	bool ShouldEmitNormalAttackDebugLog(const TCHAR* EventName, bool bVerboseOnly) const;
 	void DrawNormalAttackDebugOverlay() const;
 };
 

@@ -13,7 +13,10 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_TwoHearts_State_Action_NormalAttack);
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_TwoHearts_State_Action_Dodge);
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_TwoHearts_State_Action_Guard);
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_TwoHearts_State_CannotAttack);
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_TwoHearts_State_CannotDodge);
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_TwoHearts_State_CannotInput);
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_TwoHearts_State_Dodge_Invulnerable);
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_TwoHearts_Cooldown_Dodge);
 
 struct FTwoHeartsGameplayTags
 {
@@ -26,5 +29,8 @@ struct FTwoHeartsGameplayTags
 	static FGameplayTag State_Action_Dodge();
 	static FGameplayTag State_Action_Guard();
 	static FGameplayTag State_CannotAttack();
+	static FGameplayTag State_CannotDodge();
 	static FGameplayTag State_CannotInput();
+	static FGameplayTag State_Dodge_Invulnerable();
+	static FGameplayTag Cooldown_Dodge();
 };

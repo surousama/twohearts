@@ -111,8 +111,6 @@ void AtwoheartsCharacter::BeginPlay()
 void AtwoheartsCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-
-	DrawNormalAttackDebugOverlay();
 }
 
 void AtwoheartsCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -372,6 +370,8 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 
 void AtwoheartsCharacter::DoMove(float Right, float Forward)
 {
+	CachedMoveInput = FVector2D(Right, Forward);
+
 	if (GetController() != nullptr)
 	{
 		// find out which way is forward
@@ -434,6 +434,73 @@ float AtwoheartsCharacter::GetNormalAttackSectionLength(int32 Segment) const
 	return SectionIndex != INDEX_NONE ? NormalAttackMontage->GetSectionLength(SectionIndex) : 0.0f;
 }
 
+FVector AtwoheartsCharacter::GetDesiredDodgeDirectionWorld() const
+{
+	if (GetController())
+	{
+		const FRotator Rotation = GetController()->GetControlRotation();
+		const FRotator YawRotation(0.0f, Rotation.Yaw, 0.0f);
+		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+		const FVector MovementDirection = (ForwardDirection * CachedMoveInput.Y) + (RightDirection * CachedMoveInput.X);
+		if (!MovementDirection.IsNearlyZero())
+		{
+			return MovementDirection.GetSafeNormal2D();
+		}
+	}
+
+	const FVector ActorForward = GetActorForwardVector().GetSafeNormal2D();
+	return ActorForward.IsNearlyZero() ? FVector::ForwardVector : ActorForward;
+}
+
+FString AtwoheartsCharacter::GetDesiredDodgeDirectionName() const
+{
+	const FVector Direction = GetDesiredDodgeDirectionWorld();
+	const FVector Forward = GetActorForwardVector().GetSafeNormal2D();
+	const FVector Right = GetActorRightVector().GetSafeNormal2D();
+
+	const float ForwardDot = FVector::DotProduct(Direction, Forward);
+	const float RightDot = FVector::DotProduct(Direction, Right);
+	const float AngleDegrees = FMath::RadiansToDegrees(FMath::Atan2(RightDot, ForwardDot));
+
+	if (AngleDegrees >= -22.5f && AngleDegrees < 22.5f)
+	{
+		return TEXT("Forward");
+	}
+
+	if (AngleDegrees >= 22.5f && AngleDegrees < 67.5f)
+	{
+		return TEXT("ForwardRight");
+	}
+
+	if (AngleDegrees >= 67.5f && AngleDegrees < 112.5f)
+	{
+		return TEXT("Right");
+	}
+
+	if (AngleDegrees >= 112.5f && AngleDegrees < 157.5f)
+	{
+		return TEXT("BackwardRight");
+	}
+
+	if (AngleDegrees >= 157.5f || AngleDegrees < -157.5f)
+	{
+		return TEXT("Backward");
+	}
+
+	if (AngleDegrees >= -157.5f && AngleDegrees < -112.5f)
+	{
+		return TEXT("BackwardLeft");
+	}
+
+	if (AngleDegrees >= -112.5f && AngleDegrees < -67.5f)
+	{
+		return TEXT("Left");
+	}
+
+	return TEXT("ForwardLeft");
+}
+
 void AtwoheartsCharacter::SetNormalAttackDebugPanelEnabled(bool bEnabled)
 {
 	bShowNormalAttackDebugPanel = bEnabled;
@@ -476,6 +543,14 @@ void AtwoheartsCharacter::SetLastNormalAttackDebugFailureReason(const FString& F
 	LastNormalAttackDebugFailureReason = FailureReason;
 }
 
+void AtwoheartsCharacter::SetDodgeDebugRuntimeState(bool bIsActive, bool bIsInvulnerable, bool bIsCooldownReady, const FString& DirectionName)
+{
+	bIsDodgeAbilityActive = bIsActive;
+	bIsDodgeInvulnerable = bIsInvulnerable;
+	bIsDodgeCooldownReady = bIsCooldownReady;
+	CurrentDodgeDirectionName = DirectionName;
+}
+
 void AtwoheartsCharacter::PushNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly)
 {
 	RecordNormalAttackDebugEvent(EventName, Detail, bVerboseOnly);
@@ -484,6 +559,13 @@ void AtwoheartsCharacter::PushNormalAttackDebugEvent(const TCHAR* EventName, con
 void AtwoheartsCharacter::PushNormalAttackDebugFailure(const TCHAR* EventName, const FString& Detail)
 {
 	RecordNormalAttackFailure(EventName, Detail);
+}
+
+void AtwoheartsCharacter::PushDodgeDebugEvent(const TCHAR* EventName, const FString& Detail)
+{
+	LastDodgeDebugEventName = EventName;
+	LastDodgeDebugDetail = Detail;
+	LastDodgeEventTimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 }
 
 void AtwoheartsCharacter::RecordNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly)
@@ -499,6 +581,7 @@ void AtwoheartsCharacter::RecordNormalAttackDebugEvent(const TCHAR* EventName, c
 	Event.PhaseName = GetCombatPhaseDebugName(CurrentNormalAttackCombatPhase);
 	Event.bInterruptibleByDodge = bIsNormalAttackInterruptibleByDodge;
 	Event.bLogicEnded = bIsNormalAttackLogicEnded;
+	Event.bVerboseOnly = bVerboseOnly;
 
 	NormalAttackDebugEvents.Add(MoveTemp(Event));
 	const int32 ExcessEvents = NormalAttackDebugEvents.Num() - FMath::Max(1, NormalAttackDebugMaxEvents);
@@ -512,7 +595,7 @@ void AtwoheartsCharacter::RecordNormalAttackDebugEvent(const TCHAR* EventName, c
 		return;
 	}
 
-	if (bVerboseOnly && !bEnableNormalAttackVerboseLogging)
+	if (!ShouldEmitNormalAttackDebugLog(EventName, bVerboseOnly))
 	{
 		return;
 	}
@@ -535,6 +618,43 @@ void AtwoheartsCharacter::RecordNormalAttackDebugEvent(const TCHAR* EventName, c
 		*LatestEvent.Detail);
 }
 
+bool AtwoheartsCharacter::ShouldEmitNormalAttackDebugLog(const TCHAR* EventName, bool bVerboseOnly) const
+{
+	if (bVerboseOnly)
+	{
+		return bEnableNormalAttackVerboseLogging;
+	}
+
+	const FString EventNameString = EventName;
+	return
+		EventNameString == TEXT("EnterPhase") ||
+		EventNameString == TEXT("LogicEnded") ||
+		EventNameString == TEXT("InterruptCheck") ||
+		EventNameString == TEXT("InterruptedByDodge") ||
+		EventNameString == TEXT("SegmentFinished") ||
+		EventNameString == TEXT("ActivateFailed") ||
+		EventNameString == TEXT("SegmentInterrupted") ||
+		EventNameString.Contains(TEXT("Failure"));
+}
+
+bool AtwoheartsCharacter::ShouldDisplayNormalAttackDebugEvent(const FNormalAttackDebugEvent& Event) const
+{
+	if (Event.bVerboseOnly && !bEnableNormalAttackVerboseLogging)
+	{
+		return false;
+	}
+
+	return
+		Event.EventName == TEXT("EnterPhase") ||
+		Event.EventName == TEXT("LogicEnded") ||
+		Event.EventName == TEXT("InterruptCheck") ||
+		Event.EventName == TEXT("InterruptedByDodge") ||
+		Event.EventName == TEXT("SegmentFinished") ||
+		Event.EventName == TEXT("ActivateFailed") ||
+		Event.EventName == TEXT("SegmentInterrupted") ||
+		Event.EventName.Contains(TEXT("Failure"));
+}
+
 void AtwoheartsCharacter::RecordNormalAttackFailure(const TCHAR* EventName, const FString& Detail)
 {
 	LastNormalAttackDebugFailureReason = Detail;
@@ -548,61 +668,8 @@ void AtwoheartsCharacter::RecordNormalAttackFailure(const TCHAR* EventName, cons
 
 void AtwoheartsCharacter::DrawNormalAttackDebugOverlay() const
 {
-	if (!bShowNormalAttackDebugPanel || !IsLocallyControlled() || !GEngine)
-	{
-		return;
-	}
-
-	constexpr uint64 HeaderKey = 62000;
-	constexpr uint64 StateKey = 62001;
-	constexpr uint64 FailureKey = 62002;
-	constexpr uint64 EventBaseKey = 62010;
-	constexpr int32 MaxOverlayEvents = 6;
-
-	GEngine->AddOnScreenDebugMessage(HeaderKey, 0.0f, FColor(230, 230, 64), TEXT("Normal Attack Test Panel"));
-	GEngine->AddOnScreenDebugMessage(
-		StateKey,
-		0.0f,
-		FColor::White,
-		FString::Printf(
-			TEXT("attacking=%s segment=%d queued_next=%s phase=%s dodge_interrupt=%s logic_ended=%s latest_section=%s"),
-			bIsNormalAttackAbilityActive ? TEXT("true") : TEXT("false"),
-			CurrentNormalAttackAbilitySegment,
-			bHasQueuedNextNormalAttackAbilitySegment ? TEXT("true") : TEXT("false"),
-			*GetCombatPhaseDebugName(CurrentNormalAttackCombatPhase),
-			bIsNormalAttackInterruptibleByDodge ? TEXT("true") : TEXT("false"),
-			bIsNormalAttackLogicEnded ? TEXT("true") : TEXT("false"),
-			CurrentNormalAttackAbilitySectionName.IsEmpty() ? TEXT("None") : *CurrentNormalAttackAbilitySectionName));
-	GEngine->AddOnScreenDebugMessage(
-		FailureKey,
-		0.0f,
-		LastNormalAttackDebugFailureReason.IsEmpty() ? FColor(180, 180, 180) : FColor(255, 120, 90),
-		FString::Printf(TEXT("Last Failure: %s"), LastNormalAttackDebugFailureReason.IsEmpty() ? TEXT("None") : *LastNormalAttackDebugFailureReason));
-
-	int32 OverlayRow = 0;
-	for (int32 EventIndex = NormalAttackDebugEvents.Num() - 1; EventIndex >= 0 && OverlayRow < MaxOverlayEvents; --EventIndex, ++OverlayRow)
-	{
-		const FNormalAttackDebugEvent& Event = NormalAttackDebugEvents[EventIndex];
-		GEngine->AddOnScreenDebugMessage(
-			EventBaseKey + OverlayRow,
-			0.0f,
-			FColor(210, 210, 210),
-			FString::Printf(
-				TEXT("[%.2f] %s | seg=%d | phase=%s | dodge_interrupt=%s | logic_ended=%s | queued=%s | %s"),
-				Event.TimestampSeconds,
-				*Event.EventName,
-				Event.Segment,
-				*Event.PhaseName,
-				Event.bInterruptibleByDodge ? TEXT("true") : TEXT("false"),
-				Event.bLogicEnded ? TEXT("true") : TEXT("false"),
-				Event.bHasQueuedNextSegment ? TEXT("true") : TEXT("false"),
-				*Event.Detail));
-	}
-
-	for (; OverlayRow < MaxOverlayEvents; ++OverlayRow)
-	{
-		GEngine->AddOnScreenDebugMessage(EventBaseKey + OverlayRow, 0.0f, FColor::Transparent, TEXT(""));
-	}
+	// The debug HUD already renders a cleaner combat panel. Keep the legacy
+	// on-screen debug overlay disabled to avoid duplicate noise during tuning.
 }
 
 FString AtwoheartsCharacter::GetCombatPhaseDebugName(ETwoHeartsCombatPhase CombatPhase) const

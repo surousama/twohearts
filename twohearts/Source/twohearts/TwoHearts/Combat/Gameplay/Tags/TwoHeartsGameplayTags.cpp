@@ -9,7 +9,10 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_State_Action_NormalAttack, "State.A
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_State_Action_Dodge, "State.Action.Dodge", "Dodge action state tag.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_State_Action_Guard, "State.Action.Guard", "Guard action state tag.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_State_CannotAttack, "State.CannotAttack", "Prevents attack abilities from activating.");
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_State_CannotDodge, "State.CannotDodge", "Prevents dodge abilities from activating.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_State_CannotInput, "State.CannotInput", "Prevents combat ability input from activating.");
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_State_Dodge_Invulnerable, "State.Dodge.Invulnerable", "The avatar is inside the dodge invulnerability window.");
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Cooldown_Dodge, "Cooldown.Dodge", "Dodge is on cooldown.");
 
 FGameplayTag FTwoHeartsGameplayTags::Ability_NormalAttack()
 {
@@ -56,7 +59,22 @@ FGameplayTag FTwoHeartsGameplayTags::State_CannotAttack()
 	return TAG_TwoHearts_State_CannotAttack;
 }
 
+FGameplayTag FTwoHeartsGameplayTags::State_CannotDodge()
+{
+	return TAG_TwoHearts_State_CannotDodge;
+}
+
 FGameplayTag FTwoHeartsGameplayTags::State_CannotInput()
 {
 	return TAG_TwoHearts_State_CannotInput;
+}
+
+FGameplayTag FTwoHeartsGameplayTags::State_Dodge_Invulnerable()
+{
+	return TAG_TwoHearts_State_Dodge_Invulnerable;
+}
+
+FGameplayTag FTwoHeartsGameplayTags::Cooldown_Dodge()
+{
+	return TAG_TwoHearts_Cooldown_Dodge;
 }
