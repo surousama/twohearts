@@ -69,10 +69,13 @@ void ATwoheartsDebugHUD::DrawHUD()
 	const TArray<FNormalAttackDebugEvent>& Events = Character->GetNormalAttackDebugEvents();
 	DrawDebugLine(
 		FString::Printf(
-			TEXT("Current State: attacking=%s segment=%d queued_next=%s latest_section=%s"),
+			TEXT("Current State: attacking=%s segment=%d queued_next=%s phase=%s dodge_interrupt=%s logic_ended=%s latest_section=%s"),
 			Character->IsNormalAttackingDebugState() ? TEXT("true") : TEXT("false"),
 			Character->GetCurrentNormalAttackSegmentDebugState(),
 			Character->HasQueuedNextNormalAttackSegmentDebugState() ? TEXT("true") : TEXT("false"),
+			*Character->GetCombatPhaseDebugName(Character->GetCurrentNormalAttackCombatPhaseDebugState()),
+			Character->IsNormalAttackInterruptibleByDodgeDebugState() ? TEXT("true") : TEXT("false"),
+			Character->IsNormalAttackLogicEndedDebugState() ? TEXT("true") : TEXT("false"),
 			*Character->GetCurrentNormalAttackSectionDebugState()),
 		PanelX + 12.0f,
 		CurrentY,
@@ -95,10 +98,13 @@ void ATwoheartsDebugHUD::DrawHUD()
 		const FNormalAttackDebugEvent& Event = Events[EventIndex];
 		DrawDebugLine(
 			FString::Printf(
-				TEXT("[%.3f] %s | seg=%d | attacking=%s | queued=%s | section=%s | %s"),
+				TEXT("[%.3f] %s | seg=%d | phase=%s | interruptible=%s | logic_ended=%s | attacking=%s | queued=%s | section=%s | %s"),
 				Event.TimestampSeconds,
 				*Event.EventName,
 				Event.Segment,
+				*Event.PhaseName,
+				Event.bInterruptibleByDodge ? TEXT("true") : TEXT("false"),
+				Event.bLogicEnded ? TEXT("true") : TEXT("false"),
 				Event.bIsAttacking ? TEXT("true") : TEXT("false"),
 				Event.bHasQueuedNextSegment ? TEXT("true") : TEXT("false"),
 				*Event.SectionName,

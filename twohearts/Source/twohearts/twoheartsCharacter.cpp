@@ -12,13 +12,16 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
 #include "Engine/LocalPlayer.h"
+#include "Engine/Engine.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsAbilityGrant.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_NormalAttack_1.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_NormalAttack_2.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_NormalAttack_3.h"
+#include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_Dodge.h"
 #include "TwoHearts/Combat/Gameplay/Input/TwoHeartsAbilityInputID.h"
+#include "TwoHearts/Combat/Gameplay/Tags/TwoHeartsGameplayTags.h"
 #include "twohearts.h"
 
 AtwoheartsCharacter::AtwoheartsCharacter()
@@ -57,6 +60,7 @@ AtwoheartsCharacter::AtwoheartsCharacter()
 
 	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AbilitySystemComponent->SetIsReplicated(true);
+	PrimaryActorTick.bCanEverTick = true;
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
@@ -83,6 +87,11 @@ AtwoheartsCharacter::AtwoheartsCharacter()
 		NormalAttackSegment3Grant.AbilityClass = UTwoHeartsGA_NormalAttack_3::StaticClass();
 		NormalAttackSegment3Grant.InputID = ETwoHeartsAbilityInputID::NormalAttack;
 		DefaultCombatAbilities.Add(NormalAttackSegment3Grant);
+
+		FTwoHeartsAbilityGrant DodgeGrant;
+		DodgeGrant.AbilityClass = UTwoHeartsGA_Dodge::StaticClass();
+		DodgeGrant.InputID = ETwoHeartsAbilityInputID::Dodge;
+		DefaultCombatAbilities.Add(DodgeGrant);
 	}
 }
 
@@ -97,6 +106,13 @@ void AtwoheartsCharacter::BeginPlay()
 
 	InitializeAbilitySystem();
 	GrantDefaultCombatAbilities();
+}
+
+void AtwoheartsCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	DrawNormalAttackDebugOverlay();
 }
 
 void AtwoheartsCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -119,6 +135,11 @@ void AtwoheartsCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 		if (NormalAttackAction)
 		{
 			EnhancedInputComponent->BindAction(NormalAttackAction, ETriggerEvent::Started, this, &AtwoheartsCharacter::NormalAttack);
+		}
+
+		if (DodgeAction)
+		{
+			EnhancedInputComponent->BindAction(DodgeAction, ETriggerEvent::Started, this, &AtwoheartsCharacter::Dodge);
 		}
 	}
 	else
@@ -152,7 +173,17 @@ void AtwoheartsCharacter::NormalAttack(const FInputActionValue& Value)
 		return;
 	}
 
-	UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[AbilityInput] NormalAttack input did not match any granted combat ability on %s."), *GetNameSafe(this));
+	UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[AbilityInput] NormalAttack input did not activate any ability on %s."), *GetNameSafe(this));
+}
+
+void AtwoheartsCharacter::Dodge(const FInputActionValue& Value)
+{
+	if (HandleAbilityInputPressed(ETwoHeartsAbilityInputID::Dodge))
+	{
+		return;
+	}
+
+	UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[AbilityInput] Dodge input did not activate any ability on %s."), *GetNameSafe(this));
 }
 
 void AtwoheartsCharacter::InitializeAbilitySystem()
@@ -222,8 +253,18 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 		return false;
 	}
 
-	bool bHandledInput = false;
 	const int32 NumericInputID = static_cast<int32>(InputID);
+	bool bForwardedToActiveAbility = false;
+	bool bAttemptedActivation = false;
+	bool bActivatedAbility = false;
+	TArray<FString> MatchingAbilityNames;
+
+	auto BuildFailureReason = [](const FGameplayTagContainer& FailureTags) -> FString
+	{
+		return FailureTags.IsEmpty()
+			? TEXT("CanActivateAbility returned false with no failure tags.")
+			: FString::Printf(TEXT("Blocked by tags: %s"), *FailureTags.ToStringSimple());
+	};
 
 	for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
 	{
@@ -232,14 +273,21 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 			continue;
 		}
 
-		bHandledInput = true;
+		bForwardedToActiveAbility = true;
 		AbilitySystemComponent->AbilitySpecInputPressed(AbilitySpec);
+		RecordNormalAttackDebugEvent(
+			TEXT("ForwardInputToActiveAbility"),
+			FString::Printf(TEXT("Forwarded input to active ability %s."), *GetNameSafe(AbilitySpec.Ability)),
+			true);
 	}
 
-	if (bHandledInput)
+	if (bForwardedToActiveAbility)
 	{
 		return true;
 	}
+
+	const bool bIsNormalAttackInput = InputID == ETwoHeartsAbilityInputID::NormalAttack;
+	const FGameplayTag StarterAbilityTag = TAG_TwoHearts_Ability_NormalAttack_Segment1;
 
 	for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
 	{
@@ -248,16 +296,78 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 			continue;
 		}
 
-		bHandledInput = true;
-		AbilitySystemComponent->AbilitySpecInputPressed(AbilitySpec);
-
-		if (!AbilitySpec.IsActive() && AbilitySystemComponent->TryActivateAbility(AbilitySpec.Handle))
+		if (!AbilitySpec.Ability)
 		{
-			return true;
+			continue;
 		}
+
+		MatchingAbilityNames.Add(GetNameSafe(AbilitySpec.Ability));
+
+		if (bIsNormalAttackInput && !AbilitySpec.Ability->GetAssetTags().HasTagExact(StarterAbilityTag))
+		{
+			continue;
+		}
+
+		bAttemptedActivation = true;
+
+		FGameplayTagContainer FailureTags;
+		const bool bCanActivate = AbilitySpec.Ability->CanActivateAbility(
+			AbilitySpec.Handle,
+			AbilitySystemComponent->AbilityActorInfo.Get(),
+			nullptr,
+			nullptr,
+			&FailureTags);
+
+		if (!bCanActivate)
+		{
+			RecordNormalAttackFailure(
+				TEXT("ActivateFailed"),
+				FString::Printf(TEXT("Failed to activate %s. %s"), *GetNameSafe(AbilitySpec.Ability), *BuildFailureReason(FailureTags)));
+			continue;
+		}
+
+		AbilitySystemComponent->AbilitySpecInputPressed(AbilitySpec);
+		if (AbilitySystemComponent->TryActivateAbility(AbilitySpec.Handle))
+		{
+			bActivatedAbility = true;
+			RecordNormalAttackDebugEvent(
+				TEXT("ActivateAbility"),
+				FString::Printf(TEXT("Activated ability %s for input %d."), *GetNameSafe(AbilitySpec.Ability), NumericInputID));
+			break;
+		}
+
+		RecordNormalAttackFailure(
+			TEXT("ActivateFailed"),
+			FString::Printf(TEXT("TryActivateAbility failed for %s after CanActivateAbility succeeded."), *GetNameSafe(AbilitySpec.Ability)));
 	}
 
-	return bHandledInput;
+	if (!MatchingAbilityNames.IsEmpty())
+	{
+		RecordNormalAttackDebugEvent(
+			TEXT("InputScan"),
+			FString::Printf(TEXT("Input %d scanned abilities: %s."), NumericInputID, *FString::Join(MatchingAbilityNames, TEXT(", "))),
+			true);
+	}
+
+	if (bAttemptedActivation)
+	{
+		return bActivatedAbility;
+	}
+
+	if (bIsNormalAttackInput)
+	{
+		RecordNormalAttackFailure(
+			TEXT("ActivateFailed"),
+			TEXT("NormalAttack input found no valid starter ability. First input must enter Segment1."));
+	}
+	else if (!MatchingAbilityNames.IsEmpty())
+	{
+		RecordNormalAttackDebugEvent(
+			TEXT("ActivateFailed"),
+			FString::Printf(TEXT("Input %d matched abilities but none were eligible for activation."), NumericInputID));
+	}
+
+	return false;
 }
 
 void AtwoheartsCharacter::DoMove(float Right, float Forward)
@@ -346,16 +456,19 @@ void AtwoheartsCharacter::ClearNormalAttackDebugEvents()
 {
 	NormalAttackDebugEvents.Reset();
 	LastNormalAttackDebugFailureReason.Reset();
-	SetNormalAttackDebugRuntimeState(false, 0, false, TEXT("None"));
+	SetNormalAttackDebugRuntimeState(false, 0, false, TEXT("None"), ETwoHeartsCombatPhase::None, false, false);
 	RecordNormalAttackDebugEvent(TEXT("DebugEventsCleared"), TEXT("Cleared normal attack debug event history."));
 }
 
-void AtwoheartsCharacter::SetNormalAttackDebugRuntimeState(bool bIsActive, int32 Segment, bool bHasQueuedNextSegment, const FString& SectionName)
+void AtwoheartsCharacter::SetNormalAttackDebugRuntimeState(bool bIsActive, int32 Segment, bool bHasQueuedNextSegment, const FString& SectionName, ETwoHeartsCombatPhase CombatPhase, bool bInterruptibleByDodge, bool bLogicEnded)
 {
 	bIsNormalAttackAbilityActive = bIsActive;
 	CurrentNormalAttackAbilitySegment = Segment;
 	bHasQueuedNextNormalAttackAbilitySegment = bHasQueuedNextSegment;
 	CurrentNormalAttackAbilitySectionName = SectionName;
+	CurrentNormalAttackCombatPhase = CombatPhase;
+	bIsNormalAttackInterruptibleByDodge = bInterruptibleByDodge;
+	bIsNormalAttackLogicEnded = bLogicEnded;
 }
 
 void AtwoheartsCharacter::SetLastNormalAttackDebugFailureReason(const FString& FailureReason)
@@ -383,6 +496,9 @@ void AtwoheartsCharacter::RecordNormalAttackDebugEvent(const TCHAR* EventName, c
 	Event.bIsAttacking = bIsNormalAttackAbilityActive;
 	Event.bHasQueuedNextSegment = bHasQueuedNextNormalAttackAbilitySegment;
 	Event.SectionName = CurrentNormalAttackAbilitySectionName.IsEmpty() ? TEXT("None") : CurrentNormalAttackAbilitySectionName;
+	Event.PhaseName = GetCombatPhaseDebugName(CurrentNormalAttackCombatPhase);
+	Event.bInterruptibleByDodge = bIsNormalAttackInterruptibleByDodge;
+	Event.bLogicEnded = bIsNormalAttackLogicEnded;
 
 	NormalAttackDebugEvents.Add(MoveTemp(Event));
 	const int32 ExcessEvents = NormalAttackDebugEvents.Num() - FMath::Max(1, NormalAttackDebugMaxEvents);
@@ -405,13 +521,16 @@ void AtwoheartsCharacter::RecordNormalAttackDebugEvent(const TCHAR* EventName, c
 	UE_LOG(
 		LogtwoheartsCombatTest,
 		Display,
-		TEXT("[NormalAttack] time=%.3f event=%s actor=%s segment=%d attacking=%s queued_next=%s section=%s detail=\"%s\""),
+		TEXT("[NormalAttack] time=%.3f event=%s actor=%s segment=%d phase=%s attacking=%s queued_next=%s interruptible_by_dodge=%s logic_ended=%s section=%s detail=\"%s\""),
 		LatestEvent.TimestampSeconds,
 		*LatestEvent.EventName,
 		*GetNameSafe(this),
 		LatestEvent.Segment,
+		*LatestEvent.PhaseName,
 		LatestEvent.bIsAttacking ? TEXT("true") : TEXT("false"),
 		LatestEvent.bHasQueuedNextSegment ? TEXT("true") : TEXT("false"),
+		LatestEvent.bInterruptibleByDodge ? TEXT("true") : TEXT("false"),
+		LatestEvent.bLogicEnded ? TEXT("true") : TEXT("false"),
 		*LatestEvent.SectionName,
 		*LatestEvent.Detail);
 }
@@ -425,4 +544,69 @@ void AtwoheartsCharacter::RecordNormalAttackFailure(const TCHAR* EventName, cons
 	{
 		UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[NormalAttackFailure] actor=%s detail=\"%s\""), *GetNameSafe(this), *Detail);
 	}
+}
+
+void AtwoheartsCharacter::DrawNormalAttackDebugOverlay() const
+{
+	if (!bShowNormalAttackDebugPanel || !IsLocallyControlled() || !GEngine)
+	{
+		return;
+	}
+
+	constexpr uint64 HeaderKey = 62000;
+	constexpr uint64 StateKey = 62001;
+	constexpr uint64 FailureKey = 62002;
+	constexpr uint64 EventBaseKey = 62010;
+	constexpr int32 MaxOverlayEvents = 6;
+
+	GEngine->AddOnScreenDebugMessage(HeaderKey, 0.0f, FColor(230, 230, 64), TEXT("Normal Attack Test Panel"));
+	GEngine->AddOnScreenDebugMessage(
+		StateKey,
+		0.0f,
+		FColor::White,
+		FString::Printf(
+			TEXT("attacking=%s segment=%d queued_next=%s phase=%s dodge_interrupt=%s logic_ended=%s latest_section=%s"),
+			bIsNormalAttackAbilityActive ? TEXT("true") : TEXT("false"),
+			CurrentNormalAttackAbilitySegment,
+			bHasQueuedNextNormalAttackAbilitySegment ? TEXT("true") : TEXT("false"),
+			*GetCombatPhaseDebugName(CurrentNormalAttackCombatPhase),
+			bIsNormalAttackInterruptibleByDodge ? TEXT("true") : TEXT("false"),
+			bIsNormalAttackLogicEnded ? TEXT("true") : TEXT("false"),
+			CurrentNormalAttackAbilitySectionName.IsEmpty() ? TEXT("None") : *CurrentNormalAttackAbilitySectionName));
+	GEngine->AddOnScreenDebugMessage(
+		FailureKey,
+		0.0f,
+		LastNormalAttackDebugFailureReason.IsEmpty() ? FColor(180, 180, 180) : FColor(255, 120, 90),
+		FString::Printf(TEXT("Last Failure: %s"), LastNormalAttackDebugFailureReason.IsEmpty() ? TEXT("None") : *LastNormalAttackDebugFailureReason));
+
+	int32 OverlayRow = 0;
+	for (int32 EventIndex = NormalAttackDebugEvents.Num() - 1; EventIndex >= 0 && OverlayRow < MaxOverlayEvents; --EventIndex, ++OverlayRow)
+	{
+		const FNormalAttackDebugEvent& Event = NormalAttackDebugEvents[EventIndex];
+		GEngine->AddOnScreenDebugMessage(
+			EventBaseKey + OverlayRow,
+			0.0f,
+			FColor(210, 210, 210),
+			FString::Printf(
+				TEXT("[%.2f] %s | seg=%d | phase=%s | dodge_interrupt=%s | logic_ended=%s | queued=%s | %s"),
+				Event.TimestampSeconds,
+				*Event.EventName,
+				Event.Segment,
+				*Event.PhaseName,
+				Event.bInterruptibleByDodge ? TEXT("true") : TEXT("false"),
+				Event.bLogicEnded ? TEXT("true") : TEXT("false"),
+				Event.bHasQueuedNextSegment ? TEXT("true") : TEXT("false"),
+				*Event.Detail));
+	}
+
+	for (; OverlayRow < MaxOverlayEvents; ++OverlayRow)
+	{
+		GEngine->AddOnScreenDebugMessage(EventBaseKey + OverlayRow, 0.0f, FColor::Transparent, TEXT(""));
+	}
+}
+
+FString AtwoheartsCharacter::GetCombatPhaseDebugName(ETwoHeartsCombatPhase CombatPhase) const
+{
+	const UEnum* Enum = StaticEnum<ETwoHeartsCombatPhase>();
+	return Enum ? Enum->GetNameStringByValue(static_cast<int64>(CombatPhase)) : TEXT("Unknown");
 }

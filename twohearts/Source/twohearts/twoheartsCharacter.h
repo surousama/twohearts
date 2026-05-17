@@ -6,6 +6,7 @@
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "TwoHearts/Combat/TwoHeartsCombatPhase.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsAbilityGrant.h"
 #include "twoheartsCharacter.generated.h"
 
@@ -44,6 +45,15 @@ struct FNormalAttackDebugEvent
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug")
 	FString SectionName;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug")
+	FString PhaseName;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug")
+	bool bInterruptibleByDodge = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug")
+	bool bLogicEnded = false;
 };
 
 /**
@@ -88,6 +98,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input|Combat")
 	UInputAction* NormalAttackAction;
 
+	/** Dodge Input Action */
+	UPROPERTY(EditAnywhere, Category="Input|Combat")
+	UInputAction* DodgeAction;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat|Ability System", meta=(AllowPrivateAccess="true"))
 	TArray<FTwoHeartsAbilityGrant> DefaultCombatAbilities;
 
@@ -111,6 +125,15 @@ protected:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
 	FString CurrentNormalAttackAbilitySectionName;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
+	ETwoHeartsCombatPhase CurrentNormalAttackCombatPhase = ETwoHeartsCombatPhase::None;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
+	bool bIsNormalAttackInterruptibleByDodge = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Normal Attack", meta=(AllowPrivateAccess="true"))
+	bool bIsNormalAttackLogicEnded = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Normal Attack|Debug", meta=(AllowPrivateAccess="true"))
 	bool bEnableNormalAttackDebugLogging = true;
@@ -140,6 +163,7 @@ public:
 protected:
 
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 
 	/** Initialize input action bindings */
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -154,6 +178,9 @@ protected:
 
 	/** Called for normal attack input */
 	void NormalAttack(const FInputActionValue& Value);
+
+	/** Called for dodge input */
+	void Dodge(const FInputActionValue& Value);
 
 	void InitializeAbilitySystem();
 	void GrantDefaultCombatAbilities();
@@ -210,7 +237,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Combat|Normal Attack|Debug")
 	void ClearNormalAttackDebugEvents();
 
-	void SetNormalAttackDebugRuntimeState(bool bIsActive, int32 Segment, bool bHasQueuedNextSegment, const FString& SectionName);
+	void SetNormalAttackDebugRuntimeState(bool bIsActive, int32 Segment, bool bHasQueuedNextSegment, const FString& SectionName, ETwoHeartsCombatPhase CombatPhase, bool bInterruptibleByDodge, bool bLogicEnded);
 	void SetLastNormalAttackDebugFailureReason(const FString& FailureReason);
 	void PushNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false);
 	void PushNormalAttackDebugFailure(const TCHAR* EventName, const FString& Detail);
@@ -219,8 +246,12 @@ public:
 	int32 GetCurrentNormalAttackSegmentDebugState() const { return CurrentNormalAttackAbilitySegment; }
 	bool HasQueuedNextNormalAttackSegmentDebugState() const { return bHasQueuedNextNormalAttackAbilitySegment; }
 	const FString& GetCurrentNormalAttackSectionDebugState() const { return CurrentNormalAttackAbilitySectionName; }
+	ETwoHeartsCombatPhase GetCurrentNormalAttackCombatPhaseDebugState() const { return CurrentNormalAttackCombatPhase; }
+	bool IsNormalAttackInterruptibleByDodgeDebugState() const { return bIsNormalAttackInterruptibleByDodge; }
+	bool IsNormalAttackLogicEndedDebugState() const { return bIsNormalAttackLogicEnded; }
 	const TArray<FNormalAttackDebugEvent>& GetNormalAttackDebugEvents() const { return NormalAttackDebugEvents; }
 	const FString& GetLastNormalAttackDebugFailureReason() const { return LastNormalAttackDebugFailureReason; }
+	FString GetCombatPhaseDebugName(ETwoHeartsCombatPhase CombatPhase) const;
 
 public:
 
@@ -234,5 +265,6 @@ protected:
 
 	void RecordNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false);
 	void RecordNormalAttackFailure(const TCHAR* EventName, const FString& Detail);
+	void DrawNormalAttackDebugOverlay() const;
 };
 

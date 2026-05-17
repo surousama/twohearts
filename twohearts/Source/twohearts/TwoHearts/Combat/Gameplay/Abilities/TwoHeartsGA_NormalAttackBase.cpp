@@ -2,8 +2,10 @@
 
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "GameplayTagContainer.h"
+#include "TimerManager.h"
 #include "TwoHearts/Combat/Gameplay/Tags/TwoHeartsGameplayTags.h"
 #include "twohearts.h"
 #include "twoheartsCharacter.h"
@@ -30,11 +32,14 @@ void UTwoHeartsGA_NormalAttackBase::ActivateAbility(
 
 	bHasQueuedNextSegment = false;
 	bHasFinishedSegment = false;
+	bPreserveDebugStateUntilNextSegment = false;
+	bInterruptedByDodge = false;
+	CurrentCombatPhase = ETwoHeartsCombatPhase::None;
+	ActiveMontageTask = nullptr;
 
 	if (!StartSegmentPlayback())
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
 	}
 }
 
@@ -47,7 +52,13 @@ void UTwoHeartsGA_NormalAttackBase::InputPressed(
 
 	if (!CanQueueNextSegment())
 	{
-		RecordAbilityEvent(TEXT("InputIgnored"), FString::Printf(TEXT("Segment %d cannot queue a next segment."), NormalAttackSegment), true);
+		RecordAbilityEvent(
+			TEXT("InputIgnored"),
+			FString::Printf(
+				TEXT("Segment %d cannot queue a next segment during phase %s."),
+				NormalAttackSegment,
+				*StaticEnum<ETwoHeartsCombatPhase>()->GetNameStringByValue(static_cast<int64>(CurrentCombatPhase))),
+			true);
 		return;
 	}
 
@@ -69,8 +80,78 @@ void UTwoHeartsGA_NormalAttackBase::EndAbility(
 	bool bReplicateEndAbility,
 	bool bWasCancelled)
 {
-	UpdateDebugState(false);
+	ClearPhaseFallbackTimers();
+	UnbindMontageNotifyDelegates();
+	ActiveMontageTask = nullptr;
+
+	if (!bPreserveDebugStateUntilNextSegment)
+	{
+		UpdateDebugState(false);
+	}
+
+	bPreserveDebugStateUntilNextSegment = false;
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
+bool UTwoHeartsGA_NormalAttackBase::CanBeInterruptedByDodge() const
+{
+	return CurrentCombatPhase == ETwoHeartsCombatPhase::Recovery || CurrentCombatPhase == ETwoHeartsCombatPhase::LogicEnded;
+}
+
+bool UTwoHeartsGA_NormalAttackBase::TryInterruptByDodge()
+{
+	const bool bCanInterrupt = CanBeInterruptedByDodge();
+	RecordAbilityEvent(
+		TEXT("InterruptCheck"),
+		FString::Printf(
+			TEXT("Dodge interrupt check on segment %d during phase %s. Allowed=%s."),
+			NormalAttackSegment,
+			*StaticEnum<ETwoHeartsCombatPhase>()->GetNameStringByValue(static_cast<int64>(CurrentCombatPhase)),
+			bCanInterrupt ? TEXT("true") : TEXT("false")));
+
+	if (!bCanInterrupt)
+	{
+		return false;
+	}
+
+	bInterruptedByDodge = true;
+	EnterCombatPhase(ETwoHeartsCombatPhase::LogicEnded, TEXT("InterruptedByDodge"));
+	RecordAbilityEvent(TEXT("InterruptedByDodge"), FString::Printf(TEXT("Normal attack segment %d was interrupted by dodge."), NormalAttackSegment));
+
+	if (AtwoheartsCharacter* Character = GetTwoHeartsCharacter())
+	{
+		if (UAnimInstance* AnimInstance = Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr)
+		{
+			if (UAnimMontage* Montage = Character->GetNormalAttackMontage())
+			{
+				AnimInstance->Montage_Stop(0.05f, Montage);
+				return true;
+			}
+		}
+	}
+
+	FinishSegment(true);
+	return true;
+}
+
+void UTwoHeartsGA_NormalAttackBase::NotifyCombatPhaseByName(FName NotifyName)
+{
+	if (NotifyName == ActivePhaseNotifyName)
+	{
+		EnterCombatPhase(ETwoHeartsCombatPhase::Active, TEXT("MontageNotify"));
+		return;
+	}
+
+	if (NotifyName == RecoveryPhaseNotifyName)
+	{
+		EnterCombatPhase(ETwoHeartsCombatPhase::Recovery, TEXT("MontageNotify"));
+		return;
+	}
+
+	if (NotifyName == LogicEndedPhaseNotifyName)
+	{
+		EnterCombatPhase(ETwoHeartsCombatPhase::LogicEnded, TEXT("MontageNotify"));
+	}
 }
 
 void UTwoHeartsGA_NormalAttackBase::HandleMontageCompleted()
@@ -88,9 +169,30 @@ void UTwoHeartsGA_NormalAttackBase::HandleMontageCancelled()
 	FinishSegment(true);
 }
 
+void UTwoHeartsGA_NormalAttackBase::HandleMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointNotifyPayload)
+{
+	NotifyCombatPhaseByName(NotifyName);
+}
+
+void UTwoHeartsGA_NormalAttackBase::HandleFallbackEnterActive()
+{
+	EnterCombatPhase(ETwoHeartsCombatPhase::Active, TEXT("FallbackTime"));
+}
+
+void UTwoHeartsGA_NormalAttackBase::HandleFallbackEnterRecovery()
+{
+	EnterCombatPhase(ETwoHeartsCombatPhase::Recovery, TEXT("FallbackTime"));
+}
+
+void UTwoHeartsGA_NormalAttackBase::HandleFallbackEnterLogicEnded()
+{
+	EnterCombatPhase(ETwoHeartsCombatPhase::LogicEnded, TEXT("FallbackTime"));
+}
+
 bool UTwoHeartsGA_NormalAttackBase::CanQueueNextSegment() const
 {
-	return NormalAttackSegment < 3 && NextSegmentAbilityTag.IsValid();
+	const bool bCanAcceptQueueByPhase = CurrentCombatPhase == ETwoHeartsCombatPhase::Startup || CurrentCombatPhase == ETwoHeartsCombatPhase::Active;
+	return bCanAcceptQueueByPhase && !IsLogicEndedPhase() && NormalAttackSegment < 3 && NextSegmentAbilityTag.IsValid();
 }
 
 bool UTwoHeartsGA_NormalAttackBase::StartSegmentPlayback()
@@ -109,7 +211,8 @@ bool UTwoHeartsGA_NormalAttackBase::StartSegmentPlayback()
 		return false;
 	}
 
-	if (!Character->GetMesh() || !Character->GetMesh()->GetAnimInstance())
+	UAnimInstance* AnimInstance = Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr;
+	if (!AnimInstance)
 	{
 		RecordAbilityFailure(TEXT("ActivateFailed"), FString::Printf(TEXT("No AnimInstance found for normal attack on %s."), *GetNameSafe(Character)));
 		return false;
@@ -122,13 +225,14 @@ bool UTwoHeartsGA_NormalAttackBase::StartSegmentPlayback()
 		return false;
 	}
 
-	UpdateDebugState(true);
+	BindMontageNotifyDelegates(AnimInstance);
+	EnterCombatPhase(ETwoHeartsCombatPhase::Startup, TEXT("AbilityActivated"));
 	Character->SetLastNormalAttackDebugFailureReason(TEXT(""));
 	RecordAbilityEvent(
 		TEXT("PlaySegment"),
 		FString::Printf(TEXT("Started segment %d with section %s."), NormalAttackSegment, *SectionName.ToString()));
 
-	UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
+	ActiveMontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
 		this,
 		NAME_None,
 		Montage,
@@ -137,16 +241,19 @@ bool UTwoHeartsGA_NormalAttackBase::StartSegmentPlayback()
 		false,
 		1.0f);
 
-	if (!MontageTask)
+	if (!ActiveMontageTask)
 	{
 		RecordAbilityFailure(TEXT("ActivateFailed"), FString::Printf(TEXT("Failed to create montage task for segment %d."), NormalAttackSegment));
 		return false;
 	}
 
-	MontageTask->OnCompleted.AddDynamic(this, &UTwoHeartsGA_NormalAttackBase::HandleMontageCompleted);
-	MontageTask->OnInterrupted.AddDynamic(this, &UTwoHeartsGA_NormalAttackBase::HandleMontageInterrupted);
-	MontageTask->OnCancelled.AddDynamic(this, &UTwoHeartsGA_NormalAttackBase::HandleMontageCancelled);
-	MontageTask->ReadyForActivation();
+	const float SectionLength = Character->GetNormalAttackSectionLength(NormalAttackSegment);
+	SchedulePhaseFallbacks(SectionLength);
+
+	ActiveMontageTask->OnCompleted.AddDynamic(this, &UTwoHeartsGA_NormalAttackBase::HandleMontageCompleted);
+	ActiveMontageTask->OnInterrupted.AddDynamic(this, &UTwoHeartsGA_NormalAttackBase::HandleMontageInterrupted);
+	ActiveMontageTask->OnCancelled.AddDynamic(this, &UTwoHeartsGA_NormalAttackBase::HandleMontageCancelled);
+	ActiveMontageTask->ReadyForActivation();
 
 	return true;
 }
@@ -159,13 +266,19 @@ void UTwoHeartsGA_NormalAttackBase::FinishSegment(bool bWasCancelled)
 	}
 
 	bHasFinishedSegment = true;
+	ClearPhaseFallbackTimers();
 
 	const FGameplayAbilitySpecHandle Handle = GetCurrentAbilitySpecHandle();
 	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
 	const FGameplayAbilityActivationInfo ActivationInfo = GetCurrentActivationInfo();
 	UAbilitySystemComponent* AbilitySystemComponent = GetTwoHeartsAbilitySystemComponent();
 
-	const bool bShouldActivateNext = !bWasCancelled && bHasQueuedNextSegment && CanQueueNextSegment() && AbilitySystemComponent;
+	if (!bWasCancelled)
+	{
+		EnterCombatPhase(ETwoHeartsCombatPhase::LogicEnded, TEXT("SegmentCompleted"));
+	}
+
+	const bool bShouldActivateNext = !bWasCancelled && bHasQueuedNextSegment && NextSegmentAbilityTag.IsValid() && AbilitySystemComponent;
 
 	if (bWasCancelled)
 	{
@@ -178,6 +291,7 @@ void UTwoHeartsGA_NormalAttackBase::FinishSegment(bool bWasCancelled)
 			FString::Printf(TEXT("Segment %d finished. QueuedNext=%s."), NormalAttackSegment, bHasQueuedNextSegment ? TEXT("true") : TEXT("false")));
 	}
 
+	bPreserveDebugStateUntilNextSegment = bShouldActivateNext;
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, bWasCancelled);
 
 	if (!bShouldActivateNext)
@@ -189,6 +303,7 @@ void UTwoHeartsGA_NormalAttackBase::FinishSegment(bool bWasCancelled)
 	NextAbilityTags.AddTag(NextSegmentAbilityTag);
 	if (!AbilitySystemComponent->TryActivateAbilitiesByTag(NextAbilityTags, true))
 	{
+		UpdateDebugState(false);
 		RecordAbilityFailure(
 			TEXT("AdvanceSegmentFailed"),
 			FString::Printf(TEXT("Failed to activate next normal attack segment from segment %d."), NormalAttackSegment));
@@ -206,7 +321,14 @@ void UTwoHeartsGA_NormalAttackBase::UpdateDebugState(bool bShouldBeActive) const
 	if (AtwoheartsCharacter* Character = GetTwoHeartsCharacter())
 	{
 		const FString SectionName = bShouldBeActive ? Character->GetNormalAttackSectionName(NormalAttackSegment).ToString() : TEXT("None");
-		Character->SetNormalAttackDebugRuntimeState(bShouldBeActive, bShouldBeActive ? NormalAttackSegment : 0, bShouldBeActive ? bHasQueuedNextSegment : false, SectionName);
+		Character->SetNormalAttackDebugRuntimeState(
+			bShouldBeActive,
+			bShouldBeActive ? NormalAttackSegment : 0,
+			bShouldBeActive ? bHasQueuedNextSegment : false,
+			SectionName,
+			bShouldBeActive ? CurrentCombatPhase : ETwoHeartsCombatPhase::None,
+			bShouldBeActive ? CanBeInterruptedByDodge() : false,
+			bShouldBeActive ? IsLogicEndedPhase() : false);
 	}
 }
 
@@ -240,4 +362,99 @@ void UTwoHeartsGA_NormalAttackBase::RecordAbilityFailure(const TCHAR* EventName,
 AtwoheartsCharacter* UTwoHeartsGA_NormalAttackBase::GetTwoHeartsCharacter() const
 {
 	return Cast<AtwoheartsCharacter>(GetAbilityCharacter());
+}
+
+void UTwoHeartsGA_NormalAttackBase::EnterCombatPhase(ETwoHeartsCombatPhase NewPhase, const FString& Reason)
+{
+	if (!CanTransitionToPhase(NewPhase))
+	{
+		return;
+	}
+
+	if (CurrentCombatPhase != ETwoHeartsCombatPhase::None)
+	{
+		RecordAbilityEvent(
+			TEXT("LeavePhase"),
+			FString::Printf(
+				TEXT("Leaving phase %s because %s."),
+				*StaticEnum<ETwoHeartsCombatPhase>()->GetNameStringByValue(static_cast<int64>(CurrentCombatPhase)),
+				*Reason),
+			true);
+	}
+
+	CurrentCombatPhase = NewPhase;
+	UpdateDebugState(true);
+
+	const TCHAR* EventName = NewPhase == ETwoHeartsCombatPhase::LogicEnded ? TEXT("LogicEnded") : TEXT("EnterPhase");
+	RecordAbilityEvent(
+		EventName,
+		FString::Printf(
+			TEXT("Entered phase %s for segment %d. Reason=%s."),
+			*StaticEnum<ETwoHeartsCombatPhase>()->GetNameStringByValue(static_cast<int64>(CurrentCombatPhase)),
+			NormalAttackSegment,
+			*Reason));
+}
+
+bool UTwoHeartsGA_NormalAttackBase::CanTransitionToPhase(ETwoHeartsCombatPhase NewPhase) const
+{
+	if (NewPhase == CurrentCombatPhase)
+	{
+		return false;
+	}
+
+	return static_cast<uint8>(NewPhase) >= static_cast<uint8>(CurrentCombatPhase);
+}
+
+void UTwoHeartsGA_NormalAttackBase::BindMontageNotifyDelegates(UAnimInstance* AnimInstance)
+{
+	if (!AnimInstance || BoundAnimInstance == AnimInstance)
+	{
+		return;
+	}
+
+	UnbindMontageNotifyDelegates();
+	BoundAnimInstance = AnimInstance;
+	BoundAnimInstance->OnPlayMontageNotifyBegin.AddDynamic(this, &UTwoHeartsGA_NormalAttackBase::HandleMontageNotifyBegin);
+}
+
+void UTwoHeartsGA_NormalAttackBase::UnbindMontageNotifyDelegates()
+{
+	if (!BoundAnimInstance)
+	{
+		return;
+	}
+
+	BoundAnimInstance->OnPlayMontageNotifyBegin.RemoveDynamic(this, &UTwoHeartsGA_NormalAttackBase::HandleMontageNotifyBegin);
+	BoundAnimInstance = nullptr;
+}
+
+void UTwoHeartsGA_NormalAttackBase::ClearPhaseFallbackTimers()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ActivePhaseFallbackTimerHandle);
+		World->GetTimerManager().ClearTimer(RecoveryPhaseFallbackTimerHandle);
+		World->GetTimerManager().ClearTimer(LogicEndedFallbackTimerHandle);
+	}
+}
+
+void UTwoHeartsGA_NormalAttackBase::SchedulePhaseFallbacks(float SectionLength)
+{
+	if (SectionLength <= 0.0f)
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		FTimerManager& TimerManager = World->GetTimerManager();
+		TimerManager.SetTimer(ActivePhaseFallbackTimerHandle, this, &UTwoHeartsGA_NormalAttackBase::HandleFallbackEnterActive, SectionLength * ActivePhaseFallbackNormalizedTime, false);
+		TimerManager.SetTimer(RecoveryPhaseFallbackTimerHandle, this, &UTwoHeartsGA_NormalAttackBase::HandleFallbackEnterRecovery, SectionLength * RecoveryPhaseFallbackNormalizedTime, false);
+		TimerManager.SetTimer(LogicEndedFallbackTimerHandle, this, &UTwoHeartsGA_NormalAttackBase::HandleFallbackEnterLogicEnded, SectionLength * LogicEndedFallbackNormalizedTime, false);
+	}
+}
+
+bool UTwoHeartsGA_NormalAttackBase::IsLogicEndedPhase() const
+{
+	return CurrentCombatPhase == ETwoHeartsCombatPhase::LogicEnded;
 }

@@ -1,6 +1,7 @@
 #include "TwoHearts/Combat/Gameplay/Tags/TwoHeartsGameplayTags.h"
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Ability_NormalAttack, "Ability.NormalAttack", "Normal attack ability tag.");
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Ability_Dodge, "Ability.Dodge", "Dodge ability tag.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Ability_NormalAttack_Segment1, "Ability.NormalAttack.Segment1", "First normal attack segment ability tag.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Ability_NormalAttack_Segment2, "Ability.NormalAttack.Segment2", "Second normal attack segment ability tag.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Ability_NormalAttack_Segment3, "Ability.NormalAttack.Segment3", "Third normal attack segment ability tag.");
@@ -13,6 +14,11 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_State_CannotInput, "State.CannotInp
 FGameplayTag FTwoHeartsGameplayTags::Ability_NormalAttack()
 {
 	return TAG_TwoHearts_Ability_NormalAttack;
+}
+
+FGameplayTag FTwoHeartsGameplayTags::Ability_Dodge()
+{
+	return TAG_TwoHearts_Ability_Dodge;
 }
 
 FGameplayTag FTwoHeartsGameplayTags::Ability_NormalAttack_Segment1()

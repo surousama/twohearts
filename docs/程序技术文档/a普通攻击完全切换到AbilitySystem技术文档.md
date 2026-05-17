@@ -225,6 +225,16 @@
    旧测试 Ability 和旧 Character 普攻状态机已退出正式路径。
 3. 当前阶段验收口径仍为：
    单角色本地验证。
+4. 2026-05-17 修复补记：
+   已针对联调阶段发现的问题补充修复：
+   普攻首击改为显式只允许进入第 1 段；
+   输入分发层补充最小结构化日志与失败信号，避免“输入被静默吞掉”；
+   调试显示增加不依赖 `HUDClass` 的屏幕覆盖兜底输出；
+   段切换时的调试状态抖动已做最小收敛。
+5. 2026-05-17 联调补记：
+   在修复输入分发与调试链路后，普通攻击第 2 段 Ability 激活链路已通过日志确认打通；
+   后续联调中发现“第 2 段看起来没有播出”的主要原因不是 GAS 段切换失败，而是 `AS_Melee_NormalAttack_02` 资源表现不够易区分；
+   将第 2 段动画替换为区分明显的动作后，当前 1-2-3 普攻表现已恢复正常。
 
 # 本次实际代码落点
 
@@ -275,7 +285,7 @@
    默认 Ability 授予；
    普攻输入转发到 `HandleAbilityInputPressed`；
    `NormalAttackMontage` 与 `NormalAttackSectionNames` 配置入口；
-   普攻调试运行态与调试事件承载。
+   普攻调试运行态、调试事件承载与本地屏幕调试兜底显示。
 2. `UTwoHeartsGA_NormalAttackBase`
    当前负责：
    统一普通攻击激活流程；
@@ -291,7 +301,7 @@
    声明各自独立识别 Tag；
    声明下一段激活目标。
 4. 段序驱动口径
-   第一次点击普攻时，由第 1 段 Ability 激活；
+   第一次点击普攻时，只允许显式激活第 1 段 Ability；
    第 1 段或第 2 段执行期间再次点击普攻，只记录“请求下一段”；
    当前段 Montage 完成后，如已请求下一段，则按 Tag 激活下一段 Ability；
    第 3 段结束后直接结束整套普通攻击。
@@ -309,7 +319,9 @@
    `AtwoheartsCharacter::HandleAbilityInputPressed`
    作用：
    优先把输入发送给当前已激活的同 InputID Ability；
-   若当前没有激活中的同输入 Ability，再尝试激活可用 Ability。
+   若当前没有激活中的同输入 Ability，则按正式入口规则尝试激活可用 Ability；
+   普攻首击当前只允许尝试第 1 段 Ability；
+   若 Ability 未成功激活，会写入清晰失败日志，不再把输入静默视为“已处理”。
 3. 普攻段开始：
    `UTwoHeartsGA_NormalAttackBase::ActivateAbility`
    作用：
@@ -332,11 +344,17 @@
    作用：
    处理正常结束或被打断；
    若已请求下一段，则按 `NextSegmentAbilityTag` 激活下一段；
-   否则结束当前 Ability 并清空调试运行态。
+   否则结束当前 Ability 并清空调试运行态；
+   若正在推进下一段，则尽量保持调试状态连续，减少段切换瞬间的误判。
 7. 调试状态同步：
    `AtwoheartsCharacter::SetNormalAttackDebugRuntimeState`
    作用：
    用于 HUD 和结构化日志读取当前普攻运行态快照。
+8. 屏幕调试兜底入口：
+   `AtwoheartsCharacter::Tick`
+   `AtwoheartsCharacter::DrawNormalAttackDebugOverlay`
+   作用：
+   即使当前测试场景没有正确挂上 `ATwoheartsDebugHUD`，本地角色也能看到最小必要的普攻调试信息。
 
 # 当前 Tag 使用口径
 
@@ -358,24 +376,32 @@
 
 1. 现有调试面板仍可用。
 2. 但当前调试来源已不再是旧 Character 状态机，而是 Ability 运行态快照与事件记录。
-3. 当前调试面板主要关注字段：
+3. 如果当前测试场景没有正确显示 `ATwoheartsDebugHUD`，本地角色仍会看到屏幕覆盖形式的最小调试信息，作为兜底观察入口。
+4. 当前调试面板主要关注字段：
    `attacking`
    `segment`
    `queued_next`
    `latest_section`
    `Last Failure`
    `Recent Events`
-4. 当前常见事件包括：
+5. 当前常见事件包括：
    `PlaySegment`
    `QueueNextSegment`
    `SegmentFinished`
    `AdvanceSegment`
    `SegmentInterrupted`
    `ActivateFailed`
-5. 当前如果看到 Ability 激活失败，优先检查：
+   `InputScan`
+   `ForwardInputToActiveAbility`
+   `ActivateAbility`
+6. 当前如果看到 Ability 激活失败，优先检查：
    `NormalAttackMontage` 是否已配置；
    `Attack_1 / Attack_2 / Attack_3` Section 是否存在；
    角色 AnimInstance 是否正常。
+7. 当前联调结论补充：
+   如果日志中已经明确出现：
+   `PlaySegment segment=2 section=Attack_2`
+   则优先怀疑第 2 段动画资源内容或 Section 表现，而不是先回头怀疑 Ability 段切换逻辑。
 
 # 交接给资深测试的最小验证清单
 
@@ -511,6 +537,9 @@
 3. 如果日志里出现 `ActivateFailed`，优先检查角色资源配置，而不是先怀疑 ASC。
 4. 如果面板显示 `queued_next=true` 但没有进入下一段，优先检查下一段 Ability Tag 激活链路。
 5. 不要再用“旧 Character 普攻是否还可切回”作为当前正确行为判断标准，因为正式路径已经切干净了。
+6. 如果日志已显示第 2 段和第 3 段都正常进入，但视觉上仍感觉“没有第 2 段”，优先复查：
+   `AS_Melee_NormalAttack_02` 资源内容本身是否与第 1 段差异足够明显；
+   `Attack_2` Section 是否确实落在第 2 段动作的有效起点。
 
 # 本次用于联调的核心代码入口
 
@@ -527,6 +556,7 @@
    `UTwoHeartsGA_NormalAttackBase::FinishSegment`
 4. 调试状态入口：
    `AtwoheartsCharacter::SetNormalAttackDebugRuntimeState`
+   `AtwoheartsCharacter::DrawNormalAttackDebugOverlay`
    `ATwoheartsDebugHUD::DrawHUD`
 
 # 当前三份文档的合并使用结论
@@ -545,3 +575,31 @@
 4. 当前阶段没有处理完整联机同步。
 5. 当前段落切换虽然已迁入 Ability，但仍依赖 Montage 播放完成回调，不代表公共动作语义层已经完成。
 6. 下一阶段不应再回到 Character 补普攻状态机，而应继续在 Ability 方向上补“阶段标记与基础打断”。
+
+# 当前已记录技术债
+
+1. 技术债1：Ability 结束与 Montage 播放收尾的一致性问题。
+   对应白盒风险 3。
+   当前判断：
+   这是后续接入正式打断、闪避打断、受击取消后会放大的时序风险；
+   本轮未展开成完整打断语义修复，先作为技术债记录。
+   后续处理建议：
+   进入“阶段标记与基础打断”阶段时，统一补齐 Ability 结束、Montage 停止与动作阶段收尾的一致性策略。
+2. 技术债2：AbilitySystem 初始化与默认授予链路对联机扩展的鲁棒性不足。
+   对应白盒风险 4。
+   当前判断：
+   对单角色本地验收不构成阻断，但对后续双人共斗、联机、重新 Possess、重生重建链路仍存在风险；
+   本轮不做联机向重构，先作为技术债记录。
+   后续处理建议：
+   进入双角色、本地双控或联机阶段时，优先复查 `ActorInfo` 初始化时机、默认 Ability 授予时机和重新建链流程。
+
+# 本轮联调最终结论
+
+1. 当前普通攻击正式路径仍由 `AbilitySystem` 单路径承载。
+2. 普攻 1-2-3 的 Ability 激活、输入转发、下一段推进与调试日志链路当前已确认打通。
+3. 本轮“第 2 段未正常表现”的最终定位结果为：
+   主要是第 2 段动画资源表现问题，而不是 GAS 段切换逻辑错误。
+4. 将 `AS_Melee_NormalAttack_02` 替换为区分明显的动作后，当前普通攻击连段表现已恢复正常。
+5. 当前阶段可以认为：
+   普通攻击完全切换到 `AbilitySystem` 的主目标已完成；
+   下一步可继续进入“阶段标记与基础打断”阶段。

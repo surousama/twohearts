@@ -2,11 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "TwoHearts/Combat/TwoHeartsCombatPhase.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGameplayAbility.h"
 #include "TwoHeartsGA_NormalAttackBase.generated.h"
 
 class AtwoheartsCharacter;
 class UAbilityTask_PlayMontageAndWait;
+class UAnimInstance;
+struct FBranchingPointNotifyPayload;
 
 UCLASS(Abstract)
 class UTwoHeartsGA_NormalAttackBase : public UTwoHeartsGameplayAbility
@@ -34,6 +37,10 @@ public:
 		bool bReplicateEndAbility,
 		bool bWasCancelled) override;
 
+	bool CanBeInterruptedByDodge() const;
+	bool TryInterruptByDodge();
+	void NotifyCombatPhaseByName(FName NotifyName);
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Normal Attack")
 	int32 NormalAttackSegment = 1;
@@ -43,6 +50,24 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Normal Attack")
 	FGameplayTag NextSegmentAbilityTag;
+
+	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase")
+	FName ActivePhaseNotifyName = TEXT("CombatPhase_Active");
+
+	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase")
+	FName RecoveryPhaseNotifyName = TEXT("CombatPhase_Recovery");
+
+	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase")
+	FName LogicEndedPhaseNotifyName = TEXT("CombatPhase_LogicEnded");
+
+	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase", meta=(ClampMin="0.0", ClampMax="1.0"))
+	float ActivePhaseFallbackNormalizedTime = 0.20f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase", meta=(ClampMin="0.0", ClampMax="1.0"))
+	float RecoveryPhaseFallbackNormalizedTime = 0.60f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase", meta=(ClampMin="0.0", ClampMax="1.0"))
+	float LogicEndedFallbackNormalizedTime = 0.85f;
 
 private:
 	UFUNCTION()
@@ -54,6 +79,18 @@ private:
 	UFUNCTION()
 	void HandleMontageCancelled();
 
+	UFUNCTION()
+	void HandleMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointNotifyPayload);
+
+	UFUNCTION()
+	void HandleFallbackEnterActive();
+
+	UFUNCTION()
+	void HandleFallbackEnterRecovery();
+
+	UFUNCTION()
+	void HandleFallbackEnterLogicEnded();
+
 	bool CanQueueNextSegment() const;
 	bool StartSegmentPlayback();
 	void FinishSegment(bool bWasCancelled);
@@ -61,7 +98,22 @@ private:
 	void RecordAbilityEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false) const;
 	void RecordAbilityFailure(const TCHAR* EventName, const FString& Detail) const;
 	AtwoheartsCharacter* GetTwoHeartsCharacter() const;
+	void EnterCombatPhase(ETwoHeartsCombatPhase NewPhase, const FString& Reason);
+	bool CanTransitionToPhase(ETwoHeartsCombatPhase NewPhase) const;
+	void BindMontageNotifyDelegates(UAnimInstance* AnimInstance);
+	void UnbindMontageNotifyDelegates();
+	void ClearPhaseFallbackTimers();
+	void SchedulePhaseFallbacks(float SectionLength);
+	bool IsLogicEndedPhase() const;
 
 	bool bHasQueuedNextSegment = false;
 	bool bHasFinishedSegment = false;
+	bool bPreserveDebugStateUntilNextSegment = false;
+	bool bInterruptedByDodge = false;
+	ETwoHeartsCombatPhase CurrentCombatPhase = ETwoHeartsCombatPhase::None;
+	TObjectPtr<UAbilityTask_PlayMontageAndWait> ActiveMontageTask;
+	TObjectPtr<UAnimInstance> BoundAnimInstance;
+	FTimerHandle ActivePhaseFallbackTimerHandle;
+	FTimerHandle RecoveryPhaseFallbackTimerHandle;
+	FTimerHandle LogicEndedFallbackTimerHandle;
 };
