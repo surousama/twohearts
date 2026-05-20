@@ -1,139 +1,132 @@
-# Bootstrap Task: Fill Project Development Guidelines
+# Bootstrap 任务：补齐项目开发规范
 
-**You (the AI) are running this task. The developer does not read this file.**
+**你（AI）正在执行这个任务。开发者本人不会直接阅读这个文件。**
 
-The developer just ran `trellis init` on this project for the first time.
-`.trellis/` now exists with empty spec scaffolding, and this bootstrap task
-exists under `.trellis/tasks/`. When they want to work on it, they should start
-this task from a session that provides Trellis session identity.
+开发者刚刚第一次在这个项目中运行了 `trellis init`。
+现在 `.trellis/` 已经生成，但其中的 spec 还只是空的脚手架；
+这个 bootstrap task 也已经放在 `.trellis/tasks/` 下。
+当他们准备处理这件事时，应在一个能提供 Trellis session identity 的会话中启动这个任务。
 
-**Your job**: help them populate `.trellis/spec/` with the team's real
-coding conventions. Every future AI session — this project's
-`trellis-implement` and `trellis-check` sub-agents — auto-loads spec files
-listed in per-task jsonl manifests. Empty spec = sub-agents write generic
-code. Real spec = sub-agents match the team's actual patterns.
+**你的工作**：帮助他们把团队真实的编码约定补进 `.trellis/spec/`。
+未来这个项目中的每次 AI 会话，都会让 `trellis-implement` 与 `trellis-check`
+子代理自动读取 per-task jsonl manifest 中列出的 spec 文件。
+spec 为空，子代理就会写出通用模板式代码；
+spec 真实，子代理才会贴合团队实际模式。
 
-Don't dump instructions. Open with a short greeting, figure out if the repo
-has any existing convention docs (CLAUDE.md, .cursorrules, etc.), and drive
-the rest conversationally.
-
----
-
-## Status (update the checkboxes as you complete each item)
-
-- [ ] Fill backend guidelines
-- [ ] Fill frontend guidelines
-- [ ] Add code examples
+不要一上来倾倒长篇说明。先用一句简短开场，判断仓库里是否已有约定文档
+（例如 `CLAUDE.md`、`.cursorrules` 等），再以对话方式继续推进。
 
 ---
 
-## Spec files to populate
+## 当前状态（每完成一项就更新复选框）
 
+- [ ] 补齐后端规范
+- [ ] 补齐前端规范
+- [ ] 增加代码示例
 
-### Backend guidelines
+---
 
-| File | What to document |
+## 需要补充的 Spec 文件
+
+### 后端规范
+
+| 文件 | 应记录什么 |
 |------|------------------|
-| `.trellis/spec/backend/directory-structure.md` | Where different file types go (routes, services, utils) |
-| `.trellis/spec/backend/database-guidelines.md` | ORM, migrations, query patterns, naming conventions |
-| `.trellis/spec/backend/error-handling.md` | How errors are caught, logged, and returned |
-| `.trellis/spec/backend/logging-guidelines.md` | Log levels, format, what to log |
-| `.trellis/spec/backend/quality-guidelines.md` | Code review standards, testing requirements |
+| `.trellis/spec/backend/directory-structure.md` | 各类文件应放在哪里（routes、services、utils 等） |
+| `.trellis/spec/backend/database-guidelines.md` | ORM、migrations、查询模式、命名约定 |
+| `.trellis/spec/backend/error-handling.md` | 错误如何捕获、记录与返回 |
+| `.trellis/spec/backend/logging-guidelines.md` | 日志等级、格式、该记录什么 |
+| `.trellis/spec/backend/quality-guidelines.md` | 代码评审标准、测试要求 |
 
+### 前端规范
 
-### Frontend guidelines
-
-| File | What to document |
+| 文件 | 应记录什么 |
 |------|------------------|
-| `.trellis/spec/frontend/directory-structure.md` | Component/page/hook organization |
-| `.trellis/spec/frontend/component-guidelines.md` | Component patterns, props conventions |
-| `.trellis/spec/frontend/hook-guidelines.md` | Custom hook naming, patterns |
-| `.trellis/spec/frontend/state-management.md` | State library, patterns, what goes where |
-| `.trellis/spec/frontend/type-safety.md` | TypeScript conventions, type organization |
-| `.trellis/spec/frontend/quality-guidelines.md` | Linting, testing, accessibility |
+| `.trellis/spec/frontend/directory-structure.md` | component / page / hook 的组织方式 |
+| `.trellis/spec/frontend/component-guidelines.md` | 组件模式、props 约定 |
+| `.trellis/spec/frontend/hook-guidelines.md` | 自定义 hook 的命名与模式 |
+| `.trellis/spec/frontend/state-management.md` | 状态库、常用模式、不同状态放在哪里 |
+| `.trellis/spec/frontend/type-safety.md` | TypeScript 约定、类型组织方式 |
+| `.trellis/spec/frontend/quality-guidelines.md` | lint、测试、可访问性 |
 
+### 思考指南（已预填）
 
-### Thinking guides (already populated)
-
-`.trellis/spec/guides/` contains general thinking guides pre-filled with
-best practices. Customize only if something clearly doesn't fit this project.
+`.trellis/spec/guides/` 中已经放入通用思考指南与最佳实践。
+只有在明显不适合本项目时，才需要定制修改。
 
 ---
 
-## How to fill the spec
+## 如何补齐 spec
 
-### Step 1: Import from existing convention files first (preferred)
+### 第一步：优先从已有约定文档导入（推荐）
 
-Search the repo for existing convention docs. If any exist, read them and
-extract the relevant rules into the matching `.trellis/spec/` files —
-usually much faster than documenting from scratch.
+先搜索仓库中现有的约定文档。若存在，就先阅读它们，
+再把相关规则提炼到对应的 `.trellis/spec/` 文件里。
+这通常比从零撰写快得多。
 
-| File / Directory | Tool |
+| 文件 / 目录 | 对应工具 |
 |------|------|
 | `CLAUDE.md` / `CLAUDE.local.md` | Claude Code |
-| `AGENTS.md` | Codex / Claude Code / agent-compatible tools |
+| `AGENTS.md` | Codex / Claude Code / 兼容 agent 的工具 |
 | `.cursorrules` | Cursor |
-| `.cursor/rules/*.mdc` | Cursor (rules directory) |
+| `.cursor/rules/*.mdc` | Cursor（rules 目录） |
 | `.windsurfrules` | Windsurf |
 | `.clinerules` | Cline |
 | `.roomodes` | Roo Code |
 | `.github/copilot-instructions.md` | GitHub Copilot |
 | `.vscode/settings.json` → `github.copilot.chat.codeGeneration.instructions` | VS Code Copilot |
 | `CONVENTIONS.md` / `.aider.conf.yml` | aider |
-| `CONTRIBUTING.md` | General project conventions |
-| `.editorconfig` | Editor formatting rules |
+| `CONTRIBUTING.md` | 通用项目约定 |
+| `.editorconfig` | 编辑器格式规则 |
 
-### Step 2: Analyze the codebase for anything not covered by existing docs
+### 第二步：对未被现有文档覆盖的部分做代码库分析
 
-Scan real code to discover patterns. Before writing each spec file:
-- Find 2-3 real examples of each pattern in the codebase.
-- Reference real file paths (not hypothetical ones).
-- Document anti-patterns the team clearly avoids.
+从真实代码中识别模式。写每个 spec 文件之前：
+- 在代码库中找到 2 到 3 个真实例子
+- 引用真实文件路径，而不是假设路径
+- 记录团队明确在避免的反模式
 
-### Step 3: Document reality, not ideals
+### 第三步：记录现实，而不是理想
 
-**Critical**: write what the code *actually does*, not what it should do.
-Sub-agents match the spec, so aspirational patterns that don't exist in the
-codebase will cause sub-agents to write code that looks out of place.
+**关键点**：写代码库**现在实际怎么做**，不是你认为它未来应该怎么做。
+子代理会按 spec 行事；如果 spec 里写的是代码库里根本不存在的理想模式，
+子代理写出的代码就会显得格格不入。
 
-If the team has known tech debt, document the current state — improvement
-is a separate conversation, not a bootstrap concern.
-
----
-
-## Quick explainer of the runtime (share when they ask "why do we need spec at all")
-
-- Every AI coding task spawns two sub-agents: `trellis-implement` (writes
-  code) and `trellis-check` (verifies quality).
-- Each task has `implement.jsonl` / `check.jsonl` manifests listing which
-  spec files to load.
-- The platform hook auto-injects those spec files + the task's `prd.md`
-  into every sub-agent prompt, so the sub-agent codes/reviews per team
-  conventions without anyone pasting them manually.
-- Source of truth: `.trellis/spec/`. That's why filling it well now pays
-  off forever.
+如果团队已有明确技术债，就如实记录当前状态；
+“如何改进”是另一场对话，不属于 bootstrap 阶段。
 
 ---
 
-## Completion
+## 运行时原理速讲
 
-When the developer confirms the checklist items above are done with real
-examples (not placeholders), guide them to run:
+当开发者问“为什么一定要写 spec”时，可以这样解释：
+
+- 每个 AI 编码任务都会派生两个子代理：`trellis-implement`（负责写代码）与 `trellis-check`（负责验质量）
+- 每个 task 都有 `implement.jsonl` / `check.jsonl` 清单，用来列出要加载哪些 spec 文件
+- 平台 hook 会把这些 spec 文件以及该 task 的 `prd.md` 自动注入每个子代理的 prompt
+- 因此，子代理会按团队约定编码/评审，而不需要每次手动粘贴规则
+- 真相源就是 `.trellis/spec/`；这也是为什么现在把它填好，后面会一直受益
+
+---
+
+## 完成条件
+
+当开发者确认上面的勾选项都已用真实示例填好，而不是占位文本后，引导他们运行：
 
 ```bash
 python ./.trellis/scripts/task.py finish
 python ./.trellis/scripts/task.py archive 00-bootstrap-guidelines
 ```
 
-After archive, every new developer who joins this project will get a
-`00-join-<slug>` onboarding task instead of this bootstrap task.
+归档完成后，后续新加入项目的开发者拿到的将是
+`00-join-<slug>` onboarding task，而不再是这个 bootstrap task。
 
 ---
 
-## Suggested opening line
+## 建议开场白
 
-"Welcome to Trellis! Your init just set me up to help you fill the project
-spec — a one-time setup so every future AI session follows the team's
-conventions instead of writing generic code. Before we start, do you have
-any existing convention docs (CLAUDE.md, .cursorrules, CONTRIBUTING.md,
-etc.) I can pull from, or should I scan the codebase from scratch?"
+“欢迎来到 Trellis。刚才的 init 已经把我准备好了，我可以帮你把项目 spec 补齐。
+这是一轮一次性的配置工作，做完后，未来每次 AI 会话都会按团队约定行事，
+而不是继续写通用模板代码。开始之前，你这边有现成的约定文档
+（比如 `CLAUDE.md`、`.cursorrules`、`CONTRIBUTING.md`）可供提取吗？
+如果没有，我就从代码库本身开始扫描。”

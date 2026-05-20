@@ -2,12 +2,12 @@
 
 ## 必备内容
 
-1. Goal
-2. What I already know
-3. Requirements
-4. Acceptance Criteria
-5. Out of Scope
-6. Technical Notes
+1. 目标
+2. 当前已知信息
+3. 需求
+4. 验收标准
+5. 明确不做的范围
+6. 技术备注
 
 ## 双心印特有要求
 

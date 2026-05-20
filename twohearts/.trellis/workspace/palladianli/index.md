@@ -1,40 +1,40 @@
-# Workspace Index - palladianli
+# 工作区索引 - palladianli
 
-> Journal tracking for AI development sessions.
+> 用于跟踪 AI 开发会话的 journal 记录。
 
 ---
 
-## Current Status
+## 当前状态
 
 <!-- @@@auto:current-status -->
-- **Active File**: `journal-1.md`
-- **Total Sessions**: 0
-- **Last Active**: -
+- **当前文件**: `journal-1.md`
+- **总会话数**: 0
+- **最近活跃**: -
 <!-- @@@/auto:current-status -->
 
 ---
 
-## Active Documents
+## 当前文档
 
 <!-- @@@auto:active-documents -->
-| File | Lines | Status |
+| 文件 | 行数 | 状态 |
 |------|-------|--------|
-| `journal-1.md` | ~0 | Active |
+| `journal-1.md` | ~0 | 使用中 |
 <!-- @@@/auto:active-documents -->
 
 ---
 
-## Session History
+## 会话历史
 
 <!-- @@@auto:session-history -->
-| # | Date | Title | Commits | Branch |
+| # | 日期 | 标题 | 提交 | 分支 |
 |---|------|-------|---------|--------|
 <!-- @@@/auto:session-history -->
 
 ---
 
-## Notes
+## 备注
 
-- Sessions are appended to journal files
-- New journal file created when current exceeds 2000 lines
-- Use `add_session.py` to record sessions
+- session 会持续追加到 journal 文件中
+- 当前文件超过 2000 行时，会创建新的 journal 文件
+- 使用 `add_session.py` 记录 session

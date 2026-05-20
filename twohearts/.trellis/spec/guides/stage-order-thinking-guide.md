@@ -1,4 +1,4 @@
-# Stage Order Thinking Guide
+# 阶段顺序思考指南
 
 ## 什么时候必须读这份指南
 

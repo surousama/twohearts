@@ -1,44 +1,43 @@
-# Trellis Configuration
-# Project-level settings for the Trellis workflow system
+# Trellis 配置
+# Trellis 工作流系统的项目级设置
 #
-# All values have sensible defaults. Only override what you need.
+# 所有值都有合理默认值，只需覆盖你真正需要调整的部分。
 
 #-------------------------------------------------------------------------------
-# Session Recording
+# 会话记录
 #-------------------------------------------------------------------------------
 
-# Commit message used when auto-committing journal/index changes
-# after running add_session.py
-session_commit_message: "chore: record journal"
+# 运行 add_session.py 后，自动提交 journal/index 变更时使用的提交信息
+session_commit_message: "chore: 记录日志"
 
-# Maximum lines per journal file before rotating to a new one
+# 单个 journal 文件在轮转到新文件前允许的最大行数
 max_journal_lines: 2000
 
 #-------------------------------------------------------------------------------
-# Session Auto-Commit
+# 会话自动提交
 #-------------------------------------------------------------------------------
 
-# Auto-commit behavior for session journal + task archive operations.
-# - true (default): scripts auto-stage and auto-commit journal / task changes
-#   after add_session.py / task.py archive runs.
-# - false: scripts do not touch git. Files (journal-*.md, task archive moves)
-#   are still written to disk; you decide whether to git add / commit.
+# session journal 与 task archive 的自动提交行为。
+# - true（默认）：在执行 add_session.py / task.py archive 后，
+#   脚本会自动暂存并提交 journal / task 相关变更。
+# - false：脚本不操作 git。文件（如 journal-*.md、task 归档移动）
+#   仍会写入磁盘，由你自行决定是否 git add / commit。
 #
-# Use `false` if your project's .gitignore intentionally excludes `.trellis/`
-# and you want session data kept local-only, or if you prefer to review
-# staged changes manually before each commit.
+# 如果你的项目有意在 .gitignore 中排除了 `.trellis/`，
+# 希望这些会话数据只保留在本地，或希望每次提交前手动审查暂存内容，
+# 就使用 `false`。
 #
-# Accepts: true / false / yes / no / 1 / 0 / on / off (case-insensitive).
+# 接受值：true / false / yes / no / 1 / 0 / on / off（大小写不敏感）。
 #
 session_auto_commit: false
 
 #-------------------------------------------------------------------------------
-# Task Lifecycle Hooks
+# 任务生命周期 Hook
 #-------------------------------------------------------------------------------
 
-# Shell commands to run after task lifecycle events.
-# Each hook receives TASK_JSON_PATH environment variable pointing to task.json.
-# Hook failures print a warning but do not block the main operation.
+# task 生命周期事件触发后要执行的 shell 命令。
+# 每个 hook 都会收到 `TASK_JSON_PATH` 环境变量，指向 task.json。
+# hook 执行失败只会打印警告，不会阻塞主流程。
 #
 # hooks:
 #   after_create:
@@ -54,9 +53,9 @@ session_auto_commit: false
 # Monorepo / Packages
 #-------------------------------------------------------------------------------
 
-# Declare packages for monorepo projects.
-# Trellis auto-detects workspaces during `trellis init`, but you can also
-# configure them manually here.
+# 为 monorepo 项目声明 package。
+# Trellis 会在 `trellis init` 时自动探测 workspace，
+# 你也可以在这里手动配置。
 #
 # packages:
 #   frontend:
@@ -66,27 +65,27 @@ session_auto_commit: false
 #   docs:
 #     path: docs-site
 #     type: submodule
-#   # For polyrepo / meta-repo layouts (independent .git in each subdir),
-#   # mark the package with `git: true`. The runtime treats it as an
-#   # independent repository for things like git-context display.
+#   # 对 polyrepo / meta-repo 布局（子目录各自有独立 .git），
+#   # 可给 package 标记 `git: true`。运行时会把它当作独立仓库，
+#   # 用于 git 上下文显示等场景。
 #   webapp:
 #     path: ./webapp
 #     git: true
 
-# Default package used when --package is not specified.
+# 未显式指定 --package 时使用的默认 package。
 # default_package: frontend
 
 #-------------------------------------------------------------------------------
-# Codex (dispatch behavior)
+# Codex（分发行为）
 #-------------------------------------------------------------------------------
-# Codex-only knob; other platforms ignore it. Default ("inline") makes the
-# main Codex agent edit code directly because Codex sub-agents run with
-# `fork_turns="none"` isolation and can't inherit the parent session's
-# task context. Set to "sub-agent" to opt into the legacy dispatch model
-# (main agent spawns trellis-implement / trellis-check / trellis-research
-# sub-agents).
+# 仅对 Codex 生效，其他平台会忽略。默认值 `"inline"` 表示
+# 主 Codex agent 直接在主会话中编辑，因为 Codex 子代理以
+# `fork_turns="none"` 隔离运行，无法继承父会话的 task 上下文。
+# 设置为 `"sub-agent"` 可启用旧的分发模式
+# （主 agent 派发 trellis-implement / trellis-check / trellis-research
+# 子代理）。
 #
 # codex:
-#   dispatch_mode: inline  # or "sub-agent" to dispatch trellis-* sub-agents
+#   dispatch_mode: inline  # 或填 "sub-agent" 以派发 trellis-* 子代理
 codex:
   dispatch_mode: inline
