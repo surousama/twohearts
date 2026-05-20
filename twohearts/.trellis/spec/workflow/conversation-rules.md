@@ -30,4 +30,4 @@
 
 ## 来源
 
-由旧文档 `H:\twohearts\docs\a双心印prompt.md` 提炼。
+由旧文档 `../docs/a双心印prompt.md` 提炼。

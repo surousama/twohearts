@@ -31,5 +31,5 @@
 
 ## Technical Notes
 
-* 对应旧文档：`H:\twohearts\docs\测试文档\a基础闪避第二轮跑测与白盒反馈.md`
+* 对应旧文档：`../docs/测试文档/a基础闪避第二轮跑测与白盒反馈.md`
 * 上游阶段文档：`05-19-chapter2-basic-combat`
