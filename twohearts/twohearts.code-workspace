@@ -11,10 +11,6 @@
         {
             "name": "design",
             "path": "../design"
-        },
-        {
-            "name": "UE5",
-            "path": "H:\\UE_5.6"
         }
     ],
     "settings": {
@@ -24,10 +20,20 @@
         "C_Cpp.default.cppStandard": "c++20",
         "C_Cpp.intelliSenseEngineFallback": "Disabled",
         "C_Cpp.files.exclude": {
-            "**/UE_5.6/Engine/Source/ThirdParty/**": true,
+            "**/.git/**": true,
+            "**/.vs/**": true,
+            "**/.vscode/**": true,
+            "**/Binaries/**": true,
+            "**/DerivedDataCache/**": true,
+            "**/Intermediate/**": true,
+            "**/Saved/**": true,
+            "**/UE_5.6/Engine/Binaries/**": true,
             "**/UE_5.6/Engine/Intermediate/**": true,
+            "**/UE_5.6/Engine/Saved/**": true,
+            "**/UE_5.6/Engine/Source/ThirdParty/**": true,
+            "**/UE_5.6/Engine/Plugins/**/Binaries/**": true,
             "**/UE_5.6/Engine/Plugins/**/Intermediate/**": true,
-            "**/UE_5.6/Engine/Plugins/**/Binaries/**": true
+            "**/UE_5.6/Engine/Plugins/**/Saved/**": true
         },
         "typescript.tsc.autoDetect": "off",
         "npm.autoDetect": "off",
@@ -43,6 +49,23 @@
             "**/DerivedDataCache": true,
             "**/Intermediate": true,
             "**/Saved": true
+        },
+        "files.watcherExclude": {
+            "**/.git/**": true,
+            "**/.vs/**": true,
+            "**/.vscode/**": true,
+            "**/Binaries/**": true,
+            "**/DerivedDataCache/**": true,
+            "**/Intermediate/**": true,
+            "**/Saved/**": true,
+            "**/UE_5.6/Engine/Binaries/**": true,
+            "**/UE_5.6/Engine/DerivedDataCache/**": true,
+            "**/UE_5.6/Engine/Intermediate/**": true,
+            "**/UE_5.6/Engine/Saved/**": true,
+            "**/UE_5.6/Engine/Source/ThirdParty/**": true,
+            "**/UE_5.6/Engine/Plugins/**/Binaries/**": true,
+            "**/UE_5.6/Engine/Plugins/**/Intermediate/**": true,
+            "**/UE_5.6/Engine/Plugins/**/Saved/**": true
         },
         "search.exclude": {
             "**/Binaries": true,
