@@ -1,4 +1,4 @@
-# Change Local Agents
+﻿# Change Local Agents
 
 When the user wants to change `trellis-research`, `trellis-implement`, or `trellis-check` behavior, edit platform agent files in the user project.
 

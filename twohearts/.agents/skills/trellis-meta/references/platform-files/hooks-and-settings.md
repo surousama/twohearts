@@ -1,4 +1,4 @@
-# Hooks And Settings
+﻿# Hooks And Settings
 
 Hooks/settings are the entry layer that connects a platform to Trellis. They decide which scripts, plugins, or extensions a platform runs for which events.
 

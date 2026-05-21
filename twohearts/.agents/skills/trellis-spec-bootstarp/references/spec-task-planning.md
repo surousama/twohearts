@@ -1,4 +1,4 @@
-# Spec Task Planning
+﻿# Spec Task Planning
 
 Use a single agent as the default execution model. The agent may create Trellis tasks for traceability, but the skill should not require a specific platform, CLI, or parallel worker model.
 

@@ -1,4 +1,4 @@
-# Change Local Hooks
+﻿# Change Local Hooks
 
 Hooks are the automation layer that connects a platform to Trellis. When the user wants to change "when context is injected," "how shell commands inherit a session," or "which files are read before an agent starts," hooks are usually the edit point.
 

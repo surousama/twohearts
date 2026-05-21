@@ -1,4 +1,4 @@
-# Local Customization Overview
+﻿# Local Customization Overview
 
 This directory is for local AI working in a user project where Trellis was installed through npm and `trellis init` has already been run. The AI should modify generated `.trellis/` and platform directories inside the project, not Trellis CLI upstream source code.
 

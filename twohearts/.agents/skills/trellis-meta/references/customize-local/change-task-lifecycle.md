@@ -1,4 +1,4 @@
-# Change Local Task Lifecycle
+﻿# Change Local Task Lifecycle
 
 Task lifecycle includes creation, start, context configuration, finish, archive, parent/child tasks, and lifecycle hooks. The default customization targets are `.trellis/tasks/`, `.trellis/config.yaml`, and `.trellis/scripts/`.
 

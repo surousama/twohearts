@@ -1,4 +1,4 @@
-# Local Context Injection System
+﻿# Local Context Injection System
 
 Trellis context injection aims to make AI read the right files at the right time instead of relying on model memory. In a user project, injection is implemented by `.trellis/` scripts together with platform hooks, agents, and skills.
 

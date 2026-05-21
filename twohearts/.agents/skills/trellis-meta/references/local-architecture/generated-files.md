@@ -1,4 +1,4 @@
-# Local Files Generated After Init
+﻿# Local Files Generated After Init
 
 `trellis init` writes the Trellis runtime into the user project. Later, `trellis update` tries to update Trellis-managed template files, but it uses `.trellis/.template-hashes.json` to determine which files have already been modified by the user.
 

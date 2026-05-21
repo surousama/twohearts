@@ -1,4 +1,4 @@
-# Skills, Commands, Prompts, And Workflows
+﻿# Skills, Commands, Prompts, And Workflows
 
 Skills and commands are textual entry points for user interaction with Trellis. Different platforms use different names, but their core purpose is the same: tell the AI how to enter the Trellis flow when the user expresses a certain intent.
 

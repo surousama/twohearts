@@ -1,4 +1,4 @@
-# Change Local Spec Structure
+﻿# Change Local Spec Structure
 
 When the user wants to change the engineering conventions AI follows, add new spec layers, or adjust monorepo package mapping, edit `.trellis/spec/` and `.trellis/config.yaml`.
 

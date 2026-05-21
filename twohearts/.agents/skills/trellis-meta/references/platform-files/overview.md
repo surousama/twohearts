@@ -1,4 +1,4 @@
-# Platform Files Overview
+﻿# Platform Files Overview
 
 Trellis connects the same local architecture to different AI tools. `.trellis/` stores the shared runtime; platform directories store adapter files that define how each AI tool enters Trellis.
 

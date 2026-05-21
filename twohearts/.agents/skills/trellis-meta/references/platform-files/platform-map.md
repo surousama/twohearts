@@ -1,4 +1,4 @@
-# Platform File Map
+﻿# Platform File Map
 
 This page lists common Trellis file locations in a user project by platform. Whether a platform directory exists in an actual project depends on which `trellis init --<platform>` commands the user ran.
 

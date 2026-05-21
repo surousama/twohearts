@@ -1,4 +1,4 @@
-# Repository Analysis
+﻿# Repository Analysis
 
 The goal is to discover the project's real architecture before writing rules. Do not start from generic spec templates and fill blanks. Start from the code, then let the spec structure follow.
 

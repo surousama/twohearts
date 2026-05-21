@@ -1,4 +1,4 @@
-# Add Project-Local Conventions
+﻿# Add Project-Local Conventions
 
 Often the user does not need to change Trellis mechanics; they need local AI to understand their team's conventions. In that case, prefer `.trellis/spec/` or a project-local skill instead of editing `trellis-meta`.
 

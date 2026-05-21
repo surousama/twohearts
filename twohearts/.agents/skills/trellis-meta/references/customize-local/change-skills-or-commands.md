@@ -1,4 +1,4 @@
-# Change Local Skills, Commands, Prompts, And Workflows
+﻿# Change Local Skills, Commands, Prompts, And Workflows
 
 When the user wants to change AI entry points, auto-trigger rules, or explicit command behavior, edit skills, commands, prompts, or workflows in local platform directories.
 

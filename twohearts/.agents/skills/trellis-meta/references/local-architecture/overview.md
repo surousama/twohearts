@@ -1,4 +1,4 @@
-# Local Trellis Architecture Overview
+﻿# Local Trellis Architecture Overview
 
 `trellis-meta` is for user projects that have already run `trellis init`. The user's machine usually has only the npm-installed `trellis` command plus the Trellis files generated inside the project; it may not have the Trellis CLI source code.
 

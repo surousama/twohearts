@@ -1,4 +1,4 @@
-# Local Task System
+﻿# Local Task System
 
 The Trellis task system is stored entirely under `.trellis/tasks/` in the user project. Each task is a directory containing requirements, context, research, state, and relationship information.
 

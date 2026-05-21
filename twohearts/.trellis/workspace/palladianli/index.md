@@ -1,4 +1,4 @@
-# 工作区索引 - palladianli
+﻿# 工作区索引 - palladianli
 
 > 用于跟踪 AI 开发会话的 journal 记录。
 

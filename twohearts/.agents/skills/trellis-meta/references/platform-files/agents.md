@@ -1,4 +1,4 @@
-# Agents
+﻿# Agents
 
 Trellis agent files define specialized roles. Common Trellis agents in a user project are:
 

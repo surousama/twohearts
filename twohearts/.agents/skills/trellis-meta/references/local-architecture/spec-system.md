@@ -1,4 +1,4 @@
-# Local Spec System
+﻿# Local Spec System
 
 `.trellis/spec/` is the user's project-specific engineering spec library. Trellis is not about making AI memorize conventions; it injects relevant specs or requires the AI to read them at the right time.
 
