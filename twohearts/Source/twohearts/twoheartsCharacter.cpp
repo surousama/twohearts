@@ -443,20 +443,14 @@ float AtwoheartsCharacter::GetNormalAttackSectionLength(int32 Segment) const
 
 FVector AtwoheartsCharacter::GetDesiredDodgeDirectionWorld() const
 {
-	if (GetController())
+	const FVector ActorForward = GetActorForwardVector().GetSafeNormal2D();
+	const FVector ActorRight = GetActorRightVector().GetSafeNormal2D();
+	const FVector RelativeDodgeDirection = (ActorForward * CachedMoveInput.Y) + (ActorRight * CachedMoveInput.X);
+	if (!RelativeDodgeDirection.IsNearlyZero())
 	{
-		const FRotator Rotation = GetController()->GetControlRotation();
-		const FRotator YawRotation(0.0f, Rotation.Yaw, 0.0f);
-		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-		const FVector MovementDirection = (ForwardDirection * CachedMoveInput.Y) + (RightDirection * CachedMoveInput.X);
-		if (!MovementDirection.IsNearlyZero())
-		{
-			return MovementDirection.GetSafeNormal2D();
-		}
+		return RelativeDodgeDirection.GetSafeNormal2D();
 	}
 
-	const FVector ActorForward = GetActorForwardVector().GetSafeNormal2D();
 	return ActorForward.IsNearlyZero() ? FVector::ForwardVector : ActorForward;
 }
 
