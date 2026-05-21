@@ -1,0 +1,7 @@
+{"file":".trellis/spec/combat/current-stage.md","reason":"约束当前主顺序，确保公共战斗语义层只在基础闪避稳定后进入。"}
+{"file":".trellis/spec/roles/lead-programmer.md","reason":"保持当前输出是主程序视角的阶段评估与实施拆分，而不是直接写代码。"}
+{"file":".trellis/spec/implementation/document-maintenance.md","reason":"让输出结果收束为可直接派给资深程序的实施文档和阶段结论。"}
+{"file":".trellis/spec/tasking/parent-child-task-rules.md","reason":"把公共战斗语义层继续拆成可单轮验收的子 task，而不是一个大包任务。"}
+{"file":".trellis/tasks/05-19-chapter2-basic-combat/info.md","reason":"复用父 task 已有的阶段现状、关键接口和技术债判断。"}
+{"file":"../docs/程序技术文档/a基础战斗公共语义层技术文档.md","reason":"参考现有主程序方案草案，提炼本轮可直接开工的模块拆分。"}
+{"file":".trellis/tasks/05-21-combat-semantic-layer-readiness/prd.md","reason":"提供本子 task 的阶段目标、阻塞判断和验收标准。"}

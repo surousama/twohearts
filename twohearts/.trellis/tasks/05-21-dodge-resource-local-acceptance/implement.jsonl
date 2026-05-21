@@ -1,0 +1,6 @@
+{"file":".trellis/spec/combat/current-stage.md","reason":"确保先完成基础闪避阶段收口，不提前切去公共战斗语义层。"}
+{"file":".trellis/spec/implementation/ue5-gas-cpp-guidelines.md","reason":"保持基础闪避继续沿用 UE5 + GAS + C++ 正式承载，不回退 Character 状态机。"}
+{"file":".trellis/spec/implementation/blueprint-boundary.md","reason":"明确 Root Motion、Montage、Notify 与 C++ 规则之间的职责边界。"}
+{"file":".trellis/spec/testing/whitebox-testing-guidelines.md","reason":"指导本地联调记录、问题状态标记和调试观察口径。"}
+{"file":".trellis/tasks/05-19-chapter2-basic-combat/info.md","reason":"复用父 task 的当前阶段事实、关键接口现状和阶段顺序判断。"}
+{"file":".trellis/tasks/05-21-dodge-resource-local-acceptance/prd.md","reason":"提供本子 task 的目标、验收标准和本轮不做范围。"}

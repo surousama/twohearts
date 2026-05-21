@@ -176,12 +176,15 @@ bool UTwoHeartsGA_Dodge::StartDodgeExecution()
 		bCachedUseControllerDesiredRotation = Character->GetCharacterMovement()->bUseControllerDesiredRotation;
 		Character->GetCharacterMovement()->StopMovementImmediately();
 		Character->GetCharacterMovement()->bOrientRotationToMovement = false;
+		Character->GetCharacterMovement()->bUseControllerDesiredRotation = false;
 	}
 
 	bCachedUseControllerRotationYaw = Character->bUseControllerRotationYaw;
 	bShouldRestoreCharacterState = true;
 	Character->bUseControllerRotationYaw = false;
-	Character->SetActorRotation(DodgeDirection.Rotation());
+	RecordDodgeEvent(
+		TEXT("DodgeFacingPreserved"),
+		FString::Printf(TEXT("Preserving current facing while executing %s dodge montage."), *DodgeDirectionName));
 
 	if (UAnimInstance* AnimInstance = Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr)
 	{
