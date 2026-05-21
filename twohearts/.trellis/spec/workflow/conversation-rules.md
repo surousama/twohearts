@@ -30,6 +30,7 @@
 3. 当前任务需要什么，就读什么
 4. 在 Windows PowerShell 5.1 下读取中文 Markdown 时，优先使用 `Get-Content -Encoding UTF8`，不要依赖默认编码推断
 5. 若需要用 Python 输出中文文档内容，先显式设置 `PYTHONIOENCODING=utf-8`，避免标准输出按 `gbk` 写出后被误判为乱码
+6. 若当前终端仍频繁出现中文乱码，可先运行 `powershell -ExecutionPolicy Bypass -File .\.trellis\scripts\enable_utf8.ps1`，再执行 Trellis 脚本或人工排查命令
 
 ## 来源
 

@@ -5,7 +5,9 @@ This module provides shared functionality used by other Trellis scripts.
 """
 
 import io
+import os
 import sys
+from typing import Final
 
 # =============================================================================
 # Windows Encoding Fix (MUST be at top, before any other output)
@@ -15,6 +17,27 @@ import sys
 #
 # Any script that imports from common will automatically get this fix.
 # =============================================================================
+
+_WINDOWS_UTF8_CODE_PAGE: Final[int] = 65001
+
+
+def _configure_windows_console_code_page() -> None:
+    """Switch the active Windows console code page to UTF-8 when possible."""
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        kernel32.SetConsoleCP(_WINDOWS_UTF8_CODE_PAGE)
+        kernel32.SetConsoleOutputCP(_WINDOWS_UTF8_CODE_PAGE)
+    except Exception:
+        # Keep the stream-level UTF-8 fallback even if the console API is unavailable.
+        pass
+
+
+def _configure_windows_environment() -> None:
+    """Seed child processes with UTF-8-friendly defaults."""
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+    os.environ.setdefault("PYTHONUTF8", "1")
 
 
 def _configure_stream(stream: object) -> object:
@@ -34,6 +57,8 @@ def _configure_stream(stream: object) -> object:
 
 
 if sys.platform == "win32":
+    _configure_windows_console_code_page()
+    _configure_windows_environment()
     sys.stdout = _configure_stream(sys.stdout)  # type: ignore[assignment]
     sys.stderr = _configure_stream(sys.stderr)  # type: ignore[assignment]
     sys.stdin = _configure_stream(sys.stdin)  # type: ignore[assignment]
@@ -50,6 +75,8 @@ def configure_encoding() -> None:
     """
     global sys
     if sys.platform == "win32":
+        _configure_windows_console_code_page()
+        _configure_windows_environment()
         sys.stdout = _configure_stream(sys.stdout)  # type: ignore[assignment]
         sys.stderr = _configure_stream(sys.stderr)  # type: ignore[assignment]
         sys.stdin = _configure_stream(sys.stdin)  # type: ignore[assignment]

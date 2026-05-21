@@ -342,6 +342,23 @@ python .\.trellis\scripts\task.py list
 2. 是否已经执行 `task.py start <task>`
 3. 是否是同一轮会话上下文
 
+### 9.4 中文输出偶发乱码
+
+如果你在 Windows PowerShell 5.1 里看到中文文档或 Trellis 脚本输出偶发乱码，先运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\.trellis\scripts\enable_utf8.ps1
+```
+
+这会做几件事：
+
+1. 把当前 PowerShell 会话的输入输出编码切到 UTF-8
+2. 尝试把控制台代码页切到 `65001`
+3. 设置 `PYTHONIOENCODING=utf-8`
+4. 设置 `PYTHONUTF8=1`
+
+之后再运行 `get_context.py`、`task.py`、`Get-Content` 之类命令，中文显示会更稳定。
+
 ## 10. 当前双心印项目的结论
 
 1. Trellis 的工作流总入口在 [`.trellis/workflow.md`](../twohearts/.trellis/workflow.md)。
