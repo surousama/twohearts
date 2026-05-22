@@ -259,6 +259,8 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 	}
 
 	const int32 NumericInputID = static_cast<int32>(InputID);
+	const bool bIsNormalAttackInput = InputID == ETwoHeartsAbilityInputID::NormalAttack;
+	const bool bIsDodgeInput = InputID == ETwoHeartsAbilityInputID::Dodge;
 	bool bForwardedToActiveAbility = false;
 	bool bAttemptedActivation = false;
 	bool bActivatedAbility = false;
@@ -271,6 +273,41 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 			: FString::Printf(TEXT("Blocked by tags: %s"), *FailureTags.ToStringSimple());
 	};
 
+	auto RecordInputDebugEvent = [this, bIsDodgeInput](const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false)
+	{
+		if (bIsDodgeInput)
+		{
+			PushDodgeDebugEvent(EventName, Detail);
+			UE_LOG(
+				LogtwoheartsCombatTest,
+				Display,
+				TEXT("[DodgeInput] actor=%s event=%s detail=\"%s\""),
+				*GetNameSafe(this),
+				EventName,
+				*Detail);
+			return;
+		}
+
+		RecordNormalAttackDebugEvent(EventName, Detail, bVerboseOnly);
+	};
+
+	auto RecordInputFailure = [this, bIsDodgeInput, &RecordInputDebugEvent](const TCHAR* EventName, const FString& Detail)
+	{
+		if (bIsDodgeInput)
+		{
+			PushDodgeDebugEvent(EventName, Detail);
+			UE_LOG(
+				LogtwoheartsCombatTest,
+				Warning,
+				TEXT("[DodgeInputFailure] actor=%s detail=\"%s\""),
+				*GetNameSafe(this),
+				*Detail);
+			return;
+		}
+
+		RecordNormalAttackFailure(EventName, Detail);
+	};
+
 	for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
 	{
 		if (AbilitySpec.InputID != NumericInputID || !AbilitySpec.IsActive())
@@ -280,7 +317,7 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 
 		bForwardedToActiveAbility = true;
 		AbilitySystemComponent->AbilitySpecInputPressed(AbilitySpec);
-		RecordNormalAttackDebugEvent(
+		RecordInputDebugEvent(
 			TEXT("ForwardInputToActiveAbility"),
 			FString::Printf(TEXT("Forwarded input to active ability %s."), *GetNameSafe(AbilitySpec.Ability)),
 			true);
@@ -291,7 +328,6 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 		return true;
 	}
 
-	const bool bIsNormalAttackInput = InputID == ETwoHeartsAbilityInputID::NormalAttack;
 	const FGameplayTag StarterAbilityTag = TAG_TwoHearts_Ability_NormalAttack_Segment1;
 
 	for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
@@ -325,7 +361,7 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 
 		if (!bCanActivate)
 		{
-			RecordNormalAttackFailure(
+			RecordInputFailure(
 				TEXT("ActivateFailed"),
 				FString::Printf(TEXT("Failed to activate %s. %s"), *GetNameSafe(AbilitySpec.Ability), *BuildFailureReason(FailureTags)));
 			continue;
@@ -335,20 +371,20 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 		if (AbilitySystemComponent->TryActivateAbility(AbilitySpec.Handle))
 		{
 			bActivatedAbility = true;
-			RecordNormalAttackDebugEvent(
+			RecordInputDebugEvent(
 				TEXT("ActivateAbility"),
 				FString::Printf(TEXT("Activated ability %s for input %d."), *GetNameSafe(AbilitySpec.Ability), NumericInputID));
 			break;
 		}
 
-		RecordNormalAttackFailure(
+		RecordInputFailure(
 			TEXT("ActivateFailed"),
 			FString::Printf(TEXT("TryActivateAbility failed for %s after CanActivateAbility succeeded."), *GetNameSafe(AbilitySpec.Ability)));
 	}
 
 	if (!MatchingAbilityNames.IsEmpty())
 	{
-		RecordNormalAttackDebugEvent(
+		RecordInputDebugEvent(
 			TEXT("InputScan"),
 			FString::Printf(TEXT("Input %d scanned abilities: %s."), NumericInputID, *FString::Join(MatchingAbilityNames, TEXT(", "))),
 			true);
@@ -361,13 +397,21 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 
 	if (bIsNormalAttackInput)
 	{
-		RecordNormalAttackFailure(
+		RecordInputFailure(
 			TEXT("ActivateFailed"),
 			TEXT("NormalAttack input found no valid starter ability. First input must enter Segment1."));
 	}
+	else if (bIsDodgeInput)
+	{
+		RecordInputFailure(
+			TEXT("ActivateFailed"),
+			MatchingAbilityNames.IsEmpty()
+				? TEXT("Dodge input found no bound dodge ability.")
+				: TEXT("Dodge input matched abilities but none were eligible for activation."));
+	}
 	else if (!MatchingAbilityNames.IsEmpty())
 	{
-		RecordNormalAttackDebugEvent(
+		RecordInputDebugEvent(
 			TEXT("ActivateFailed"),
 			FString::Printf(TEXT("Input %d matched abilities but none were eligible for activation."), NumericInputID));
 	}

@@ -7,9 +7,9 @@
 ## 当前状态
 
 <!-- @@@auto:current-status -->
-- **当前文件**: `journal-1.md`
-- **总会话数**: 0
-- **最近活跃**: -
+- **Active File**: `journal-1.md`
+- **Total Sessions**: 1
+- **Last Active**: 2026-05-21
 <!-- @@@/auto:current-status -->
 
 ---
@@ -17,9 +17,9 @@
 ## 当前文档
 
 <!-- @@@auto:active-documents -->
-| 文件 | 行数 | 状态 |
+| File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~0 | 使用中 |
+| `journal-1.md` | ~40 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | 日期 | 标题 | 提交 | 分支 |
 |---|------|-------|---------|--------|
+| 1 | 2026-05-21 | Finish dodge-second-pass-polish | `fd41608` | `master` |
 <!-- @@@/auto:session-history -->
 
 ---
