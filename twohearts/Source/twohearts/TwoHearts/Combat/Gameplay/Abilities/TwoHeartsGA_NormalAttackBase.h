@@ -10,6 +10,7 @@ class AtwoheartsCharacter;
 class UAbilityTask_PlayMontageAndWait;
 class UAnimInstance;
 class UTwoHeartsCombatActionContextComponent;
+enum class ETwoHeartsCombatActionType : uint8;
 struct FBranchingPointNotifyPayload;
 
 UCLASS(Abstract)
@@ -39,6 +40,7 @@ public:
 		bool bWasCancelled) override;
 
 	bool CanBeInterruptedByDodge() const;
+	bool TryInterruptByAction(ETwoHeartsCombatActionType InterruptingActionType, const FString& InterruptReason);
 	bool TryInterruptByDodge();
 	void NotifyCombatPhaseByName(FName NotifyName);
 

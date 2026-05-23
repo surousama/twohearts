@@ -722,6 +722,7 @@ bool AtwoheartsCharacter::ShouldEmitNormalAttackDebugLog(const TCHAR* EventName,
 		EventNameString == TEXT("EnterPhase") ||
 		EventNameString == TEXT("LogicEnded") ||
 		EventNameString == TEXT("InterruptCheck") ||
+		EventNameString == TEXT("InterruptedByAction") ||
 		EventNameString == TEXT("InterruptedByDodge") ||
 		EventNameString == TEXT("SegmentFinished") ||
 		EventNameString == TEXT("ActivateFailed") ||
@@ -740,6 +741,7 @@ bool AtwoheartsCharacter::ShouldDisplayNormalAttackDebugEvent(const FNormalAttac
 		Event.EventName == TEXT("EnterPhase") ||
 		Event.EventName == TEXT("LogicEnded") ||
 		Event.EventName == TEXT("InterruptCheck") ||
+		Event.EventName == TEXT("InterruptedByAction") ||
 		Event.EventName == TEXT("InterruptedByDodge") ||
 		Event.EventName == TEXT("SegmentFinished") ||
 		Event.EventName == TEXT("ActivateFailed") ||

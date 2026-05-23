@@ -6,6 +6,8 @@
 #include "Animation/AnimMontage.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
+#include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
+#include "TwoHearts/Combat/TwoHeartsCombatPhase.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_NormalAttackBase.h"
 #include "TwoHearts/Combat/Gameplay/Tags/TwoHeartsGameplayTags.h"
 #include "twohearts.h"
@@ -37,20 +39,16 @@ void UTwoHeartsGA_Dodge::ActivateAbility(
 	bDodgeFinished = false;
 	bHasAppliedCleanup = false;
 	bInvulnerabilityActive = false;
+	bHasRegisteredCombatActionContext = false;
+	bHasMarkedCombatLogicEnded = false;
 	bHasReceivedInvulnerabilityBeginNotify = false;
 	bHasReceivedInvulnerabilityEndNotify = false;
 	bShouldRestoreCharacterState = false;
 
-	if (UTwoHeartsGA_NormalAttackBase* ActiveNormalAttack = FindActiveNormalAttackAbility())
+	if (!TryInterruptCurrentActionByDodge())
 	{
-		if (!ActiveNormalAttack->TryInterruptByDodge())
-		{
-			RecordDodgeEvent(TEXT("DodgeRejected"), TEXT("The active normal attack phase is not interruptible by dodge."), true);
-			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-			return;
-		}
-
-		RecordDodgeEvent(TEXT("DodgeInterruptedNormalAttack"), TEXT("Interrupted the active normal attack and entered dodge."));
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
 	}
 
 	if (!ResolveDodgeDirection(DodgeDirection, DodgeDirectionName))
@@ -109,6 +107,71 @@ UTwoHeartsGA_NormalAttackBase* UTwoHeartsGA_Dodge::FindActiveNormalAttackAbility
 	return nullptr;
 }
 
+UTwoHeartsCombatActionContextComponent* UTwoHeartsGA_Dodge::GetCombatActionContextComponent() const
+{
+	if (const AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter()))
+	{
+		return Character->GetCombatActionContextComponent();
+	}
+
+	return nullptr;
+}
+
+bool UTwoHeartsGA_Dodge::TryInterruptCurrentActionByDodge()
+{
+	const UTwoHeartsCombatActionContextComponent* ActionContextComponent = GetCombatActionContextComponent();
+	if (!ActionContextComponent || !ActionContextComponent->HasActiveAction())
+	{
+		return true;
+	}
+
+	const FTwoHeartsCombatActionContextSnapshot& CurrentContext = ActionContextComponent->GetCurrentContext();
+	if (CurrentContext.ActionType != ETwoHeartsCombatActionType::NormalAttack)
+	{
+		return true;
+	}
+
+	if (!ActionContextComponent->CanCurrentActionBeInterruptedBy(ETwoHeartsCombatActionType::Dodge))
+	{
+		RecordDodgeEvent(
+			TEXT("DodgeRejected"),
+			FString::Printf(
+				TEXT("Public action context rejected dodge interrupt for %s during phase %s."),
+				*CurrentContext.ActionInstanceName,
+				*StaticEnum<ETwoHeartsCombatPhase>()->GetNameStringByValue(static_cast<int64>(CurrentContext.ActionPhase))),
+			true);
+		return false;
+	}
+
+	UTwoHeartsGA_NormalAttackBase* ActiveNormalAttack = FindActiveNormalAttackAbility();
+	if (!ActiveNormalAttack)
+	{
+		RecordDodgeEvent(
+			TEXT("DodgeRejected"),
+			FString::Printf(
+				TEXT("Public action context reported interruptible action %s but no active normal attack instance was found."),
+				*CurrentContext.ActionInstanceName),
+			true);
+		return false;
+	}
+
+	if (!ActiveNormalAttack->TryInterruptByAction(ETwoHeartsCombatActionType::Dodge, TEXT("InterruptedByDodge")))
+	{
+		RecordDodgeEvent(
+			TEXT("DodgeRejected"),
+			FString::Printf(
+				TEXT("Public action context allowed dodge interrupt but applying it to %s failed."),
+				*CurrentContext.ActionInstanceName),
+			true);
+		return false;
+	}
+
+	RecordDodgeEvent(
+		TEXT("DodgeInterruptedAction"),
+		FString::Printf(TEXT("Interrupted %s through the public action context."), *CurrentContext.ActionInstanceName));
+	return true;
+}
+
 bool UTwoHeartsGA_Dodge::ResolveDodgeDirection(FVector& OutDirection, FString& OutDirectionName) const
 {
 	const AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter());
@@ -158,6 +221,7 @@ bool UTwoHeartsGA_Dodge::StartDodgeExecution()
 	}
 
 	ApplyDodgeCooldown();
+	SyncCombatActionContextOnPhaseEntered(ETwoHeartsCombatPhase::Startup, TEXT("DodgeActivated"));
 	UpdateDodgeDebugState();
 
 	RecordDodgeEvent(
@@ -236,6 +300,7 @@ void UTwoHeartsGA_Dodge::BeginInvulnerabilityWindow()
 	}
 
 	bInvulnerabilityActive = true;
+	SyncCombatActionContextOnPhaseEntered(ETwoHeartsCombatPhase::Active, TEXT("DodgeInvulnerableBegin"));
 	UpdateDodgeDebugState();
 	RecordDodgeEvent(TEXT("DodgeInvulnerableBegin"), TEXT("Entered dodge invulnerability window."));
 }
@@ -253,6 +318,10 @@ void UTwoHeartsGA_Dodge::EndInvulnerabilityWindow()
 	}
 
 	bInvulnerabilityActive = false;
+	if (!bHasMarkedCombatLogicEnded)
+	{
+		SyncCombatActionContextOnPhaseEntered(ETwoHeartsCombatPhase::Recovery, TEXT("DodgeInvulnerableEnd"));
+	}
 	UpdateDodgeDebugState();
 	RecordDodgeEvent(TEXT("DodgeInvulnerableEnd"), TEXT("Exited dodge invulnerability window."));
 }
@@ -266,6 +335,7 @@ void UTwoHeartsGA_Dodge::FinishDodge(bool bWasCancelled)
 
 	bDodgeFinished = true;
 	bDodgeStarted = false;
+	MarkCombatActionLogicEnded(bWasCancelled ? TEXT("DodgeCancelled") : TEXT("DodgeFinished"));
 	RecordDodgeEvent(TEXT("DodgeFinished"), bWasCancelled ? TEXT("Dodge was cancelled.") : TEXT("Dodge finished and can chain into follow-up actions."));
 
 	EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, bWasCancelled);
@@ -385,6 +455,68 @@ UAnimMontage* UTwoHeartsGA_Dodge::ResolveDodgeMontage() const
 	return nullptr;
 }
 
+void UTwoHeartsGA_Dodge::SyncCombatActionContextOnPhaseEntered(ETwoHeartsCombatPhase NewPhase, const FString& Reason)
+{
+	UTwoHeartsCombatActionContextComponent* ActionContextComponent = GetCombatActionContextComponent();
+	if (!ActionContextComponent)
+	{
+		return;
+	}
+
+	if (!bHasRegisteredCombatActionContext)
+	{
+		FTwoHeartsCombatActionRegistration Registration;
+		Registration.ActionType = ETwoHeartsCombatActionType::Dodge;
+		Registration.InitialPhase = NewPhase;
+		Registration.AbilityTag = TAG_TwoHearts_Ability_Dodge;
+		Registration.ActionStateTag = TAG_TwoHearts_State_Action_Dodge;
+		Registration.ActionInstanceName = FString::Printf(TEXT("Dodge.%s"), *DodgeDirectionName);
+
+		ActionContextComponent->BeginAction(Registration, Reason);
+		bHasRegisteredCombatActionContext = true;
+		return;
+	}
+
+	if (NewPhase == ETwoHeartsCombatPhase::LogicEnded)
+	{
+		ActionContextComponent->MarkLogicEnded(Reason);
+		bHasMarkedCombatLogicEnded = true;
+		return;
+	}
+
+	ActionContextComponent->TransitionToPhase(NewPhase, Reason);
+}
+
+void UTwoHeartsGA_Dodge::MarkCombatActionLogicEnded(const FString& Reason)
+{
+	if (bHasMarkedCombatLogicEnded)
+	{
+		return;
+	}
+
+	SyncCombatActionContextOnPhaseEntered(ETwoHeartsCombatPhase::LogicEnded, Reason);
+}
+
+void UTwoHeartsGA_Dodge::FinishCombatActionContext(bool bWasCancelled)
+{
+	if (!bHasRegisteredCombatActionContext)
+	{
+		return;
+	}
+
+	if (UTwoHeartsCombatActionContextComponent* ActionContextComponent = GetCombatActionContextComponent())
+	{
+		const ETwoHeartsCombatActionEndReason EndReason = bWasCancelled
+			? ETwoHeartsCombatActionEndReason::Cancelled
+			: ETwoHeartsCombatActionEndReason::Completed;
+		const FString FinishReason = bWasCancelled ? TEXT("DodgeCancelled") : TEXT("DodgeEnded");
+		ActionContextComponent->FinishAction(EndReason, FinishReason);
+	}
+
+	bHasRegisteredCombatActionContext = false;
+	bHasMarkedCombatLogicEnded = false;
+}
+
 void UTwoHeartsGA_Dodge::BindMontageNotifyDelegates(UAnimInstance* AnimInstance)
 {
 	if (!AnimInstance || BoundAnimInstance == AnimInstance)
@@ -487,7 +619,8 @@ void UTwoHeartsGA_Dodge::HandleMontageCancelled()
 
 void UTwoHeartsGA_Dodge::HandleDodgeFinished()
 {
-	FinishDodge(false);
+	MarkCombatActionLogicEnded(TEXT("DodgeFinishedNotify"));
+	RecordDodgeEvent(TEXT("DodgeLogicEnded"), TEXT("Dodge reached its logical follow-up point."));
 }
 
 void UTwoHeartsGA_Dodge::HandleMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointNotifyPayload)
@@ -572,6 +705,7 @@ void UTwoHeartsGA_Dodge::CleanupDodgeExecution(bool bWasCancelled)
 	}
 
 	EndInvulnerabilityWindow();
+	FinishCombatActionContext(bWasCancelled);
 	RestoreCharacterState();
 	bDodgeStarted = false;
 	UpdateDodgeDebugState();

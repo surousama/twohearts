@@ -1,0 +1,9 @@
+{"file":".trellis/spec/combat/current-stage.md","reason":"约束当前仍是公共语义层首轮落地，不允许借 Dodge 桥接扩大到格挡、受击或完整预输入。"}
+{"file":".trellis/spec/combat/system-framework.md","reason":"明确打断关系、动作阶段和逻辑结束属于公共层应统一收束的长期语义。"}
+{"file":".trellis/spec/roles/senior-programmer.md","reason":"保持当前执行角色为资深程序，直接做正式桥接与统一接入口实现。"}
+{"file":".trellis/spec/implementation/ue5-gas-cpp-guidelines.md","reason":"约束 Dodge 桥接与打断统一继续落在正式 C++ / GAS 路线中。"}
+{"file":".trellis/spec/tasking/parent-child-task-rules.md","reason":"防止本 task 越界到输入评估或更后续系统。"}
+{"file":".trellis/tasks/05-21-combat-semantic-layer-readiness/info.md","reason":"读取主程序已明确的固定顺序、桥接边界与“先保真再泛化”的要求。"}
+{"file":".trellis/tasks/05-23-combat-action-context-foundation/prd.md","reason":"理解上游公共动作上下文底座的接口前提。"}
+{"file":".trellis/tasks/05-23-normal-attack-semantic-bridge/prd.md","reason":"理解上游普攻桥接已产出的公共动作接入方式，避免 Dodge 侧再发明一套。"}
+{"file":".trellis/tasks/05-23-dodge-semantic-bridge-and-interrupt-unification/prd.md","reason":"当前子 task 的直接目标、边界与验收口径。"}

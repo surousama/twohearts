@@ -98,16 +98,30 @@ void UTwoHeartsGA_NormalAttackBase::EndAbility(
 
 bool UTwoHeartsGA_NormalAttackBase::CanBeInterruptedByDodge() const
 {
+	if (const UTwoHeartsCombatActionContextComponent* ActionContextComponent = GetCombatActionContextComponent())
+	{
+		return ActionContextComponent->CanCurrentActionBeInterruptedBy(ETwoHeartsCombatActionType::Dodge);
+	}
+
 	return CurrentCombatPhase == ETwoHeartsCombatPhase::Recovery || CurrentCombatPhase == ETwoHeartsCombatPhase::LogicEnded;
 }
 
-bool UTwoHeartsGA_NormalAttackBase::TryInterruptByDodge()
+bool UTwoHeartsGA_NormalAttackBase::TryInterruptByAction(ETwoHeartsCombatActionType InterruptingActionType, const FString& InterruptReason)
 {
-	const bool bCanInterrupt = CanBeInterruptedByDodge();
+	const UEnum* ActionTypeEnum = StaticEnum<ETwoHeartsCombatActionType>();
+	const FString InterruptingActionName = ActionTypeEnum
+		? ActionTypeEnum->GetNameStringByValue(static_cast<int64>(InterruptingActionType))
+		: TEXT("Unknown");
+	const bool bCanInterrupt =
+		InterruptingActionType == ETwoHeartsCombatActionType::Dodge
+			? CanBeInterruptedByDodge()
+			: false;
+
 	RecordAbilityEvent(
 		TEXT("InterruptCheck"),
 		FString::Printf(
-			TEXT("Dodge interrupt check on segment %d during phase %s. Allowed=%s."),
+			TEXT("%s interrupt check on segment %d during phase %s. Allowed=%s."),
+			*InterruptingActionName,
 			NormalAttackSegment,
 			*StaticEnum<ETwoHeartsCombatPhase>()->GetNameStringByValue(static_cast<int64>(CurrentCombatPhase)),
 			bCanInterrupt ? TEXT("true") : TEXT("false")));
@@ -117,9 +131,14 @@ bool UTwoHeartsGA_NormalAttackBase::TryInterruptByDodge()
 		return false;
 	}
 
-	bInterruptedByDodge = true;
-	EnterCombatPhase(ETwoHeartsCombatPhase::LogicEnded, TEXT("InterruptedByDodge"));
-	RecordAbilityEvent(TEXT("InterruptedByDodge"), FString::Printf(TEXT("Normal attack segment %d was interrupted by dodge."), NormalAttackSegment));
+	bInterruptedByDodge = InterruptingActionType == ETwoHeartsCombatActionType::Dodge;
+	EnterCombatPhase(ETwoHeartsCombatPhase::LogicEnded, InterruptReason);
+	RecordAbilityEvent(
+		TEXT("InterruptedByAction"),
+		FString::Printf(
+			TEXT("Normal attack segment %d was interrupted by %s."),
+			NormalAttackSegment,
+			*InterruptingActionName));
 
 	if (AtwoheartsCharacter* Character = GetTwoHeartsCharacter())
 	{
@@ -135,6 +154,11 @@ bool UTwoHeartsGA_NormalAttackBase::TryInterruptByDodge()
 
 	FinishSegment(true);
 	return true;
+}
+
+bool UTwoHeartsGA_NormalAttackBase::TryInterruptByDodge()
+{
+	return TryInterruptByAction(ETwoHeartsCombatActionType::Dodge, TEXT("InterruptedByDodge"));
 }
 
 void UTwoHeartsGA_NormalAttackBase::NotifyCombatPhaseByName(FName NotifyName)

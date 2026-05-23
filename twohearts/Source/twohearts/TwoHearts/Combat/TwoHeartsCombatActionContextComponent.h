@@ -114,6 +114,9 @@ public:
 	bool HasActiveAction() const { return CurrentContext.bIsActionActive; }
 
 	UFUNCTION(BlueprintPure, Category="Combat|Action Context")
+	bool CanCurrentActionBeInterruptedBy(ETwoHeartsCombatActionType IncomingActionType) const;
+
+	UFUNCTION(BlueprintPure, Category="Combat|Action Context")
 	FString BuildCurrentContextDebugString() const;
 
 private:

@@ -119,11 +119,12 @@ void ATwoheartsDebugHUD::DrawHUD()
 
 		DrawDebugLine(
 			FString::Printf(
-				TEXT("active=%s   type=%s   phase=%s   logic_end=%s   end=%s"),
+				TEXT("active=%s   type=%s   phase=%s   logic_end=%s   dodge_interrupt=%s   end=%s"),
 				ActionContext.bIsActionActive ? TEXT("YES") : TEXT("NO"),
 				ActionTypeEnum ? *ActionTypeEnum->GetNameStringByValue(static_cast<int64>(ActionContext.ActionType)) : TEXT("Unknown"),
 				*Character->GetCombatPhaseDebugName(ActionContext.ActionPhase),
 				ActionContext.bHasLogicEnded ? TEXT("YES") : TEXT("NO"),
+				ActionContextComponent->CanCurrentActionBeInterruptedBy(ETwoHeartsCombatActionType::Dodge) ? TEXT("YES") : TEXT("NO"),
 				EndReasonEnum ? *EndReasonEnum->GetNameStringByValue(static_cast<int64>(ActionContext.LastEndReason)) : TEXT("Unknown")),
 			PanelX + 12.0f,
 			CurrentY,

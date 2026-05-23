@@ -6,11 +6,13 @@
 #include "TwoHeartsGA_Dodge.generated.h"
 
 class UTwoHeartsGA_NormalAttackBase;
+class UTwoHeartsCombatActionContextComponent;
 struct FTwoHeartsDodgeConfig;
 class UAbilitySystemComponent;
 class UAnimMontage;
 class UAnimInstance;
 class UAbilityTask_PlayMontageAndWait;
+enum class ETwoHeartsCombatPhase : uint8;
 struct FBranchingPointNotifyPayload;
 
 UCLASS()
@@ -36,8 +38,13 @@ public:
 
 private:
 	UTwoHeartsGA_NormalAttackBase* FindActiveNormalAttackAbility() const;
+	UTwoHeartsCombatActionContextComponent* GetCombatActionContextComponent() const;
+	bool TryInterruptCurrentActionByDodge();
 	bool ResolveDodgeDirection(FVector& OutDirection, FString& OutDirectionName) const;
 	bool StartDodgeExecution();
+	void SyncCombatActionContextOnPhaseEntered(ETwoHeartsCombatPhase NewPhase, const FString& Reason);
+	void MarkCombatActionLogicEnded(const FString& Reason);
+	void FinishCombatActionContext(bool bWasCancelled);
 	void BeginInvulnerabilityWindow();
 	void EndInvulnerabilityWindow();
 	void FinishDodge(bool bWasCancelled = false);
@@ -85,6 +92,8 @@ private:
 	bool bHasAppliedCleanup = false;
 	bool bInvulnerabilityActive = false;
 	bool bCooldownActive = false;
+	bool bHasRegisteredCombatActionContext = false;
+	bool bHasMarkedCombatLogicEnded = false;
 	bool bHasReceivedInvulnerabilityBeginNotify = false;
 	bool bHasReceivedInvulnerabilityEndNotify = false;
 	bool bCachedOrientRotationToMovement = false;

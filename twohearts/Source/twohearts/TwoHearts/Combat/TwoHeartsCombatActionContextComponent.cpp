@@ -96,6 +96,25 @@ void UTwoHeartsCombatActionContextComponent::FinishAction(ETwoHeartsCombatAction
 			*CurrentContext.LastReason));
 }
 
+bool UTwoHeartsCombatActionContextComponent::CanCurrentActionBeInterruptedBy(ETwoHeartsCombatActionType IncomingActionType) const
+{
+	if (!CurrentContext.bIsActionActive)
+	{
+		return false;
+	}
+
+	switch (CurrentContext.ActionType)
+	{
+	case ETwoHeartsCombatActionType::NormalAttack:
+		return IncomingActionType == ETwoHeartsCombatActionType::Dodge
+			&& (CurrentContext.ActionPhase == ETwoHeartsCombatPhase::Recovery
+				|| CurrentContext.ActionPhase == ETwoHeartsCombatPhase::LogicEnded);
+
+	default:
+		return false;
+	}
+}
+
 FString UTwoHeartsCombatActionContextComponent::BuildCurrentContextDebugString() const
 {
 	return FString::Printf(
