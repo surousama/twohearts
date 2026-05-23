@@ -1,0 +1,29 @@
+{
+  "id": "combat-semantic-layer-regression-review",
+  "name": "combat-semantic-layer-regression-review",
+  "title": "公共战斗语义层收口复核与回归拆单",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "palladianli",
+  "assignee": "palladianli",
+  "createdAt": "2026-05-23",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "master",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "05-23-combat-input-evaluation-polish",
+    "05-23-combat-semantic-layer-test-pass"
+  ],
+  "parent": "05-21-combat-semantic-layer-readiness",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

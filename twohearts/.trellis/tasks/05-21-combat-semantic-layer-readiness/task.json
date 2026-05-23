@@ -3,7 +3,7 @@
   "name": "combat-semantic-layer-readiness",
   "title": "公共战斗语义层开工评估与实施拆分",
   "description": "",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -18,7 +18,13 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [],
+  "children": [
+    "05-23-combat-action-context-foundation",
+    "05-23-normal-attack-semantic-bridge",
+    "05-23-dodge-semantic-bridge-and-interrupt-unification",
+    "05-23-combat-input-evaluation-preinput-hook",
+    "05-23-combat-semantic-layer-regression-review"
+  ],
   "parent": "05-19-chapter2-basic-combat",
   "relatedFiles": [],
   "notes": "",
