@@ -1,0 +1,9 @@
+{"file":".trellis/spec/combat/current-stage.md","reason":"约束当前第二章推进顺序，确保公共动作上下文作为公共语义层首轮底座，而不是提前跳到预输入或后续系统。"}
+{"file":".trellis/spec/combat/system-framework.md","reason":"明确动作阶段、打断关系、输入权限、逻辑结束事件属于长期共通语义，避免本 task 只做普攻特化结构。"}
+{"file":".trellis/spec/roles/senior-programmer.md","reason":"约束当前执行角色为资深程序，输出应以正式 C++ 承载与可实施结构为主。"}
+{"file":".trellis/spec/implementation/ue5-gas-cpp-guidelines.md","reason":"确保公共动作上下文沿用 UE5 + GAS + C++ 正式路线，不回退到 Character 临时状态机。"}
+{"file":".trellis/spec/implementation/document-maintenance.md","reason":"提醒本轮产物需要能支撑后续桥接 task 持续回写，不制造新的碎片真相源。"}
+{"file":".trellis/spec/tasking/parent-child-task-rules.md","reason":"约束本 task 只承担首轮底座，不把后续普攻桥接、Dodge 桥接、输入评估揉进一个 task。"}
+{"file":".trellis/tasks/05-21-combat-semantic-layer-readiness/prd.md","reason":"读取父 task 的阶段 gate、当前目标和验收边界。"}
+{"file":".trellis/tasks/05-21-combat-semantic-layer-readiness/info.md","reason":"读取主程序对固定顺序、共享概念与首轮公共语义层边界的正式结论。"}
+{"file":".trellis/tasks/05-23-combat-action-context-foundation/prd.md","reason":"当前子 task 的直接实施要求与验收口径。"}

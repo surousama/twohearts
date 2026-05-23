@@ -1,0 +1,6 @@
+{"file":".trellis/spec/combat/current-stage.md","reason":"检查是否仍服从当前阶段顺序，没有偷做预输入或其他后续系统。"}
+{"file":".trellis/spec/combat/system-framework.md","reason":"检查公共动作上下文是否真的承载长期共通语义，而不是另起一套局部规则。"}
+{"file":".trellis/spec/implementation/ue5-gas-cpp-guidelines.md","reason":"检查正式承载位置是否仍在 UE5 + GAS + C++ 路线内。"}
+{"file":".trellis/spec/tasking/parent-child-task-rules.md","reason":"检查 task 粒度是否越界，把后续桥接内容提前塞进本 task。"}
+{"file":".trellis/tasks/05-21-combat-semantic-layer-readiness/info.md","reason":"复核本 task 是否遵守主程序已写定的固定顺序和边界。"}
+{"file":".trellis/tasks/05-23-combat-action-context-foundation/prd.md","reason":"按当前子 task 的验收标准做质量复核。"}

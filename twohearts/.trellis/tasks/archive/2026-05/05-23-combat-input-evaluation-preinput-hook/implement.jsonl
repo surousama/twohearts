@@ -1,0 +1,10 @@
+{"file":".trellis/spec/combat/current-stage.md","reason":"约束当前只做输入评估与预输入接入口，不提前完成完整预输入或更后续系统。"}
+{"file":".trellis/spec/combat/system-framework.md","reason":"明确输入权限、动作阶段与逻辑结束都属于本 task 必须依赖的公共长期语义。"}
+{"file":".trellis/spec/roles/senior-programmer.md","reason":"保持当前执行角色为资深程序，直接实施统一输入评估入口。"}
+{"file":".trellis/spec/implementation/ue5-gas-cpp-guidelines.md","reason":"约束输入评估继续落在正式 C++ / GAS / Combat 层路径中。"}
+{"file":".trellis/spec/tasking/parent-child-task-rules.md","reason":"防止本 task 越界实现完整预输入或其他后续动作系统。"}
+{"file":".trellis/tasks/05-21-combat-semantic-layer-readiness/info.md","reason":"读取主程序已明确的固定顺序、边界与“本轮只做接入口”的要求。"}
+{"file":".trellis/tasks/05-23-combat-action-context-foundation/prd.md","reason":"理解公共动作上下文底座的接口前提。"}
+{"file":".trellis/tasks/05-23-normal-attack-semantic-bridge/prd.md","reason":"理解普攻桥接如何向公共层暴露动作与阶段。"}
+{"file":".trellis/tasks/05-23-dodge-semantic-bridge-and-interrupt-unification/prd.md","reason":"理解 Dodge 桥接与统一打断入口的上游产物。"}
+{"file":".trellis/tasks/05-23-combat-input-evaluation-preinput-hook/prd.md","reason":"当前子 task 的直接目标、边界与验收口径。"}
