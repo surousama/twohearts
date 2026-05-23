@@ -9,6 +9,7 @@
 class AtwoheartsCharacter;
 class UAbilityTask_PlayMontageAndWait;
 class UAnimInstance;
+class UTwoHeartsCombatActionContextComponent;
 struct FBranchingPointNotifyPayload;
 
 UCLASS(Abstract)
@@ -98,6 +99,9 @@ private:
 	void RecordAbilityEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false) const;
 	void RecordAbilityFailure(const TCHAR* EventName, const FString& Detail) const;
 	AtwoheartsCharacter* GetTwoHeartsCharacter() const;
+	UTwoHeartsCombatActionContextComponent* GetCombatActionContextComponent() const;
+	void SyncCombatActionContextOnPhaseEntered(ETwoHeartsCombatPhase NewPhase, const FString& Reason);
+	void FinishCombatActionContext(bool bWasCancelled);
 	void EnterCombatPhase(ETwoHeartsCombatPhase NewPhase, const FString& Reason);
 	bool CanTransitionToPhase(ETwoHeartsCombatPhase NewPhase) const;
 	void BindMontageNotifyDelegates(UAnimInstance* AnimInstance);
@@ -108,6 +112,7 @@ private:
 
 	bool bHasQueuedNextSegment = false;
 	bool bHasFinishedSegment = false;
+	bool bHasRegisteredCombatActionContext = false;
 	bool bPreserveDebugStateUntilNextSegment = false;
 	bool bInterruptedByDodge = false;
 	ETwoHeartsCombatPhase CurrentCombatPhase = ETwoHeartsCombatPhase::None;

@@ -1,0 +1,8 @@
+{"file":".trellis/spec/combat/current-stage.md","reason":"约束当前仍在公共语义层首轮实施，不允许借普攻桥接提前叠完整预输入或其他后续系统。"}
+{"file":".trellis/spec/combat/system-framework.md","reason":"明确普攻阶段语义与逻辑结束属于要桥接到公共层的长期共通语义。"}
+{"file":".trellis/spec/roles/senior-programmer.md","reason":"保持当前执行角色为资深程序，直接实施正式桥接，而不是停留在主程序评估口径。"}
+{"file":".trellis/spec/implementation/ue5-gas-cpp-guidelines.md","reason":"约束桥接工作继续落在正式 C++ / GAS 路线中。"}
+{"file":".trellis/spec/tasking/parent-child-task-rules.md","reason":"防止本 task 越界去实现 Dodge 桥接或输入评估。"}
+{"file":".trellis/tasks/05-21-combat-semantic-layer-readiness/info.md","reason":"读取主程序已明确的固定顺序、首轮边界与普攻作为第一份动作样板的要求。"}
+{"file":".trellis/tasks/05-23-combat-action-context-foundation/prd.md","reason":"理解上游底座 task 的产物目标与接口前提。"}
+{"file":".trellis/tasks/05-23-normal-attack-semantic-bridge/prd.md","reason":"当前子 task 的直接桥接目标与验收口径。"}

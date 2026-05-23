@@ -1,0 +1,5 @@
+{"file":".trellis/spec/combat/system-framework.md","reason":"检查普攻桥接后是否真的进入公共共通语义，而不是保留局部私有真相源。"}
+{"file":".trellis/spec/implementation/ue5-gas-cpp-guidelines.md","reason":"检查桥接是否继续沿用正式 C++ / GAS 承载，不回退到 Character 临时逻辑。"}
+{"file":".trellis/spec/tasking/parent-child-task-rules.md","reason":"检查 task 是否越界实现了 Dodge 桥接或输入评估。"}
+{"file":".trellis/tasks/05-21-combat-semantic-layer-readiness/info.md","reason":"复核是否遵守固定顺序与“普攻先做第一份真实样板”的要求。"}
+{"file":".trellis/tasks/05-23-normal-attack-semantic-bridge/prd.md","reason":"按当前子 task 的验收标准做质量复核。"}

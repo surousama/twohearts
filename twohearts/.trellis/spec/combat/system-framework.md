@@ -23,6 +23,14 @@
 4. 状态标签
 5. 动作逻辑结束事件
 
+## 公共动作上下文接入约定
+
+1. 正式 Ability 动作接入公共语义层时，应优先写入 `UTwoHeartsCombatActionContextComponent`
+2. 动作开始使用 `BeginAction`，并提供 `ActionType`、初始 `ActionPhase`、Ability Tag、动作状态 Tag 和可读实例名
+3. 阶段切换使用 `TransitionToPhase`；进入 `LogicEnded` 时使用 `MarkLogicEnded`
+4. Ability 收尾时使用 `FinishAction`，并明确写入 `Completed / Cancelled / Interrupted / Failed` 中的真实结束原因
+5. 后续动作或输入评估应优先读取公共动作上下文，不应反查某个动作的私有调试字段作为长期真相源
+
 ## 对 AI 的要求
 
 1. 任何子系统实现都不能自行发明一套与其他动作冲突的规则

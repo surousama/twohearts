@@ -6,6 +6,7 @@
 #include "Animation/AnimMontage.h"
 #include "GameplayTagContainer.h"
 #include "TimerManager.h"
+#include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
 #include "TwoHearts/Combat/Gameplay/Tags/TwoHeartsGameplayTags.h"
 #include "twohearts.h"
 #include "twoheartsCharacter.h"
@@ -32,6 +33,7 @@ void UTwoHeartsGA_NormalAttackBase::ActivateAbility(
 
 	bHasQueuedNextSegment = false;
 	bHasFinishedSegment = false;
+	bHasRegisteredCombatActionContext = false;
 	bPreserveDebugStateUntilNextSegment = false;
 	bInterruptedByDodge = false;
 	CurrentCombatPhase = ETwoHeartsCombatPhase::None;
@@ -83,6 +85,7 @@ void UTwoHeartsGA_NormalAttackBase::EndAbility(
 	ClearPhaseFallbackTimers();
 	UnbindMontageNotifyDelegates();
 	ActiveMontageTask = nullptr;
+	FinishCombatActionContext(bWasCancelled);
 
 	if (!bPreserveDebugStateUntilNextSegment)
 	{
@@ -364,6 +367,72 @@ AtwoheartsCharacter* UTwoHeartsGA_NormalAttackBase::GetTwoHeartsCharacter() cons
 	return Cast<AtwoheartsCharacter>(GetAbilityCharacter());
 }
 
+UTwoHeartsCombatActionContextComponent* UTwoHeartsGA_NormalAttackBase::GetCombatActionContextComponent() const
+{
+	if (AtwoheartsCharacter* Character = GetTwoHeartsCharacter())
+	{
+		return Character->GetCombatActionContextComponent();
+	}
+
+	return nullptr;
+}
+
+void UTwoHeartsGA_NormalAttackBase::SyncCombatActionContextOnPhaseEntered(ETwoHeartsCombatPhase NewPhase, const FString& Reason)
+{
+	UTwoHeartsCombatActionContextComponent* ActionContextComponent = GetCombatActionContextComponent();
+	if (!ActionContextComponent)
+	{
+		return;
+	}
+
+	if (!bHasRegisteredCombatActionContext)
+	{
+		FTwoHeartsCombatActionRegistration Registration;
+		Registration.ActionType = ETwoHeartsCombatActionType::NormalAttack;
+		Registration.InitialPhase = NewPhase;
+		Registration.AbilityTag = SegmentAbilityTag.IsValid() ? SegmentAbilityTag : TAG_TwoHearts_Ability_NormalAttack;
+		Registration.ActionStateTag = TAG_TwoHearts_State_Action_NormalAttack;
+		Registration.ActionInstanceName = FString::Printf(TEXT("NormalAttack.Segment%d"), NormalAttackSegment);
+
+		ActionContextComponent->BeginAction(Registration, Reason);
+		bHasRegisteredCombatActionContext = true;
+		return;
+	}
+
+	if (NewPhase == ETwoHeartsCombatPhase::LogicEnded)
+	{
+		ActionContextComponent->MarkLogicEnded(Reason);
+		return;
+	}
+
+	ActionContextComponent->TransitionToPhase(NewPhase, Reason);
+}
+
+void UTwoHeartsGA_NormalAttackBase::FinishCombatActionContext(bool bWasCancelled)
+{
+	if (!bHasRegisteredCombatActionContext)
+	{
+		return;
+	}
+
+	if (UTwoHeartsCombatActionContextComponent* ActionContextComponent = GetCombatActionContextComponent())
+	{
+		const ETwoHeartsCombatActionEndReason EndReason =
+			!bWasCancelled ? ETwoHeartsCombatActionEndReason::Completed :
+			bInterruptedByDodge ? ETwoHeartsCombatActionEndReason::Interrupted :
+			ETwoHeartsCombatActionEndReason::Cancelled;
+
+		const FString FinishReason =
+			!bWasCancelled ? TEXT("NormalAttackEnded") :
+			bInterruptedByDodge ? TEXT("InterruptedByDodge") :
+			TEXT("NormalAttackCancelled");
+
+		ActionContextComponent->FinishAction(EndReason, FinishReason);
+	}
+
+	bHasRegisteredCombatActionContext = false;
+}
+
 void UTwoHeartsGA_NormalAttackBase::EnterCombatPhase(ETwoHeartsCombatPhase NewPhase, const FString& Reason)
 {
 	if (!CanTransitionToPhase(NewPhase))
@@ -383,6 +452,7 @@ void UTwoHeartsGA_NormalAttackBase::EnterCombatPhase(ETwoHeartsCombatPhase NewPh
 	}
 
 	CurrentCombatPhase = NewPhase;
+	SyncCombatActionContextOnPhaseEntered(NewPhase, Reason);
 	UpdateDebugState(true);
 
 	const TCHAR* EventName = NewPhase == ETwoHeartsCombatPhase::LogicEnded ? TEXT("LogicEnded") : TEXT("EnterPhase");
