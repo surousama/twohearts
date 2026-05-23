@@ -21,7 +21,8 @@
   "children": [
     "05-19-dodge-second-pass-polish",
     "05-21-dodge-resource-local-acceptance",
-    "05-21-combat-semantic-layer-readiness"
+    "05-21-combat-semantic-layer-readiness",
+    "05-23-normal-attack-weapon-switch"
   ],
   "parent": null,
   "relatedFiles": [],

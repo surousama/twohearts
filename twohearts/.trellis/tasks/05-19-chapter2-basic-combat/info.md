@@ -209,3 +209,27 @@
 2. `../docs/程序技术文档/a基础闪避正式落地技术文档.md`
 3. `../docs/测试文档/a普通攻击切换到AbilitySystem跑测清单.md`
 4. `../docs/测试文档/a普通攻击测试调试功能说明.md`
+
+## 2026-05-23 公共语义层 readiness 更新
+
+1. `05-21-combat-semantic-layer-readiness` 已进入主程序正式评估阶段。
+2. 当前阶段结论更新为：
+   只要 `05-21-dodge-resource-local-acceptance` 对应的 Unreal Editor 白盒验收已经实际完成并通过，就允许进入“公共战斗语义层”首轮实施。
+3. 当前不建议把“公共语义层”理解成一次性做完整战斗中台；第一轮只应先收束：
+   动作上下文；
+   阶段语义；
+   逻辑结束出口；
+   普攻与 Dodge 的统一打断接入口。
+4. 当前不应直接跳到“最小预输入”。
+   原因：
+   输入评估与缓存执行仍依赖公共动作上下文先稳定。
+5. readiness 后的建议顺序更新为：
+   动作上下文底座
+   -> 普攻语义桥接
+   -> Dodge 语义桥接与打断统一
+   -> 输入评估与预输入预留接口
+6. 该顺序视为当前阶段固定顺序，不建议并行打乱：
+   `combat-action-context-foundation`
+   -> `normal-attack-semantic-bridge`
+   -> `dodge-semantic-bridge-and-interrupt-unification`
+   -> `combat-input-evaluation-preinput-hook`
