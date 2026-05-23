@@ -59,7 +59,14 @@ void ATwoheartsDebugHUD::DrawHUD()
 		}
 	}
 
-	const float PanelHeight = 210.0f + (VisibleEvents.Num() * LineHeight);
+	TArray<const FTwoHeartsCombatInputDebugEvent*> VisibleInputEvents;
+	const TArray<FTwoHeartsCombatInputDebugEvent>& InputEvents = Character->GetCombatInputDebugEvents();
+	for (int32 EventIndex = InputEvents.Num() - 1; EventIndex >= 0 && VisibleInputEvents.Num() < 3; --EventIndex)
+	{
+		VisibleInputEvents.Add(&InputEvents[EventIndex]);
+	}
+
+	const float PanelHeight = 270.0f + (VisibleEvents.Num() * LineHeight) + (VisibleInputEvents.Num() * LineHeight * 2.0f);
 	FCanvasTileItem Background(FVector2D(PanelX, PanelY), FVector2D(PanelWidth, PanelHeight), FLinearColor(0.02f, 0.02f, 0.02f, 0.78f));
 	Background.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(Background);
@@ -153,6 +160,36 @@ void ATwoheartsDebugHUD::DrawHUD()
 	{
 		DrawDebugLine(TEXT("action_context_component=None"), PanelX + 12.0f, CurrentY, FailureColor);
 		CurrentY += LineHeight * 1.5f;
+	}
+
+	DrawDebugLine(TEXT("Input Evaluation"), PanelX + 12.0f, CurrentY, HeaderColor);
+	CurrentY += LineHeight;
+
+	if (VisibleInputEvents.IsEmpty())
+	{
+		DrawDebugLine(TEXT("no_input_evaluations_yet"), PanelX + 12.0f, CurrentY, MutedColor);
+		CurrentY += LineHeight * 1.5f;
+	}
+	else
+	{
+		for (const FTwoHeartsCombatInputDebugEvent* Event : VisibleInputEvents)
+		{
+			DrawDebugLine(
+				FString::Printf(TEXT("[%.2f] %s -> %s"), Event->TimestampSeconds, *Event->InputName, *Event->ResultName),
+				PanelX + 12.0f,
+				CurrentY,
+				TextColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(TEXT("detail=%s"), *Event->Detail),
+				PanelX + 24.0f,
+				CurrentY,
+				MutedColor);
+			CurrentY += LineHeight;
+		}
+
+		CurrentY += LineHeight * 0.5f;
 	}
 
 	DrawDebugLine(TEXT("Dodge"), PanelX + 12.0f, CurrentY, HeaderColor);

@@ -115,6 +115,57 @@ bool UTwoHeartsCombatActionContextComponent::CanCurrentActionBeInterruptedBy(ETw
 	}
 }
 
+FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::EvaluateInputForAction(ETwoHeartsCombatActionType IncomingActionType) const
+{
+	FTwoHeartsCombatInputEvaluation Evaluation;
+	Evaluation.IncomingActionType = IncomingActionType;
+	Evaluation.bHasActiveAction = CurrentContext.bIsActionActive;
+	Evaluation.ActiveActionType = CurrentContext.ActionType;
+	Evaluation.ActiveActionPhase = CurrentContext.ActionPhase;
+
+	if (IncomingActionType == ETwoHeartsCombatActionType::None)
+	{
+		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::Reject;
+		Evaluation.Reason = TEXT("Incoming action type was invalid.");
+		return Evaluation;
+	}
+
+	if (!CurrentContext.bIsActionActive)
+	{
+		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::ExecuteNow;
+		Evaluation.Reason = TEXT("No active combat action is currently registered.");
+		return Evaluation;
+	}
+
+	if (CurrentContext.ActionType == ETwoHeartsCombatActionType::NormalAttack
+		&& IncomingActionType == ETwoHeartsCombatActionType::NormalAttack)
+	{
+		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::BufferInput;
+
+		if (CurrentContext.ActionPhase == ETwoHeartsCombatPhase::Startup
+			|| CurrentContext.ActionPhase == ETwoHeartsCombatPhase::Active)
+		{
+			Evaluation.bShouldForwardToActiveAbility = true;
+			Evaluation.Reason = TEXT("Current normal attack can still consume combo queue input on the active ability.");
+			return Evaluation;
+		}
+
+		Evaluation.Reason = TEXT("Normal attack input was accepted by the minimal preinput hook, but this build does not consume late buffered attack input yet.");
+		return Evaluation;
+	}
+
+	if (CanCurrentActionBeInterruptedBy(IncomingActionType))
+	{
+		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::ExecuteNow;
+		Evaluation.Reason = TEXT("Current combat action can be interrupted by the incoming action.");
+		return Evaluation;
+	}
+
+	Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::Reject;
+	Evaluation.Reason = TEXT("Current combat action neither exposes a buffer window nor allows this interrupt.");
+	return Evaluation;
+}
+
 FString UTwoHeartsCombatActionContextComponent::BuildCurrentContextDebugString() const
 {
 	return FString::Printf(

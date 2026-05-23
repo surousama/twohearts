@@ -108,6 +108,24 @@ struct FTwoHeartsDodgeConfig
 	float DodgeInvulnerableDurationSeconds = 0.22f;
 };
 
+USTRUCT(BlueprintType)
+struct FTwoHeartsCombatInputDebugEvent
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input|Debug")
+	float TimestampSeconds = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input|Debug")
+	FString InputName;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input|Debug")
+	FString ResultName;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input|Debug")
+	FString Detail;
+};
+
 /**
  *  A simple player-controllable third person character
  *  Implements a controllable orbiting camera
@@ -235,6 +253,12 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Input", meta=(AllowPrivateAccess="true"))
 	FVector2D CachedMoveInput = FVector2D::ZeroVector;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Input|Debug", meta=(ClampMin="1", UIMin="1", ClampMax="20", UIMax="20", AllowPrivateAccess="true"))
+	int32 CombatInputDebugMaxEvents = 6;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Input|Debug", meta=(AllowPrivateAccess="true"))
+	TArray<FTwoHeartsCombatInputDebugEvent> CombatInputDebugEvents;
+
 public:
 
 	/** Constructor */
@@ -360,6 +384,7 @@ public:
 	const FString& GetLastDodgeDebugEventName() const { return LastDodgeDebugEventName; }
 	const FString& GetLastDodgeDebugDetail() const { return LastDodgeDebugDetail; }
 	float GetLastDodgeEventTimeSeconds() const { return LastDodgeEventTimeSeconds; }
+	const TArray<FTwoHeartsCombatInputDebugEvent>& GetCombatInputDebugEvents() const { return CombatInputDebugEvents; }
 
 public:
 
@@ -373,6 +398,7 @@ protected:
 
 	void RecordNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false);
 	void RecordNormalAttackFailure(const TCHAR* EventName, const FString& Detail);
+	void RecordCombatInputDebugEvent(const FString& InputName, const FString& ResultName, const FString& Detail);
 	bool ShouldEmitNormalAttackDebugLog(const TCHAR* EventName, bool bVerboseOnly) const;
 	void DrawNormalAttackDebugOverlay() const;
 };

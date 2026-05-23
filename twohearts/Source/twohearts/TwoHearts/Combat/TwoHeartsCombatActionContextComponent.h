@@ -25,6 +25,14 @@ enum class ETwoHeartsCombatActionEndReason : uint8
 	Failed UMETA(DisplayName="Failed")
 };
 
+UENUM(BlueprintType)
+enum class ETwoHeartsCombatInputEvaluationResult : uint8
+{
+	ExecuteNow = 0 UMETA(DisplayName="ExecuteNow"),
+	BufferInput UMETA(DisplayName="BufferInput"),
+	Reject UMETA(DisplayName="Reject")
+};
+
 USTRUCT(BlueprintType)
 struct FTwoHeartsCombatActionRegistration
 {
@@ -85,6 +93,33 @@ struct FTwoHeartsCombatActionContextSnapshot
 	float LastUpdateTimeSeconds = 0.0f;
 };
 
+USTRUCT(BlueprintType)
+struct FTwoHeartsCombatInputEvaluation
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Evaluation")
+	ETwoHeartsCombatInputEvaluationResult Result = ETwoHeartsCombatInputEvaluationResult::ExecuteNow;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Evaluation")
+	ETwoHeartsCombatActionType IncomingActionType = ETwoHeartsCombatActionType::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Evaluation")
+	bool bHasActiveAction = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Evaluation")
+	ETwoHeartsCombatActionType ActiveActionType = ETwoHeartsCombatActionType::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Evaluation")
+	ETwoHeartsCombatPhase ActiveActionPhase = ETwoHeartsCombatPhase::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Evaluation")
+	bool bShouldForwardToActiveAbility = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Evaluation")
+	FString Reason = TEXT("None");
+};
+
 UCLASS(ClassGroup=(Combat), BlueprintType, Blueprintable, meta=(BlueprintSpawnableComponent))
 class UTwoHeartsCombatActionContextComponent : public UActorComponent
 {
@@ -115,6 +150,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Combat|Action Context")
 	bool CanCurrentActionBeInterruptedBy(ETwoHeartsCombatActionType IncomingActionType) const;
+
+	UFUNCTION(BlueprintPure, Category="Combat|Input Evaluation")
+	FTwoHeartsCombatInputEvaluation EvaluateInputForAction(ETwoHeartsCombatActionType IncomingActionType) const;
 
 	UFUNCTION(BlueprintPure, Category="Combat|Action Context")
 	FString BuildCurrentContextDebugString() const;

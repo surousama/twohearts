@@ -25,6 +25,45 @@
 #include "TwoHearts/Combat/Gameplay/Tags/TwoHeartsGameplayTags.h"
 #include "twohearts.h"
 
+namespace
+{
+ETwoHeartsCombatActionType GetCombatActionTypeForInputID(ETwoHeartsAbilityInputID InputID)
+{
+	switch (InputID)
+	{
+	case ETwoHeartsAbilityInputID::NormalAttack:
+		return ETwoHeartsCombatActionType::NormalAttack;
+
+	case ETwoHeartsAbilityInputID::Dodge:
+		return ETwoHeartsCombatActionType::Dodge;
+
+	default:
+		return ETwoHeartsCombatActionType::None;
+	}
+}
+
+FString GetCombatInputName(ETwoHeartsAbilityInputID InputID)
+{
+	switch (InputID)
+	{
+	case ETwoHeartsAbilityInputID::NormalAttack:
+		return TEXT("NormalAttack");
+
+	case ETwoHeartsAbilityInputID::Dodge:
+		return TEXT("Dodge");
+
+	default:
+		return FString::Printf(TEXT("Input_%d"), static_cast<int32>(InputID));
+	}
+}
+
+FString GetCombatInputEvaluationResultName(ETwoHeartsCombatInputEvaluationResult Result)
+{
+	const UEnum* ResultEnum = StaticEnum<ETwoHeartsCombatInputEvaluationResult>();
+	return ResultEnum ? ResultEnum->GetNameStringByValue(static_cast<int64>(Result)) : TEXT("Unknown");
+}
+}
+
 AtwoheartsCharacter::AtwoheartsCharacter()
 {
 	// Set size for collision capsule
@@ -263,9 +302,12 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 	const int32 NumericInputID = static_cast<int32>(InputID);
 	const bool bIsNormalAttackInput = InputID == ETwoHeartsAbilityInputID::NormalAttack;
 	const bool bIsDodgeInput = InputID == ETwoHeartsAbilityInputID::Dodge;
+	const FString InputName = GetCombatInputName(InputID);
+	const ETwoHeartsCombatActionType IncomingActionType = GetCombatActionTypeForInputID(InputID);
 	bool bForwardedToActiveAbility = false;
 	bool bAttemptedActivation = false;
 	bool bActivatedAbility = false;
+	FString ActivatedAbilityName;
 	TArray<FString> MatchingAbilityNames;
 
 	auto BuildFailureReason = [](const FGameplayTagContainer& FailureTags) -> FString
@@ -310,23 +352,51 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 		RecordNormalAttackFailure(EventName, Detail);
 	};
 
-	for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
+	FTwoHeartsCombatInputEvaluation InputEvaluation;
+	if (CombatActionContextComponent)
 	{
-		if (AbilitySpec.InputID != NumericInputID || !AbilitySpec.IsActive())
-		{
-			continue;
-		}
-
-		bForwardedToActiveAbility = true;
-		AbilitySystemComponent->AbilitySpecInputPressed(AbilitySpec);
-		RecordInputDebugEvent(
-			TEXT("ForwardInputToActiveAbility"),
-			FString::Printf(TEXT("Forwarded input to active ability %s."), *GetNameSafe(AbilitySpec.Ability)),
-			true);
+		InputEvaluation = CombatActionContextComponent->EvaluateInputForAction(IncomingActionType);
+	}
+	else
+	{
+		InputEvaluation.Result = ETwoHeartsCombatInputEvaluationResult::ExecuteNow;
+		InputEvaluation.IncomingActionType = IncomingActionType;
+		InputEvaluation.Reason = TEXT("No combat action context component was available; falling back to immediate activation.");
 	}
 
-	if (bForwardedToActiveAbility)
+	if (InputEvaluation.Result == ETwoHeartsCombatInputEvaluationResult::Reject)
 	{
+		const FString RejectDetail = FString::Printf(TEXT("%s Input=%s."), *InputEvaluation.Reason, *InputName);
+		RecordInputFailure(TEXT("InputRejected"), RejectDetail);
+		RecordCombatInputDebugEvent(InputName, GetCombatInputEvaluationResultName(InputEvaluation.Result), RejectDetail);
+		return false;
+	}
+
+	if (InputEvaluation.Result == ETwoHeartsCombatInputEvaluationResult::BufferInput)
+	{
+		if (InputEvaluation.bShouldForwardToActiveAbility)
+		{
+			for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
+			{
+				if (AbilitySpec.InputID != NumericInputID || !AbilitySpec.IsActive())
+				{
+					continue;
+				}
+
+				bForwardedToActiveAbility = true;
+				AbilitySystemComponent->AbilitySpecInputPressed(AbilitySpec);
+				RecordInputDebugEvent(
+					TEXT("ForwardInputToActiveAbility"),
+					FString::Printf(TEXT("Forwarded buffered input to active ability %s."), *GetNameSafe(AbilitySpec.Ability)),
+					true);
+			}
+		}
+
+		const FString BufferDetail = bForwardedToActiveAbility
+			? FString::Printf(TEXT("%s Input=%s was forwarded to the active ability buffer path."), *InputEvaluation.Reason, *InputName)
+			: FString::Printf(TEXT("%s Input=%s is accepted by the formal preinput hook and reserved for a later consumer."), *InputEvaluation.Reason, *InputName);
+		RecordInputDebugEvent(TEXT("InputBuffered"), BufferDetail);
+		RecordCombatInputDebugEvent(InputName, GetCombatInputEvaluationResultName(InputEvaluation.Result), BufferDetail);
 		return true;
 	}
 
@@ -373,9 +443,10 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 		if (AbilitySystemComponent->TryActivateAbility(AbilitySpec.Handle))
 		{
 			bActivatedAbility = true;
+			ActivatedAbilityName = GetNameSafe(AbilitySpec.Ability);
 			RecordInputDebugEvent(
 				TEXT("ActivateAbility"),
-				FString::Printf(TEXT("Activated ability %s for input %d."), *GetNameSafe(AbilitySpec.Ability), NumericInputID));
+				FString::Printf(TEXT("Activated ability %s for input %d after ExecuteNow evaluation."), *ActivatedAbilityName, NumericInputID));
 			break;
 		}
 
@@ -394,6 +465,10 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 
 	if (bAttemptedActivation)
 	{
+		const FString ExecuteDetail = bActivatedAbility
+			? FString::Printf(TEXT("%s Input=%s executed immediately via %s."), *InputEvaluation.Reason, *InputName, *ActivatedAbilityName)
+			: FString::Printf(TEXT("%s Input=%s was evaluated as ExecuteNow, but ability activation still failed."), *InputEvaluation.Reason, *InputName);
+		RecordCombatInputDebugEvent(InputName, GetCombatInputEvaluationResultName(InputEvaluation.Result), ExecuteDetail);
 		return bActivatedAbility;
 	}
 
@@ -418,6 +493,10 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 			FString::Printf(TEXT("Input %d matched abilities but none were eligible for activation."), NumericInputID));
 	}
 
+	RecordCombatInputDebugEvent(
+		InputName,
+		GetCombatInputEvaluationResultName(InputEvaluation.Result),
+		FString::Printf(TEXT("%s Input=%s found no eligible ability instance to execute immediately."), *InputEvaluation.Reason, *InputName));
 	return false;
 }
 
@@ -758,6 +837,32 @@ void AtwoheartsCharacter::RecordNormalAttackFailure(const TCHAR* EventName, cons
 	{
 		UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[NormalAttackFailure] actor=%s detail=\"%s\""), *GetNameSafe(this), *Detail);
 	}
+}
+
+void AtwoheartsCharacter::RecordCombatInputDebugEvent(const FString& InputName, const FString& ResultName, const FString& Detail)
+{
+	FTwoHeartsCombatInputDebugEvent Event;
+	Event.TimestampSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	Event.InputName = InputName;
+	Event.ResultName = ResultName;
+	Event.Detail = Detail;
+
+	CombatInputDebugEvents.Add(MoveTemp(Event));
+	const int32 ExcessEvents = CombatInputDebugEvents.Num() - FMath::Max(1, CombatInputDebugMaxEvents);
+	if (ExcessEvents > 0)
+	{
+		CombatInputDebugEvents.RemoveAt(0, ExcessEvents);
+	}
+
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[CombatInputEval] time=%.3f actor=%s input=%s result=%s detail=\"%s\""),
+		CombatInputDebugEvents.Last().TimestampSeconds,
+		*GetNameSafe(this),
+		*CombatInputDebugEvents.Last().InputName,
+		*CombatInputDebugEvents.Last().ResultName,
+		*CombatInputDebugEvents.Last().Detail);
 }
 
 void AtwoheartsCharacter::DrawNormalAttackDebugOverlay() const
