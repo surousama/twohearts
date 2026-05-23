@@ -104,3 +104,36 @@ Unified dodge direction with current facing, verified editor build, and archived
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Combat input evaluation polish wrap-up
+
+**Date**: 2026-05-23
+**Task**: Combat input evaluation polish wrap-up
+**Branch**: `master`
+
+### Summary
+
+Refined combat input evaluation by separating evaluation result from consumption route, split Character-side input handling into clearer execution paths, verified with a successful twoheartsEditor build, and archived the subtask.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ede54cd` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

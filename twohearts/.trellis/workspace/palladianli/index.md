@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 3
+- **Total Sessions**: 4
 - **Last Active**: 2026-05-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~106 | Active |
+| `journal-1.md` | ~139 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | 日期 | 标题 | 提交 | 分支 |
 |---|------|-------|---------|--------|
+| 4 | 2026-05-23 | Combat input evaluation polish wrap-up | `ede54cd` | `master` |
 | 3 | 2026-05-23 | 基础闪避语义桥接与打断统一 | `eb0a444` | `master` |
 | 2 | 2026-05-23 | 普通攻击语义桥接收尾 | `5024f1a` | `master` |
 | 1 | 2026-05-21 | Finish dodge-second-pass-polish | `fd41608` | `master` |
