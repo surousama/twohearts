@@ -15,6 +15,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 class UAnimMontage;
+class UTwoHeartsCombatActionContextComponent;
 enum class ETwoHeartsAbilityInputID : uint8;
 struct FInputActionValue;
 
@@ -126,6 +127,9 @@ class AtwoheartsCharacter : public ACharacter, public IAbilitySystemInterface
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UTwoHeartsCombatActionContextComponent> CombatActionContextComponent;
 	
 protected:
 
@@ -306,6 +310,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Combat|Dodge")
 	UAnimMontage* GetDodgeMontageForDirection(const FString& DirectionName) const;
+
+	UFUNCTION(BlueprintPure, Category="Combat|Action Context")
+	UTwoHeartsCombatActionContextComponent* GetCombatActionContextComponent() const { return CombatActionContextComponent; }
 
 	UFUNCTION(BlueprintPure, Category="Combat|Normal Attack|Debug")
 	bool IsNormalAttackDebugPanelEnabled() const { return bShowNormalAttackDebugPanel; }

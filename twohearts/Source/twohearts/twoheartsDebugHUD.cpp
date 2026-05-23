@@ -2,6 +2,7 @@
 
 #include "twoheartsDebugHUD.h"
 #include "twoheartsCharacter.h"
+#include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
 #include "CanvasItem.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
@@ -106,6 +107,52 @@ void ATwoheartsDebugHUD::DrawHUD()
 		CurrentY,
 		FailureReason.IsEmpty() ? MutedColor : FailureColor);
 	CurrentY += LineHeight * 1.5f;
+
+	DrawDebugLine(TEXT("Public Action Context"), PanelX + 12.0f, CurrentY, HeaderColor);
+	CurrentY += LineHeight;
+
+	if (const UTwoHeartsCombatActionContextComponent* ActionContextComponent = Character->GetCombatActionContextComponent())
+	{
+		const FTwoHeartsCombatActionContextSnapshot& ActionContext = ActionContextComponent->GetCurrentContext();
+		const UEnum* ActionTypeEnum = StaticEnum<ETwoHeartsCombatActionType>();
+		const UEnum* EndReasonEnum = StaticEnum<ETwoHeartsCombatActionEndReason>();
+
+		DrawDebugLine(
+			FString::Printf(
+				TEXT("active=%s   type=%s   phase=%s   logic_end=%s   end=%s"),
+				ActionContext.bIsActionActive ? TEXT("YES") : TEXT("NO"),
+				ActionTypeEnum ? *ActionTypeEnum->GetNameStringByValue(static_cast<int64>(ActionContext.ActionType)) : TEXT("Unknown"),
+				*Character->GetCombatPhaseDebugName(ActionContext.ActionPhase),
+				ActionContext.bHasLogicEnded ? TEXT("YES") : TEXT("NO"),
+				EndReasonEnum ? *EndReasonEnum->GetNameStringByValue(static_cast<int64>(ActionContext.LastEndReason)) : TEXT("Unknown")),
+			PanelX + 12.0f,
+			CurrentY,
+			TextColor);
+		CurrentY += LineHeight;
+
+		DrawDebugLine(
+			FString::Printf(
+				TEXT("instance=%s   ability=%s   state=%s"),
+				*ActionContext.ActionInstanceName,
+				ActionContext.AbilityTag.IsValid() ? *ActionContext.AbilityTag.ToString() : TEXT("None"),
+				ActionContext.ActionStateTag.IsValid() ? *ActionContext.ActionStateTag.ToString() : TEXT("None")),
+			PanelX + 12.0f,
+			CurrentY,
+			TextColor);
+		CurrentY += LineHeight;
+
+		DrawDebugLine(
+			FString::Printf(TEXT("reason=%s"), *ActionContext.LastReason),
+			PanelX + 12.0f,
+			CurrentY,
+			ActionContext.LastReason == TEXT("None") ? MutedColor : TextColor);
+		CurrentY += LineHeight * 1.5f;
+	}
+	else
+	{
+		DrawDebugLine(TEXT("action_context_component=None"), PanelX + 12.0f, CurrentY, FailureColor);
+		CurrentY += LineHeight * 1.5f;
+	}
 
 	DrawDebugLine(TEXT("Dodge"), PanelX + 12.0f, CurrentY, HeaderColor);
 	CurrentY += LineHeight;
