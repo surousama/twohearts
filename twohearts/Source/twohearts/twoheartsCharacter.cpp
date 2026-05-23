@@ -62,6 +62,12 @@ FString GetCombatInputEvaluationResultName(ETwoHeartsCombatInputEvaluationResult
 	const UEnum* ResultEnum = StaticEnum<ETwoHeartsCombatInputEvaluationResult>();
 	return ResultEnum ? ResultEnum->GetNameStringByValue(static_cast<int64>(Result)) : TEXT("Unknown");
 }
+
+FString GetCombatInputConsumptionRouteName(ETwoHeartsCombatInputConsumptionRoute Route)
+{
+	const UEnum* RouteEnum = StaticEnum<ETwoHeartsCombatInputConsumptionRoute>();
+	return RouteEnum ? RouteEnum->GetNameStringByValue(static_cast<int64>(Route)) : TEXT("Unknown");
+}
 }
 
 AtwoheartsCharacter::AtwoheartsCharacter()
@@ -299,58 +305,8 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 		return false;
 	}
 
-	const int32 NumericInputID = static_cast<int32>(InputID);
-	const bool bIsNormalAttackInput = InputID == ETwoHeartsAbilityInputID::NormalAttack;
-	const bool bIsDodgeInput = InputID == ETwoHeartsAbilityInputID::Dodge;
 	const FString InputName = GetCombatInputName(InputID);
 	const ETwoHeartsCombatActionType IncomingActionType = GetCombatActionTypeForInputID(InputID);
-	bool bForwardedToActiveAbility = false;
-	bool bAttemptedActivation = false;
-	bool bActivatedAbility = false;
-	FString ActivatedAbilityName;
-	TArray<FString> MatchingAbilityNames;
-
-	auto BuildFailureReason = [](const FGameplayTagContainer& FailureTags) -> FString
-	{
-		return FailureTags.IsEmpty()
-			? TEXT("CanActivateAbility returned false with no failure tags.")
-			: FString::Printf(TEXT("Blocked by tags: %s"), *FailureTags.ToStringSimple());
-	};
-
-	auto RecordInputDebugEvent = [this, bIsDodgeInput](const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false)
-	{
-		if (bIsDodgeInput)
-		{
-			PushDodgeDebugEvent(EventName, Detail);
-			UE_LOG(
-				LogtwoheartsCombatTest,
-				Display,
-				TEXT("[DodgeInput] actor=%s event=%s detail=\"%s\""),
-				*GetNameSafe(this),
-				EventName,
-				*Detail);
-			return;
-		}
-
-		RecordNormalAttackDebugEvent(EventName, Detail, bVerboseOnly);
-	};
-
-	auto RecordInputFailure = [this, bIsDodgeInput, &RecordInputDebugEvent](const TCHAR* EventName, const FString& Detail)
-	{
-		if (bIsDodgeInput)
-		{
-			PushDodgeDebugEvent(EventName, Detail);
-			UE_LOG(
-				LogtwoheartsCombatTest,
-				Warning,
-				TEXT("[DodgeInputFailure] actor=%s detail=\"%s\""),
-				*GetNameSafe(this),
-				*Detail);
-			return;
-		}
-
-		RecordNormalAttackFailure(EventName, Detail);
-	};
 
 	FTwoHeartsCombatInputEvaluation InputEvaluation;
 	if (CombatActionContextComponent)
@@ -367,137 +323,36 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 	if (InputEvaluation.Result == ETwoHeartsCombatInputEvaluationResult::Reject)
 	{
 		const FString RejectDetail = FString::Printf(TEXT("%s Input=%s."), *InputEvaluation.Reason, *InputName);
-		RecordInputFailure(TEXT("InputRejected"), RejectDetail);
-		RecordCombatInputDebugEvent(InputName, GetCombatInputEvaluationResultName(InputEvaluation.Result), RejectDetail);
+		RecordAbilityInputFailure(InputID, TEXT("InputRejected"), RejectDetail);
+		RecordCombatInputDebugEvent(
+			InputName,
+			GetCombatInputEvaluationResultName(InputEvaluation.Result),
+			GetCombatInputConsumptionRouteName(InputEvaluation.ConsumptionRoute),
+			RejectDetail);
 		return false;
 	}
 
 	if (InputEvaluation.Result == ETwoHeartsCombatInputEvaluationResult::BufferInput)
 	{
-		if (InputEvaluation.bShouldForwardToActiveAbility)
-		{
-			for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
-			{
-				if (AbilitySpec.InputID != NumericInputID || !AbilitySpec.IsActive())
-				{
-					continue;
-				}
-
-				bForwardedToActiveAbility = true;
-				AbilitySystemComponent->AbilitySpecInputPressed(AbilitySpec);
-				RecordInputDebugEvent(
-					TEXT("ForwardInputToActiveAbility"),
-					FString::Printf(TEXT("Forwarded buffered input to active ability %s."), *GetNameSafe(AbilitySpec.Ability)),
-					true);
-			}
-		}
-
-		const FString BufferDetail = bForwardedToActiveAbility
-			? FString::Printf(TEXT("%s Input=%s was forwarded to the active ability buffer path."), *InputEvaluation.Reason, *InputName)
-			: FString::Printf(TEXT("%s Input=%s is accepted by the formal preinput hook and reserved for a later consumer."), *InputEvaluation.Reason, *InputName);
-		RecordInputDebugEvent(TEXT("InputBuffered"), BufferDetail);
-		RecordCombatInputDebugEvent(InputName, GetCombatInputEvaluationResultName(InputEvaluation.Result), BufferDetail);
-		return true;
+		return HandleBufferedCombatInput(InputID, InputName, InputEvaluation);
 	}
 
-	const FGameplayTag StarterAbilityTag = TAG_TwoHearts_Ability_NormalAttack_Segment1;
-
-	for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
+	if (InputEvaluation.ConsumptionRoute != ETwoHeartsCombatInputConsumptionRoute::ActivateMatchingAbility)
 	{
-		if (AbilitySpec.InputID != NumericInputID)
-		{
-			continue;
-		}
-
-		if (!AbilitySpec.Ability)
-		{
-			continue;
-		}
-
-		MatchingAbilityNames.Add(GetNameSafe(AbilitySpec.Ability));
-
-		if (bIsNormalAttackInput && !AbilitySpec.Ability->GetAssetTags().HasTagExact(StarterAbilityTag))
-		{
-			continue;
-		}
-
-		bAttemptedActivation = true;
-
-		FGameplayTagContainer FailureTags;
-		const bool bCanActivate = AbilitySpec.Ability->CanActivateAbility(
-			AbilitySpec.Handle,
-			AbilitySystemComponent->AbilityActorInfo.Get(),
-			nullptr,
-			nullptr,
-			&FailureTags);
-
-		if (!bCanActivate)
-		{
-			RecordInputFailure(
-				TEXT("ActivateFailed"),
-				FString::Printf(TEXT("Failed to activate %s. %s"), *GetNameSafe(AbilitySpec.Ability), *BuildFailureReason(FailureTags)));
-			continue;
-		}
-
-		AbilitySystemComponent->AbilitySpecInputPressed(AbilitySpec);
-		if (AbilitySystemComponent->TryActivateAbility(AbilitySpec.Handle))
-		{
-			bActivatedAbility = true;
-			ActivatedAbilityName = GetNameSafe(AbilitySpec.Ability);
-			RecordInputDebugEvent(
-				TEXT("ActivateAbility"),
-				FString::Printf(TEXT("Activated ability %s for input %d after ExecuteNow evaluation."), *ActivatedAbilityName, NumericInputID));
-			break;
-		}
-
-		RecordInputFailure(
-			TEXT("ActivateFailed"),
-			FString::Printf(TEXT("TryActivateAbility failed for %s after CanActivateAbility succeeded."), *GetNameSafe(AbilitySpec.Ability)));
+		const FString UnexpectedRouteDetail = FString::Printf(
+			TEXT("%s Input=%s evaluated as ExecuteNow without an immediate activation route."),
+			*InputEvaluation.Reason,
+			*InputName);
+		RecordAbilityInputFailure(InputID, TEXT("InputRouteInvalid"), UnexpectedRouteDetail);
+		RecordCombatInputDebugEvent(
+			InputName,
+			GetCombatInputEvaluationResultName(InputEvaluation.Result),
+			GetCombatInputConsumptionRouteName(InputEvaluation.ConsumptionRoute),
+			UnexpectedRouteDetail);
+		return false;
 	}
 
-	if (!MatchingAbilityNames.IsEmpty())
-	{
-		RecordInputDebugEvent(
-			TEXT("InputScan"),
-			FString::Printf(TEXT("Input %d scanned abilities: %s."), NumericInputID, *FString::Join(MatchingAbilityNames, TEXT(", "))),
-			true);
-	}
-
-	if (bAttemptedActivation)
-	{
-		const FString ExecuteDetail = bActivatedAbility
-			? FString::Printf(TEXT("%s Input=%s executed immediately via %s."), *InputEvaluation.Reason, *InputName, *ActivatedAbilityName)
-			: FString::Printf(TEXT("%s Input=%s was evaluated as ExecuteNow, but ability activation still failed."), *InputEvaluation.Reason, *InputName);
-		RecordCombatInputDebugEvent(InputName, GetCombatInputEvaluationResultName(InputEvaluation.Result), ExecuteDetail);
-		return bActivatedAbility;
-	}
-
-	if (bIsNormalAttackInput)
-	{
-		RecordInputFailure(
-			TEXT("ActivateFailed"),
-			TEXT("NormalAttack input found no valid starter ability. First input must enter Segment1."));
-	}
-	else if (bIsDodgeInput)
-	{
-		RecordInputFailure(
-			TEXT("ActivateFailed"),
-			MatchingAbilityNames.IsEmpty()
-				? TEXT("Dodge input found no bound dodge ability.")
-				: TEXT("Dodge input matched abilities but none were eligible for activation."));
-	}
-	else if (!MatchingAbilityNames.IsEmpty())
-	{
-		RecordInputDebugEvent(
-			TEXT("ActivateFailed"),
-			FString::Printf(TEXT("Input %d matched abilities but none were eligible for activation."), NumericInputID));
-	}
-
-	RecordCombatInputDebugEvent(
-		InputName,
-		GetCombatInputEvaluationResultName(InputEvaluation.Result),
-		FString::Printf(TEXT("%s Input=%s found no eligible ability instance to execute immediately."), *InputEvaluation.Reason, *InputName));
-	return false;
+	return TryExecuteCombatInputNow(InputID, InputName, InputEvaluation);
 }
 
 void AtwoheartsCharacter::DoMove(float Right, float Forward)
@@ -839,12 +694,212 @@ void AtwoheartsCharacter::RecordNormalAttackFailure(const TCHAR* EventName, cons
 	}
 }
 
-void AtwoheartsCharacter::RecordCombatInputDebugEvent(const FString& InputName, const FString& ResultName, const FString& Detail)
+void AtwoheartsCharacter::RecordAbilityInputDebugEvent(ETwoHeartsAbilityInputID InputID, const TCHAR* EventName, const FString& Detail, bool bVerboseOnly)
+{
+	if (InputID == ETwoHeartsAbilityInputID::Dodge)
+	{
+		PushDodgeDebugEvent(EventName, Detail);
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Display,
+			TEXT("[DodgeInput] actor=%s event=%s detail=\"%s\""),
+			*GetNameSafe(this),
+			EventName,
+			*Detail);
+		return;
+	}
+
+	RecordNormalAttackDebugEvent(EventName, Detail, bVerboseOnly);
+}
+
+void AtwoheartsCharacter::RecordAbilityInputFailure(ETwoHeartsAbilityInputID InputID, const TCHAR* EventName, const FString& Detail)
+{
+	if (InputID == ETwoHeartsAbilityInputID::Dodge)
+	{
+		PushDodgeDebugEvent(EventName, Detail);
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Warning,
+			TEXT("[DodgeInputFailure] actor=%s detail=\"%s\""),
+			*GetNameSafe(this),
+			*Detail);
+		return;
+	}
+
+	RecordNormalAttackFailure(EventName, Detail);
+}
+
+bool AtwoheartsCharacter::HandleBufferedCombatInput(ETwoHeartsAbilityInputID InputID, const FString& InputName, const FTwoHeartsCombatInputEvaluation& InputEvaluation)
+{
+	const int32 NumericInputID = static_cast<int32>(InputID);
+	bool bForwardedToActiveAbility = false;
+
+	if (InputEvaluation.ConsumptionRoute == ETwoHeartsCombatInputConsumptionRoute::ForwardToActiveAbility)
+	{
+		for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
+		{
+			if (AbilitySpec.InputID != NumericInputID || !AbilitySpec.IsActive())
+			{
+				continue;
+			}
+
+			bForwardedToActiveAbility = true;
+			AbilitySystemComponent->AbilitySpecInputPressed(AbilitySpec);
+			RecordAbilityInputDebugEvent(
+				InputID,
+				TEXT("ForwardInputToActiveAbility"),
+				FString::Printf(TEXT("Forwarded buffered input to active ability %s."), *GetNameSafe(AbilitySpec.Ability)),
+				true);
+		}
+	}
+
+	const FString BufferDetail = bForwardedToActiveAbility
+		? FString::Printf(TEXT("%s Input=%s was forwarded to the active ability buffer path."), *InputEvaluation.Reason, *InputName)
+		: FString::Printf(TEXT("%s Input=%s is accepted by the formal preinput hook and reserved for a later consumer."), *InputEvaluation.Reason, *InputName);
+	RecordAbilityInputDebugEvent(InputID, TEXT("InputBuffered"), BufferDetail);
+	RecordCombatInputDebugEvent(
+		InputName,
+		GetCombatInputEvaluationResultName(InputEvaluation.Result),
+		GetCombatInputConsumptionRouteName(InputEvaluation.ConsumptionRoute),
+		BufferDetail);
+	return true;
+}
+
+bool AtwoheartsCharacter::TryExecuteCombatInputNow(ETwoHeartsAbilityInputID InputID, const FString& InputName, const FTwoHeartsCombatInputEvaluation& InputEvaluation)
+{
+	const int32 NumericInputID = static_cast<int32>(InputID);
+	const bool bIsNormalAttackInput = InputID == ETwoHeartsAbilityInputID::NormalAttack;
+	const bool bIsDodgeInput = InputID == ETwoHeartsAbilityInputID::Dodge;
+	const FGameplayTag StarterAbilityTag = TAG_TwoHearts_Ability_NormalAttack_Segment1;
+	bool bAttemptedActivation = false;
+	bool bActivatedAbility = false;
+	FString ActivatedAbilityName;
+	TArray<FString> MatchingAbilityNames;
+
+	auto BuildFailureReason = [](const FGameplayTagContainer& FailureTags) -> FString
+	{
+		return FailureTags.IsEmpty()
+			? TEXT("CanActivateAbility returned false with no failure tags.")
+			: FString::Printf(TEXT("Blocked by tags: %s"), *FailureTags.ToStringSimple());
+	};
+
+	for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
+	{
+		if (AbilitySpec.InputID != NumericInputID)
+		{
+			continue;
+		}
+
+		if (!AbilitySpec.Ability)
+		{
+			continue;
+		}
+
+		MatchingAbilityNames.Add(GetNameSafe(AbilitySpec.Ability));
+
+		if (bIsNormalAttackInput && !AbilitySpec.Ability->GetAssetTags().HasTagExact(StarterAbilityTag))
+		{
+			continue;
+		}
+
+		bAttemptedActivation = true;
+
+		FGameplayTagContainer FailureTags;
+		const bool bCanActivate = AbilitySpec.Ability->CanActivateAbility(
+			AbilitySpec.Handle,
+			AbilitySystemComponent->AbilityActorInfo.Get(),
+			nullptr,
+			nullptr,
+			&FailureTags);
+
+		if (!bCanActivate)
+		{
+			RecordAbilityInputFailure(
+				InputID,
+				TEXT("ActivateFailed"),
+				FString::Printf(TEXT("Failed to activate %s. %s"), *GetNameSafe(AbilitySpec.Ability), *BuildFailureReason(FailureTags)));
+			continue;
+		}
+
+		AbilitySystemComponent->AbilitySpecInputPressed(AbilitySpec);
+		if (AbilitySystemComponent->TryActivateAbility(AbilitySpec.Handle))
+		{
+			bActivatedAbility = true;
+			ActivatedAbilityName = GetNameSafe(AbilitySpec.Ability);
+			RecordAbilityInputDebugEvent(
+				InputID,
+				TEXT("ActivateAbility"),
+				FString::Printf(TEXT("Activated ability %s for input %d after ExecuteNow evaluation."), *ActivatedAbilityName, NumericInputID));
+			break;
+		}
+
+		RecordAbilityInputFailure(
+			InputID,
+			TEXT("ActivateFailed"),
+			FString::Printf(TEXT("TryActivateAbility failed for %s after CanActivateAbility succeeded."), *GetNameSafe(AbilitySpec.Ability)));
+	}
+
+	if (!MatchingAbilityNames.IsEmpty())
+	{
+		RecordAbilityInputDebugEvent(
+			InputID,
+			TEXT("InputScan"),
+			FString::Printf(TEXT("Input %d scanned abilities: %s."), NumericInputID, *FString::Join(MatchingAbilityNames, TEXT(", "))),
+			true);
+	}
+
+	if (bAttemptedActivation)
+	{
+		const FString ExecuteDetail = bActivatedAbility
+			? FString::Printf(TEXT("%s Input=%s executed immediately via %s."), *InputEvaluation.Reason, *InputName, *ActivatedAbilityName)
+			: FString::Printf(TEXT("%s Input=%s was evaluated as ExecuteNow, but ability activation still failed."), *InputEvaluation.Reason, *InputName);
+		RecordCombatInputDebugEvent(
+			InputName,
+			GetCombatInputEvaluationResultName(InputEvaluation.Result),
+			GetCombatInputConsumptionRouteName(InputEvaluation.ConsumptionRoute),
+			ExecuteDetail);
+		return bActivatedAbility;
+	}
+
+	if (bIsNormalAttackInput)
+	{
+		RecordAbilityInputFailure(
+			InputID,
+			TEXT("ActivateFailed"),
+			TEXT("NormalAttack input found no valid starter ability. First input must enter Segment1."));
+	}
+	else if (bIsDodgeInput)
+	{
+		RecordAbilityInputFailure(
+			InputID,
+			TEXT("ActivateFailed"),
+			MatchingAbilityNames.IsEmpty()
+				? TEXT("Dodge input found no bound dodge ability.")
+				: TEXT("Dodge input matched abilities but none were eligible for activation."));
+	}
+	else if (!MatchingAbilityNames.IsEmpty())
+	{
+		RecordAbilityInputDebugEvent(
+			InputID,
+			TEXT("ActivateFailed"),
+			FString::Printf(TEXT("Input %d matched abilities but none were eligible for activation."), NumericInputID));
+	}
+
+	RecordCombatInputDebugEvent(
+		InputName,
+		GetCombatInputEvaluationResultName(InputEvaluation.Result),
+		GetCombatInputConsumptionRouteName(InputEvaluation.ConsumptionRoute),
+		FString::Printf(TEXT("%s Input=%s found no eligible ability instance to execute immediately."), *InputEvaluation.Reason, *InputName));
+	return false;
+}
+
+void AtwoheartsCharacter::RecordCombatInputDebugEvent(const FString& InputName, const FString& ResultName, const FString& RouteName, const FString& Detail)
 {
 	FTwoHeartsCombatInputDebugEvent Event;
 	Event.TimestampSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 	Event.InputName = InputName;
 	Event.ResultName = ResultName;
+	Event.RouteName = RouteName;
 	Event.Detail = Detail;
 
 	CombatInputDebugEvents.Add(MoveTemp(Event));
@@ -857,11 +912,12 @@ void AtwoheartsCharacter::RecordCombatInputDebugEvent(const FString& InputName, 
 	UE_LOG(
 		LogtwoheartsCombatTest,
 		Display,
-		TEXT("[CombatInputEval] time=%.3f actor=%s input=%s result=%s detail=\"%s\""),
+		TEXT("[CombatInputEval] time=%.3f actor=%s input=%s result=%s route=%s detail=\"%s\""),
 		CombatInputDebugEvents.Last().TimestampSeconds,
 		*GetNameSafe(this),
 		*CombatInputDebugEvents.Last().InputName,
 		*CombatInputDebugEvents.Last().ResultName,
+		*CombatInputDebugEvents.Last().RouteName,
 		*CombatInputDebugEvents.Last().Detail);
 }
 

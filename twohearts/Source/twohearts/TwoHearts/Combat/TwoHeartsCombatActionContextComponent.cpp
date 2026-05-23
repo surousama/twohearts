@@ -133,6 +133,7 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 	if (!CurrentContext.bIsActionActive)
 	{
 		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::ExecuteNow;
+		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ActivateMatchingAbility;
 		Evaluation.Reason = TEXT("No active combat action is currently registered.");
 		return Evaluation;
 	}
@@ -145,11 +146,13 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 		if (CurrentContext.ActionPhase == ETwoHeartsCombatPhase::Startup
 			|| CurrentContext.ActionPhase == ETwoHeartsCombatPhase::Active)
 		{
+			Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ForwardToActiveAbility;
 			Evaluation.bShouldForwardToActiveAbility = true;
 			Evaluation.Reason = TEXT("Current normal attack can still consume combo queue input on the active ability.");
 			return Evaluation;
 		}
 
+		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ReserveForFutureBufferConsumer;
 		Evaluation.Reason = TEXT("Normal attack input was accepted by the minimal preinput hook, but this build does not consume late buffered attack input yet.");
 		return Evaluation;
 	}
@@ -157,6 +160,7 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 	if (CanCurrentActionBeInterruptedBy(IncomingActionType))
 	{
 		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::ExecuteNow;
+		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ActivateMatchingAbility;
 		Evaluation.Reason = TEXT("Current combat action can be interrupted by the incoming action.");
 		return Evaluation;
 	}

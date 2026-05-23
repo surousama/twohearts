@@ -33,6 +33,15 @@ enum class ETwoHeartsCombatInputEvaluationResult : uint8
 	Reject UMETA(DisplayName="Reject")
 };
 
+UENUM(BlueprintType)
+enum class ETwoHeartsCombatInputConsumptionRoute : uint8
+{
+	None = 0 UMETA(DisplayName="None"),
+	ActivateMatchingAbility UMETA(DisplayName="ActivateMatchingAbility"),
+	ForwardToActiveAbility UMETA(DisplayName="ForwardToActiveAbility"),
+	ReserveForFutureBufferConsumer UMETA(DisplayName="ReserveForFutureBufferConsumer")
+};
+
 USTRUCT(BlueprintType)
 struct FTwoHeartsCombatActionRegistration
 {
@@ -103,6 +112,9 @@ struct FTwoHeartsCombatInputEvaluation
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Evaluation")
 	ETwoHeartsCombatActionType IncomingActionType = ETwoHeartsCombatActionType::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Evaluation")
+	ETwoHeartsCombatInputConsumptionRoute ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::None;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Evaluation")
 	bool bHasActiveAction = false;

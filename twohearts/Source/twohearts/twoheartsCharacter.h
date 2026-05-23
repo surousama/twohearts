@@ -18,6 +18,7 @@ class UAnimMontage;
 class UTwoHeartsCombatActionContextComponent;
 enum class ETwoHeartsAbilityInputID : uint8;
 struct FInputActionValue;
+struct FTwoHeartsCombatInputEvaluation;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -121,6 +122,9 @@ struct FTwoHeartsCombatInputDebugEvent
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input|Debug")
 	FString ResultName;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input|Debug")
+	FString RouteName;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input|Debug")
 	FString Detail;
@@ -398,7 +402,11 @@ protected:
 
 	void RecordNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false);
 	void RecordNormalAttackFailure(const TCHAR* EventName, const FString& Detail);
-	void RecordCombatInputDebugEvent(const FString& InputName, const FString& ResultName, const FString& Detail);
+	void RecordAbilityInputDebugEvent(ETwoHeartsAbilityInputID InputID, const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false);
+	void RecordAbilityInputFailure(ETwoHeartsAbilityInputID InputID, const TCHAR* EventName, const FString& Detail);
+	bool HandleBufferedCombatInput(ETwoHeartsAbilityInputID InputID, const FString& InputName, const FTwoHeartsCombatInputEvaluation& InputEvaluation);
+	bool TryExecuteCombatInputNow(ETwoHeartsAbilityInputID InputID, const FString& InputName, const FTwoHeartsCombatInputEvaluation& InputEvaluation);
+	void RecordCombatInputDebugEvent(const FString& InputName, const FString& ResultName, const FString& RouteName, const FString& Detail);
 	bool ShouldEmitNormalAttackDebugLog(const TCHAR* EventName, bool bVerboseOnly) const;
 	void DrawNormalAttackDebugOverlay() const;
 };

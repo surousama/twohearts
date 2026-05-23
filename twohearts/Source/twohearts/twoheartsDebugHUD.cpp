@@ -175,7 +175,7 @@ void ATwoheartsDebugHUD::DrawHUD()
 		for (const FTwoHeartsCombatInputDebugEvent* Event : VisibleInputEvents)
 		{
 			DrawDebugLine(
-				FString::Printf(TEXT("[%.2f] %s -> %s"), Event->TimestampSeconds, *Event->InputName, *Event->ResultName),
+				FString::Printf(TEXT("[%.2f] %s -> %s / %s"), Event->TimestampSeconds, *Event->InputName, *Event->ResultName, *Event->RouteName),
 				PanelX + 12.0f,
 				CurrentY,
 				TextColor);
