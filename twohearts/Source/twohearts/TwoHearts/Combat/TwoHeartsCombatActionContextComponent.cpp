@@ -10,6 +10,7 @@ UTwoHeartsCombatActionContextComponent::UTwoHeartsCombatActionContextComponent()
 void UTwoHeartsCombatActionContextComponent::BeginAction(const FTwoHeartsCombatActionRegistration& Registration, const FString& Reason)
 {
 	CurrentContext = FTwoHeartsCombatActionContextSnapshot();
+	SyncBufferedInputToSnapshot();
 	CurrentContext.bIsActionActive = true;
 	CurrentContext.ActionType = Registration.ActionType;
 	CurrentContext.ActionPhase = Registration.InitialPhase;
@@ -153,7 +154,27 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 		}
 
 		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ReserveForFutureBufferConsumer;
-		Evaluation.Reason = TEXT("Normal attack input was accepted by the minimal preinput hook, but this build does not consume late buffered attack input yet.");
+		Evaluation.Reason = TEXT("Current normal attack accepted a late follow-up input for post-action buffered consumption.");
+		return Evaluation;
+	}
+
+	if (CurrentContext.ActionType == ETwoHeartsCombatActionType::Dodge)
+	{
+		const bool bCanBufferDodgeFollowUp =
+			CurrentContext.ActionPhase == ETwoHeartsCombatPhase::Recovery
+			|| CurrentContext.ActionPhase == ETwoHeartsCombatPhase::LogicEnded
+			|| CurrentContext.bHasLogicEnded;
+
+		if (bCanBufferDodgeFollowUp)
+		{
+			Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::BufferInput;
+			Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ReserveForFutureBufferConsumer;
+			Evaluation.Reason = TEXT("Current dodge accepted a buffered follow-up input for post-action consumption.");
+			return Evaluation;
+		}
+
+		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::Reject;
+		Evaluation.Reason = TEXT("Current dodge has not reached its buffered follow-up window yet.");
 		return Evaluation;
 	}
 
@@ -170,10 +191,73 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 	return Evaluation;
 }
 
+void UTwoHeartsCombatActionContextComponent::BufferInput(
+	ETwoHeartsCombatActionType IncomingActionType,
+	ETwoHeartsCombatInputConsumptionRoute ConsumptionRoute,
+	const FString& Reason)
+{
+	BufferedInput.bIsSet = true;
+	BufferedInput.IncomingActionType = IncomingActionType;
+	BufferedInput.ConsumptionRoute = ConsumptionRoute;
+	BufferedInput.Reason = Reason.IsEmpty() ? TEXT("None") : Reason;
+	BufferedInput.BufferedTimeSeconds = GetWorldTimeSecondsSafe();
+	SyncBufferedInputToSnapshot();
+
+	RecordContextEvent(
+		TEXT("BufferInput"),
+		FString::Printf(
+			TEXT("input=%s route=%s reason=%s"),
+			*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(BufferedInput.IncomingActionType)),
+			*StaticEnum<ETwoHeartsCombatInputConsumptionRoute>()->GetNameStringByValue(static_cast<int64>(BufferedInput.ConsumptionRoute)),
+			*BufferedInput.Reason));
+}
+
+bool UTwoHeartsCombatActionContextComponent::ConsumeBufferedInput(
+	FTwoHeartsBufferedCombatInput& OutBufferedInput,
+	const FString& ConsumerName)
+{
+	if (!BufferedInput.bIsSet)
+	{
+		return false;
+	}
+
+	OutBufferedInput = BufferedInput;
+	RecordContextEvent(
+		TEXT("ConsumeBufferedInput"),
+		FString::Printf(
+			TEXT("consumer=%s input=%s route=%s reason=%s"),
+			*ConsumerName,
+			*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(BufferedInput.IncomingActionType)),
+			*StaticEnum<ETwoHeartsCombatInputConsumptionRoute>()->GetNameStringByValue(static_cast<int64>(BufferedInput.ConsumptionRoute)),
+			*BufferedInput.Reason));
+
+	BufferedInput = FTwoHeartsBufferedCombatInput();
+	SyncBufferedInputToSnapshot();
+	return true;
+}
+
+void UTwoHeartsCombatActionContextComponent::ClearBufferedInput(const FString& Reason)
+{
+	if (!BufferedInput.bIsSet)
+	{
+		return;
+	}
+
+	RecordContextEvent(
+		TEXT("ClearBufferedInput"),
+		FString::Printf(
+			TEXT("reason=%s input=%s"),
+			*Reason,
+			*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(BufferedInput.IncomingActionType))));
+
+	BufferedInput = FTwoHeartsBufferedCombatInput();
+	SyncBufferedInputToSnapshot();
+}
+
 FString UTwoHeartsCombatActionContextComponent::BuildCurrentContextDebugString() const
 {
 	return FString::Printf(
-		TEXT("active=%s type=%s phase=%s logic_ended=%s end_reason=%s instance=%s ability=%s state=%s reason=%s"),
+		TEXT("active=%s type=%s phase=%s logic_ended=%s end_reason=%s instance=%s ability=%s state=%s reason=%s buffered=%s buffered_input=%s buffered_route=%s"),
 		CurrentContext.bIsActionActive ? TEXT("true") : TEXT("false"),
 		*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(CurrentContext.ActionType)),
 		*StaticEnum<ETwoHeartsCombatPhase>()->GetNameStringByValue(static_cast<int64>(CurrentContext.ActionPhase)),
@@ -182,7 +266,10 @@ FString UTwoHeartsCombatActionContextComponent::BuildCurrentContextDebugString()
 		*CurrentContext.ActionInstanceName,
 		*CurrentContext.AbilityTag.ToString(),
 		*CurrentContext.ActionStateTag.ToString(),
-		*CurrentContext.LastReason);
+		*CurrentContext.LastReason,
+		CurrentContext.bHasBufferedInput ? TEXT("true") : TEXT("false"),
+		*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(CurrentContext.BufferedInputActionType)),
+		*StaticEnum<ETwoHeartsCombatInputConsumptionRoute>()->GetNameStringByValue(static_cast<int64>(CurrentContext.BufferedInputRoute)));
 }
 
 float UTwoHeartsCombatActionContextComponent::GetWorldTimeSecondsSafe() const
@@ -200,4 +287,13 @@ void UTwoHeartsCombatActionContextComponent::RecordContextEvent(const TCHAR* Eve
 		*GetNameSafe(GetOwner()),
 		EventName,
 		*Detail);
+}
+
+void UTwoHeartsCombatActionContextComponent::SyncBufferedInputToSnapshot()
+{
+	CurrentContext.bHasBufferedInput = BufferedInput.bIsSet;
+	CurrentContext.BufferedInputActionType = BufferedInput.bIsSet ? BufferedInput.IncomingActionType : ETwoHeartsCombatActionType::None;
+	CurrentContext.BufferedInputRoute = BufferedInput.bIsSet ? BufferedInput.ConsumptionRoute : ETwoHeartsCombatInputConsumptionRoute::None;
+	CurrentContext.BufferedInputReason = BufferedInput.bIsSet ? BufferedInput.Reason : TEXT("None");
+	CurrentContext.BufferedInputTimeSeconds = BufferedInput.bIsSet ? BufferedInput.BufferedTimeSeconds : 0.0f;
 }

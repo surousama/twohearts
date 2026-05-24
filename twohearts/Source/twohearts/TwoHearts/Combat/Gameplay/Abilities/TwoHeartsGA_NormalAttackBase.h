@@ -101,6 +101,7 @@ private:
 	bool StartSegmentPlayback();
 	void FinishSegment(bool bWasCancelled);
 	void AttemptDeferredNextSegmentActivation();
+	bool TryConsumeLateBufferedNextSegment();
 	void UpdateDebugState(bool bIsActive) const;
 	void RecordAbilityEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false) const;
 	void RecordAbilityFailure(const TCHAR* EventName, const FString& Detail) const;

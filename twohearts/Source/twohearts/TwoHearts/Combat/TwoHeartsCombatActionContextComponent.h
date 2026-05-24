@@ -64,6 +64,27 @@ struct FTwoHeartsCombatActionRegistration
 };
 
 USTRUCT(BlueprintType)
+struct FTwoHeartsBufferedCombatInput
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Buffer")
+	bool bIsSet = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Buffer")
+	ETwoHeartsCombatActionType IncomingActionType = ETwoHeartsCombatActionType::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Buffer")
+	ETwoHeartsCombatInputConsumptionRoute ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Buffer")
+	FString Reason = TEXT("None");
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Buffer")
+	float BufferedTimeSeconds = 0.0f;
+};
+
+USTRUCT(BlueprintType)
 struct FTwoHeartsCombatActionContextSnapshot
 {
 	GENERATED_BODY()
@@ -100,6 +121,21 @@ struct FTwoHeartsCombatActionContextSnapshot
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Action Context")
 	float LastUpdateTimeSeconds = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Buffer")
+	bool bHasBufferedInput = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Buffer")
+	ETwoHeartsCombatActionType BufferedInputActionType = ETwoHeartsCombatActionType::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Buffer")
+	ETwoHeartsCombatInputConsumptionRoute BufferedInputRoute = ETwoHeartsCombatInputConsumptionRoute::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Buffer")
+	FString BufferedInputReason = TEXT("None");
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Buffer")
+	float BufferedInputTimeSeconds = 0.0f;
 };
 
 USTRUCT(BlueprintType)
@@ -166,13 +202,32 @@ public:
 	UFUNCTION(BlueprintPure, Category="Combat|Input Evaluation")
 	FTwoHeartsCombatInputEvaluation EvaluateInputForAction(ETwoHeartsCombatActionType IncomingActionType) const;
 
+	UFUNCTION(BlueprintCallable, Category="Combat|Input Buffer")
+	void BufferInput(ETwoHeartsCombatActionType IncomingActionType, ETwoHeartsCombatInputConsumptionRoute ConsumptionRoute, const FString& Reason);
+
+	UFUNCTION(BlueprintPure, Category="Combat|Input Buffer")
+	bool HasBufferedInput() const { return BufferedInput.bIsSet; }
+
+	UFUNCTION(BlueprintPure, Category="Combat|Input Buffer")
+	FTwoHeartsBufferedCombatInput GetBufferedInputCopy() const { return BufferedInput; }
+
+	UFUNCTION(BlueprintCallable, Category="Combat|Input Buffer")
+	bool ConsumeBufferedInput(FTwoHeartsBufferedCombatInput& OutBufferedInput, const FString& ConsumerName);
+
+	UFUNCTION(BlueprintCallable, Category="Combat|Input Buffer")
+	void ClearBufferedInput(const FString& Reason);
+
 	UFUNCTION(BlueprintPure, Category="Combat|Action Context")
 	FString BuildCurrentContextDebugString() const;
 
 private:
 	float GetWorldTimeSecondsSafe() const;
 	void RecordContextEvent(const TCHAR* EventName, const FString& Detail) const;
+	void SyncBufferedInputToSnapshot();
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Action Context", meta=(AllowPrivateAccess="true"))
 	FTwoHeartsCombatActionContextSnapshot CurrentContext;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Input Buffer", meta=(AllowPrivateAccess="true"))
+	FTwoHeartsBufferedCombatInput BufferedInput;
 };

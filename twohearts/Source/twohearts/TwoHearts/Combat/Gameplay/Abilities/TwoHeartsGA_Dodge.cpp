@@ -580,6 +580,14 @@ void UTwoHeartsGA_Dodge::FinishCombatActionContext(bool bWasCancelled)
 		ActionContextComponent->FinishAction(EndReason, FinishReason);
 	}
 
+	if (!bWasCancelled)
+	{
+		if (AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter()))
+		{
+			Character->TryConsumeReservedCombatInput(TEXT("DodgeEnded"));
+		}
+	}
+
 	bHasRegisteredCombatActionContext = false;
 	bHasMarkedCombatLogicEnded = false;
 }

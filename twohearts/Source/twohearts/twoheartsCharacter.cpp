@@ -57,6 +57,23 @@ FString GetCombatInputName(ETwoHeartsAbilityInputID InputID)
 	}
 }
 
+bool TryGetCombatInputIDForActionType(ETwoHeartsCombatActionType ActionType, ETwoHeartsAbilityInputID& OutInputID)
+{
+	switch (ActionType)
+	{
+	case ETwoHeartsCombatActionType::NormalAttack:
+		OutInputID = ETwoHeartsAbilityInputID::NormalAttack;
+		return true;
+
+	case ETwoHeartsCombatActionType::Dodge:
+		OutInputID = ETwoHeartsAbilityInputID::Dodge;
+		return true;
+
+	default:
+		return false;
+	}
+}
+
 FString GetCombatInputEvaluationResultName(ETwoHeartsCombatInputEvaluationResult Result)
 {
 	const UEnum* ResultEnum = StaticEnum<ETwoHeartsCombatInputEvaluationResult>();
@@ -770,9 +787,18 @@ bool AtwoheartsCharacter::HandleBufferedCombatInput(ETwoHeartsAbilityInputID Inp
 		return false;
 	}
 
+	if (InputEvaluation.ConsumptionRoute == ETwoHeartsCombatInputConsumptionRoute::ReserveForFutureBufferConsumer
+		&& CombatActionContextComponent)
+	{
+		CombatActionContextComponent->BufferInput(
+			InputEvaluation.IncomingActionType,
+			InputEvaluation.ConsumptionRoute,
+			InputEvaluation.Reason);
+	}
+
 	const FString BufferDetail = bForwardedToActiveAbility
 		? FString::Printf(TEXT("%s Input=%s was forwarded to the active ability buffer path."), *InputEvaluation.Reason, *InputName)
-		: FString::Printf(TEXT("%s Input=%s is accepted by the formal preinput hook and reserved for a later consumer."), *InputEvaluation.Reason, *InputName);
+		: FString::Printf(TEXT("%s Input=%s is now stored in the formal buffered follow-up slot for a later consumer."), *InputEvaluation.Reason, *InputName);
 	RecordAbilityInputDebugEvent(InputID, TEXT("InputBuffered"), BufferDetail);
 	RecordCombatInputDebugEvent(
 		InputName,
@@ -908,6 +934,56 @@ bool AtwoheartsCharacter::TryExecuteCombatInputNow(ETwoHeartsAbilityInputID Inpu
 		GetCombatInputConsumptionRouteName(InputEvaluation.ConsumptionRoute),
 		FString::Printf(TEXT("%s Input=%s found no eligible ability instance to execute immediately."), *InputEvaluation.Reason, *InputName));
 	return false;
+}
+
+void AtwoheartsCharacter::PushCombatInputDebugEvent(const FString& InputName, const FString& ResultName, const FString& RouteName, const FString& Detail)
+{
+	RecordCombatInputDebugEvent(InputName, ResultName, RouteName, Detail);
+}
+
+bool AtwoheartsCharacter::TryConsumeReservedCombatInput(const FString& ConsumerName)
+{
+	if (!CombatActionContextComponent)
+	{
+		return false;
+	}
+
+	FTwoHeartsBufferedCombatInput BufferedInput;
+	if (!CombatActionContextComponent->ConsumeBufferedInput(BufferedInput, ConsumerName))
+	{
+		return false;
+	}
+
+	ETwoHeartsAbilityInputID InputID = ETwoHeartsAbilityInputID::None;
+	if (!TryGetCombatInputIDForActionType(BufferedInput.IncomingActionType, InputID))
+	{
+		RecordCombatInputDebugEvent(
+			TEXT("Unknown"),
+			TEXT("BufferedConsumeFailed"),
+			GetCombatInputConsumptionRouteName(BufferedInput.ConsumptionRoute),
+			FString::Printf(
+				TEXT("Buffered input consumer %s found unsupported action type %s."),
+				*ConsumerName,
+				*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(BufferedInput.IncomingActionType))));
+		return false;
+	}
+
+	const FString InputName = GetCombatInputName(InputID);
+	FTwoHeartsCombatInputEvaluation ConsumedEvaluation;
+	ConsumedEvaluation.Result = ETwoHeartsCombatInputEvaluationResult::BufferInput;
+	ConsumedEvaluation.IncomingActionType = BufferedInput.IncomingActionType;
+	ConsumedEvaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ActivateMatchingAbility;
+	ConsumedEvaluation.Reason = FString::Printf(TEXT("Buffered input was consumed by %s. OriginalReason=%s"), *ConsumerName, *BufferedInput.Reason);
+
+	const bool bConsumed = TryExecuteCombatInputNow(InputID, InputName, ConsumedEvaluation);
+	RecordCombatInputDebugEvent(
+		InputName,
+		bConsumed ? TEXT("BufferedConsumed") : TEXT("BufferedConsumeFailed"),
+		GetCombatInputConsumptionRouteName(ConsumedEvaluation.ConsumptionRoute),
+		bConsumed
+			? FString::Printf(TEXT("Buffered input was consumed successfully by %s."), *ConsumerName)
+			: FString::Printf(TEXT("Buffered input consumption by %s failed to activate a follow-up action."), *ConsumerName));
+	return bConsumed;
 }
 
 void AtwoheartsCharacter::RecordCombatInputDebugEvent(const FString& InputName, const FString& ResultName, const FString& RouteName, const FString& Detail)

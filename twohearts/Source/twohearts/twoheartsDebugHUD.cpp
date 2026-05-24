@@ -155,6 +155,25 @@ void ATwoheartsDebugHUD::DrawHUD()
 			CurrentY,
 			ActionContext.LastReason == TEXT("None") ? MutedColor : TextColor);
 		CurrentY += LineHeight * 1.5f;
+
+		const UEnum* RouteEnum = StaticEnum<ETwoHeartsCombatInputConsumptionRoute>();
+		DrawDebugLine(
+			FString::Printf(
+				TEXT("buffered=%s   input=%s   route=%s"),
+				ActionContext.bHasBufferedInput ? TEXT("YES") : TEXT("NO"),
+				ActionTypeEnum ? *ActionTypeEnum->GetNameStringByValue(static_cast<int64>(ActionContext.BufferedInputActionType)) : TEXT("Unknown"),
+				RouteEnum ? *RouteEnum->GetNameStringByValue(static_cast<int64>(ActionContext.BufferedInputRoute)) : TEXT("Unknown")),
+			PanelX + 12.0f,
+			CurrentY,
+			ActionContext.bHasBufferedInput ? HeaderColor : MutedColor);
+		CurrentY += LineHeight;
+
+		DrawDebugLine(
+			FString::Printf(TEXT("buffer_reason=%s"), *ActionContext.BufferedInputReason),
+			PanelX + 12.0f,
+			CurrentY,
+			ActionContext.bHasBufferedInput ? TextColor : MutedColor);
+		CurrentY += LineHeight * 1.5f;
 	}
 	else
 	{

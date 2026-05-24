@@ -389,6 +389,8 @@ public:
 	const FString& GetLastDodgeDebugDetail() const { return LastDodgeDebugDetail; }
 	float GetLastDodgeEventTimeSeconds() const { return LastDodgeEventTimeSeconds; }
 	const TArray<FTwoHeartsCombatInputDebugEvent>& GetCombatInputDebugEvents() const { return CombatInputDebugEvents; }
+	void PushCombatInputDebugEvent(const FString& InputName, const FString& ResultName, const FString& RouteName, const FString& Detail);
+	bool TryConsumeReservedCombatInput(const FString& ConsumerName);
 
 public:
 

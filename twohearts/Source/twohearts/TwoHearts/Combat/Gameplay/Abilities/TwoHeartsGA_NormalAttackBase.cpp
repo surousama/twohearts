@@ -312,7 +312,12 @@ void UTwoHeartsGA_NormalAttackBase::FinishSegment(bool bWasCancelled)
 		EnterCombatPhase(ETwoHeartsCombatPhase::LogicEnded, TEXT("SegmentCompleted"));
 	}
 
-	const bool bShouldActivateNext = !bWasCancelled && bHasQueuedNextSegment && NextSegmentAbilityTag.IsValid() && AbilitySystemComponent;
+	const bool bConsumedLateBufferedNext = !bWasCancelled && !bHasQueuedNextSegment && TryConsumeLateBufferedNextSegment();
+	const bool bShouldActivateNext =
+		!bWasCancelled
+		&& (bHasQueuedNextSegment || bConsumedLateBufferedNext)
+		&& NextSegmentAbilityTag.IsValid()
+		&& AbilitySystemComponent;
 
 	if (bWasCancelled)
 	{
@@ -322,7 +327,11 @@ void UTwoHeartsGA_NormalAttackBase::FinishSegment(bool bWasCancelled)
 	{
 		RecordAbilityEvent(
 			TEXT("SegmentFinished"),
-			FString::Printf(TEXT("Segment %d finished. QueuedNext=%s."), NormalAttackSegment, bHasQueuedNextSegment ? TEXT("true") : TEXT("false")));
+			FString::Printf(
+				TEXT("Segment %d finished. QueuedNext=%s LateBufferedNext=%s."),
+				NormalAttackSegment,
+				bHasQueuedNextSegment ? TEXT("true") : TEXT("false"),
+				bConsumedLateBufferedNext ? TEXT("true") : TEXT("false")));
 	}
 
 	bPreserveDebugStateUntilNextSegment = bShouldActivateNext;
@@ -330,6 +339,13 @@ void UTwoHeartsGA_NormalAttackBase::FinishSegment(bool bWasCancelled)
 
 	if (!bShouldActivateNext)
 	{
+		if (!bWasCancelled)
+		{
+			if (AtwoheartsCharacter* Character = GetTwoHeartsCharacter())
+			{
+				Character->TryConsumeReservedCombatInput(TEXT("NormalAttackEnded"));
+			}
+		}
 		return;
 	}
 
@@ -350,6 +366,47 @@ void UTwoHeartsGA_NormalAttackBase::FinishSegment(bool bWasCancelled)
 	}
 
 	AttemptDeferredNextSegmentActivation();
+}
+
+bool UTwoHeartsGA_NormalAttackBase::TryConsumeLateBufferedNextSegment()
+{
+	if (!NextSegmentAbilityTag.IsValid())
+	{
+		return false;
+	}
+
+	UTwoHeartsCombatActionContextComponent* ActionContextComponent = GetCombatActionContextComponent();
+	AtwoheartsCharacter* Character = GetTwoHeartsCharacter();
+	if (!ActionContextComponent || !Character)
+	{
+		return false;
+	}
+
+	FTwoHeartsBufferedCombatInput BufferedInput;
+	if (!ActionContextComponent->ConsumeBufferedInput(BufferedInput, TEXT("NormalAttackLateFollowUp")))
+	{
+		return false;
+	}
+
+	if (BufferedInput.IncomingActionType != ETwoHeartsCombatActionType::NormalAttack)
+	{
+		ActionContextComponent->BufferInput(BufferedInput.IncomingActionType, BufferedInput.ConsumptionRoute, BufferedInput.Reason);
+		return false;
+	}
+
+	const FString Detail = FString::Printf(
+		TEXT("Consumed late buffered normal attack after segment %d; scheduling %s."),
+		NormalAttackSegment,
+		*NextSegmentAbilityTag.ToString());
+	Character->PushCombatInputDebugEvent(
+		TEXT("NormalAttack"),
+		TEXT("BufferedConsumed"),
+		StaticEnum<ETwoHeartsCombatInputConsumptionRoute>()
+			? StaticEnum<ETwoHeartsCombatInputConsumptionRoute>()->GetNameStringByValue(static_cast<int64>(BufferedInput.ConsumptionRoute))
+			: TEXT("Unknown"),
+		Detail);
+	RecordAbilityEvent(TEXT("ConsumeLateBufferedNextSegment"), Detail, true);
+	return true;
 }
 
 void UTwoHeartsGA_NormalAttackBase::UpdateDebugState(bool bShouldBeActive) const
