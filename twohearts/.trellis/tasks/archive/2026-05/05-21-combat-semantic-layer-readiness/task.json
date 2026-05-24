@@ -3,7 +3,7 @@
   "name": "combat-semantic-layer-readiness",
   "title": "公共战斗语义层开工评估与实施拆分",
   "description": "",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,7 +11,7 @@
   "creator": "palladianli",
   "assignee": "palladianli",
   "createdAt": "2026-05-21",
-  "completedAt": null,
+  "completedAt": "2026-05-24",
   "branch": null,
   "base_branch": "master",
   "worktree_path": null,
@@ -23,7 +23,8 @@
     "05-23-normal-attack-semantic-bridge",
     "05-23-dodge-semantic-bridge-and-interrupt-unification",
     "05-23-combat-input-evaluation-preinput-hook",
-    "05-23-combat-semantic-layer-regression-review"
+    "05-23-combat-semantic-layer-regression-review",
+    "05-24-combat-semantic-layer-parent-closure-review"
   ],
   "parent": "05-19-chapter2-basic-combat",
   "relatedFiles": [],
