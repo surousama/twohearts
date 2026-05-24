@@ -38,6 +38,13 @@ void UTwoHeartsGA_NormalAttackBase::ActivateAbility(
 	bInterruptedByDodge = false;
 	CurrentCombatPhase = ETwoHeartsCombatPhase::None;
 	ActiveMontageTask = nullptr;
+	PendingNextSegmentAbilityTag = FGameplayTag();
+	PendingNextSegmentSourceSegment = 0;
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(DeferredNextSegmentActivationTimerHandle);
+	}
 
 	if (!StartSegmentPlayback())
 	{
@@ -326,21 +333,23 @@ void UTwoHeartsGA_NormalAttackBase::FinishSegment(bool bWasCancelled)
 		return;
 	}
 
-	FGameplayTagContainer NextAbilityTags;
-	NextAbilityTags.AddTag(NextSegmentAbilityTag);
-	if (!AbilitySystemComponent->TryActivateAbilitiesByTag(NextAbilityTags, true))
+	PendingNextSegmentAbilityTag = NextSegmentAbilityTag;
+	PendingNextSegmentSourceSegment = NormalAttackSegment;
+
+	if (UWorld* World = GetWorld())
 	{
-		UpdateDebugState(false);
-		RecordAbilityFailure(
-			TEXT("AdvanceSegmentFailed"),
-			FString::Printf(TEXT("Failed to activate next normal attack segment from segment %d."), NormalAttackSegment));
+		World->GetTimerManager().SetTimerForNextTick(this, &UTwoHeartsGA_NormalAttackBase::HandleDeferredNextSegmentActivation);
+		RecordAbilityEvent(
+			TEXT("AdvanceSegmentDeferred"),
+			FString::Printf(
+				TEXT("Queued deferred activation from segment %d to next segment tag %s."),
+				NormalAttackSegment,
+				*NextSegmentAbilityTag.ToString()),
+			true);
 		return;
 	}
 
-	RecordAbilityEvent(
-		TEXT("AdvanceSegment"),
-		FString::Printf(TEXT("Advancing from segment %d to next segment tag %s."), NormalAttackSegment, *NextSegmentAbilityTag.ToString()),
-		true);
+	AttemptDeferredNextSegmentActivation();
 }
 
 void UTwoHeartsGA_NormalAttackBase::UpdateDebugState(bool bShouldBeActive) const
@@ -379,10 +388,11 @@ void UTwoHeartsGA_NormalAttackBase::RecordAbilityFailure(const TCHAR* EventName,
 	UE_LOG(
 		LogtwoheartsCombatTest,
 		Warning,
-		TEXT("[GameplayAbility] ability=%s owner=%s avatar=%s detail=\"%s\""),
+		TEXT("[GameplayAbility] ability=%s owner=%s avatar=%s event=%s detail=\"%s\""),
 		*GetNameSafe(GetClass()),
 		*GetNameSafe(GetAbilityOwnerActor()),
 		*GetNameSafe(GetAbilityAvatarActor()),
+		EventName,
 		*Detail);
 }
 
@@ -529,6 +539,7 @@ void UTwoHeartsGA_NormalAttackBase::ClearPhaseFallbackTimers()
 		World->GetTimerManager().ClearTimer(ActivePhaseFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(RecoveryPhaseFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(LogicEndedFallbackTimerHandle);
+		World->GetTimerManager().ClearTimer(DeferredNextSegmentActivationTimerHandle);
 	}
 }
 
@@ -551,4 +562,106 @@ void UTwoHeartsGA_NormalAttackBase::SchedulePhaseFallbacks(float SectionLength)
 bool UTwoHeartsGA_NormalAttackBase::IsLogicEndedPhase() const
 {
 	return CurrentCombatPhase == ETwoHeartsCombatPhase::LogicEnded;
+}
+
+void UTwoHeartsGA_NormalAttackBase::HandleDeferredNextSegmentActivation()
+{
+	AttemptDeferredNextSegmentActivation();
+}
+
+void UTwoHeartsGA_NormalAttackBase::AttemptDeferredNextSegmentActivation()
+{
+	UAbilitySystemComponent* AbilitySystemComponent = GetTwoHeartsAbilitySystemComponent();
+	const FGameplayTag NextAbilityTag = PendingNextSegmentAbilityTag;
+	const int32 SourceSegment = PendingNextSegmentSourceSegment;
+
+	PendingNextSegmentAbilityTag = FGameplayTag();
+	PendingNextSegmentSourceSegment = 0;
+
+	if (!AbilitySystemComponent || !NextAbilityTag.IsValid())
+	{
+		UpdateDebugState(false);
+		RecordAbilityFailure(
+			TEXT("AdvanceSegmentFailed"),
+			FString::Printf(
+				TEXT("Deferred next-segment activation from segment %d aborted because ability system or next tag was invalid."),
+				SourceSegment));
+		return;
+	}
+
+	TArray<FString> MatchingAbilityNames;
+	TArray<FString> ActivationFailureReasons;
+	bool bAttemptedActivation = false;
+
+	auto BuildFailureReason = [](const FGameplayTagContainer& FailureTags) -> FString
+	{
+		return FailureTags.IsEmpty()
+			? TEXT("CanActivateAbility returned false with no failure tags.")
+			: FString::Printf(TEXT("Blocked by tags: %s"), *FailureTags.ToStringSimple());
+	};
+
+	for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
+	{
+		if (!AbilitySpec.Ability || !AbilitySpec.Ability->GetAssetTags().HasTagExact(NextAbilityTag))
+		{
+			continue;
+		}
+
+		MatchingAbilityNames.Add(GetNameSafe(AbilitySpec.Ability));
+		bAttemptedActivation = true;
+
+		FGameplayTagContainer FailureTags;
+		const bool bCanActivate = AbilitySpec.Ability->CanActivateAbility(
+			AbilitySpec.Handle,
+			AbilitySystemComponent->AbilityActorInfo.Get(),
+			nullptr,
+			nullptr,
+			&FailureTags);
+
+		if (!bCanActivate)
+		{
+			ActivationFailureReasons.Add(
+				FString::Printf(TEXT("%s -> %s"), *GetNameSafe(AbilitySpec.Ability), *BuildFailureReason(FailureTags)));
+			continue;
+		}
+
+		if (AbilitySystemComponent->TryActivateAbility(AbilitySpec.Handle))
+		{
+			RecordAbilityEvent(
+				TEXT("AdvanceSegment"),
+				FString::Printf(
+					TEXT("Advanced from segment %d to %s via deferred activation."),
+					SourceSegment,
+					*GetNameSafe(AbilitySpec.Ability)),
+				true);
+			return;
+		}
+
+		ActivationFailureReasons.Add(
+			FString::Printf(
+				TEXT("%s -> TryActivateAbility failed after CanActivateAbility succeeded."),
+				*GetNameSafe(AbilitySpec.Ability)));
+	}
+
+	UpdateDebugState(false);
+
+	if (!bAttemptedActivation)
+	{
+		RecordAbilityFailure(
+			TEXT("AdvanceSegmentFailed"),
+			FString::Printf(
+				TEXT("Deferred next-segment activation from segment %d found no ability with tag %s."),
+				SourceSegment,
+				*NextAbilityTag.ToString()));
+		return;
+	}
+
+	RecordAbilityFailure(
+		TEXT("AdvanceSegmentFailed"),
+		FString::Printf(
+			TEXT("Failed to activate next normal attack segment from segment %d. Tag=%s. Matching=%s. Reasons=%s"),
+			SourceSegment,
+			*NextAbilityTag.ToString(),
+			MatchingAbilityNames.IsEmpty() ? TEXT("None") : *FString::Join(MatchingAbilityNames, TEXT(", ")),
+			ActivationFailureReasons.IsEmpty() ? TEXT("None") : *FString::Join(ActivationFailureReasons, TEXT(" | "))));
 }

@@ -317,6 +317,7 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 	{
 		InputEvaluation.Result = ETwoHeartsCombatInputEvaluationResult::ExecuteNow;
 		InputEvaluation.IncomingActionType = IncomingActionType;
+		InputEvaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ActivateMatchingAbility;
 		InputEvaluation.Reason = TEXT("No combat action context component was available; falling back to immediate activation.");
 	}
 
@@ -751,6 +752,22 @@ bool AtwoheartsCharacter::HandleBufferedCombatInput(ETwoHeartsAbilityInputID Inp
 				FString::Printf(TEXT("Forwarded buffered input to active ability %s."), *GetNameSafe(AbilitySpec.Ability)),
 				true);
 		}
+	}
+
+	if (InputEvaluation.ConsumptionRoute == ETwoHeartsCombatInputConsumptionRoute::ForwardToActiveAbility
+		&& !bForwardedToActiveAbility)
+	{
+		const FString ForwardFailureDetail = FString::Printf(
+			TEXT("%s Input=%s expected forwarding to the active ability, but no matching active ability instance was found."),
+			*InputEvaluation.Reason,
+			*InputName);
+		RecordAbilityInputFailure(InputID, TEXT("ForwardToActiveAbilityFailed"), ForwardFailureDetail);
+		RecordCombatInputDebugEvent(
+			InputName,
+			GetCombatInputEvaluationResultName(InputEvaluation.Result),
+			GetCombatInputConsumptionRouteName(InputEvaluation.ConsumptionRoute),
+			ForwardFailureDetail);
+		return false;
 	}
 
 	const FString BufferDetail = bForwardedToActiveAbility

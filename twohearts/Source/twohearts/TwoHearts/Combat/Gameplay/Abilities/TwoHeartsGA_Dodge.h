@@ -39,6 +39,8 @@ public:
 private:
 	UTwoHeartsGA_NormalAttackBase* FindActiveNormalAttackAbility() const;
 	UTwoHeartsCombatActionContextComponent* GetCombatActionContextComponent() const;
+	bool CanStartDodgeExecution() const;
+	bool CanInterruptCurrentActionByDodge() const;
 	bool TryInterruptCurrentActionByDodge();
 	bool ResolveDodgeDirection(FVector& OutDirection, FString& OutDirectionName) const;
 	bool StartDodgeExecution();

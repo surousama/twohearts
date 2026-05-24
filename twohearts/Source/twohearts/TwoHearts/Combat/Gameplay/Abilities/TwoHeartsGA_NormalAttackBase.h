@@ -94,9 +94,13 @@ private:
 	UFUNCTION()
 	void HandleFallbackEnterLogicEnded();
 
+	UFUNCTION()
+	void HandleDeferredNextSegmentActivation();
+
 	bool CanQueueNextSegment() const;
 	bool StartSegmentPlayback();
 	void FinishSegment(bool bWasCancelled);
+	void AttemptDeferredNextSegmentActivation();
 	void UpdateDebugState(bool bIsActive) const;
 	void RecordAbilityEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false) const;
 	void RecordAbilityFailure(const TCHAR* EventName, const FString& Detail) const;
@@ -123,4 +127,7 @@ private:
 	FTimerHandle ActivePhaseFallbackTimerHandle;
 	FTimerHandle RecoveryPhaseFallbackTimerHandle;
 	FTimerHandle LogicEndedFallbackTimerHandle;
+	FTimerHandle DeferredNextSegmentActivationTimerHandle;
+	FGameplayTag PendingNextSegmentAbilityTag;
+	int32 PendingNextSegmentSourceSegment = 0;
 };

@@ -45,12 +45,6 @@ void UTwoHeartsGA_Dodge::ActivateAbility(
 	bHasReceivedInvulnerabilityEndNotify = false;
 	bShouldRestoreCharacterState = false;
 
-	if (!TryInterruptCurrentActionByDodge())
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-
 	if (!ResolveDodgeDirection(DodgeDirection, DodgeDirectionName))
 	{
 		RecordDodgeEvent(TEXT("DodgeRejected"), TEXT("Failed to resolve a valid dodge direction."), true);
@@ -58,9 +52,27 @@ void UTwoHeartsGA_Dodge::ActivateAbility(
 		return;
 	}
 
+	if (!CanStartDodgeExecution())
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+	if (!CanInterruptCurrentActionByDodge())
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		RecordDodgeEvent(TEXT("DodgeRejected"), TEXT("CommitAbility failed."), true);
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+	if (!TryInterruptCurrentActionByDodge())
+	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -115,6 +127,76 @@ UTwoHeartsCombatActionContextComponent* UTwoHeartsGA_Dodge::GetCombatActionConte
 	}
 
 	return nullptr;
+}
+
+bool UTwoHeartsGA_Dodge::CanStartDodgeExecution() const
+{
+	const AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter());
+	const UAbilitySystemComponent* AbilitySystemComponent = GetTwoHeartsAbilitySystemComponent();
+	const FTwoHeartsDodgeConfig* DodgeConfig = GetDodgeConfig();
+	UAnimMontage* DodgeMontage = ResolveDodgeMontage();
+	if (!Character || !AbilitySystemComponent || !DodgeConfig)
+	{
+		RecordDodgeEvent(TEXT("DodgeRejected"), TEXT("Character, ability system component, or dodge config is invalid."), true);
+		return false;
+	}
+
+	if (!DodgeMontage)
+	{
+		RecordDodgeEvent(TEXT("DodgeRejected"), TEXT("No dodge montage was configured for the resolved direction."), true);
+		return false;
+	}
+
+	if (!DodgeMontage->HasRootMotion())
+	{
+		RecordDodgeEvent(
+			TEXT("DodgeRejected"),
+			FString::Printf(TEXT("Selected dodge montage %s does not have Root Motion enabled."), *GetNameSafe(DodgeMontage)),
+			true);
+		return false;
+	}
+
+	return true;
+}
+
+bool UTwoHeartsGA_Dodge::CanInterruptCurrentActionByDodge() const
+{
+	const UTwoHeartsCombatActionContextComponent* ActionContextComponent = GetCombatActionContextComponent();
+	if (!ActionContextComponent || !ActionContextComponent->HasActiveAction())
+	{
+		return true;
+	}
+
+	const FTwoHeartsCombatActionContextSnapshot& CurrentContext = ActionContextComponent->GetCurrentContext();
+	if (CurrentContext.ActionType != ETwoHeartsCombatActionType::NormalAttack)
+	{
+		return true;
+	}
+
+	if (!ActionContextComponent->CanCurrentActionBeInterruptedBy(ETwoHeartsCombatActionType::Dodge))
+	{
+		RecordDodgeEvent(
+			TEXT("DodgeRejected"),
+			FString::Printf(
+				TEXT("Public action context rejected dodge interrupt for %s during phase %s."),
+				*CurrentContext.ActionInstanceName,
+				*StaticEnum<ETwoHeartsCombatPhase>()->GetNameStringByValue(static_cast<int64>(CurrentContext.ActionPhase))),
+			true);
+		return false;
+	}
+
+	if (!FindActiveNormalAttackAbility())
+	{
+		RecordDodgeEvent(
+			TEXT("DodgeRejected"),
+			FString::Printf(
+				TEXT("Public action context reported interruptible action %s but no active normal attack instance was found."),
+				*CurrentContext.ActionInstanceName),
+			true);
+		return false;
+	}
+
+	return true;
 }
 
 bool UTwoHeartsGA_Dodge::TryInterruptCurrentActionByDodge()
@@ -204,21 +286,6 @@ bool UTwoHeartsGA_Dodge::StartDodgeExecution()
 	bHasAppliedCleanup = false;
 	bHasReceivedInvulnerabilityBeginNotify = false;
 	bHasReceivedInvulnerabilityEndNotify = false;
-
-	if (!ActiveDodgeMontage)
-	{
-		RecordDodgeEvent(TEXT("DodgeRejected"), TEXT("No dodge montage was configured for the resolved direction."), true);
-		return false;
-	}
-
-	if (!ActiveDodgeMontage->HasRootMotion())
-	{
-		RecordDodgeEvent(
-			TEXT("DodgeRejected"),
-			FString::Printf(TEXT("Selected dodge montage %s does not have Root Motion enabled."), *GetNameSafe(ActiveDodgeMontage)),
-			true);
-		return false;
-	}
 
 	ApplyDodgeCooldown();
 	SyncCombatActionContextOnPhaseEntered(ETwoHeartsCombatPhase::Startup, TEXT("DodgeActivated"));
