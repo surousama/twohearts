@@ -957,14 +957,18 @@ bool AtwoheartsCharacter::TryConsumeReservedCombatInput(const FString& ConsumerN
 	ETwoHeartsAbilityInputID InputID = ETwoHeartsAbilityInputID::None;
 	if (!TryGetCombatInputIDForActionType(BufferedInput.IncomingActionType, InputID))
 	{
+		const bool bRestoredUnsupportedInput = CombatActionContextComponent->RestoreBufferedInput(
+			BufferedInput,
+			FString::Printf(TEXT("%s.UnsupportedActionType"), *ConsumerName));
 		RecordCombatInputDebugEvent(
 			TEXT("Unknown"),
 			TEXT("BufferedConsumeFailed"),
 			GetCombatInputConsumptionRouteName(BufferedInput.ConsumptionRoute),
 			FString::Printf(
-				TEXT("Buffered input consumer %s found unsupported action type %s."),
+				TEXT("Buffered input consumer %s found unsupported action type %s. Restored=%s."),
 				*ConsumerName,
-				*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(BufferedInput.IncomingActionType))));
+				*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(BufferedInput.IncomingActionType)),
+				bRestoredUnsupportedInput ? TEXT("true") : TEXT("false")));
 		return false;
 	}
 
@@ -976,13 +980,20 @@ bool AtwoheartsCharacter::TryConsumeReservedCombatInput(const FString& ConsumerN
 	ConsumedEvaluation.Reason = FString::Printf(TEXT("Buffered input was consumed by %s. OriginalReason=%s"), *ConsumerName, *BufferedInput.Reason);
 
 	const bool bConsumed = TryExecuteCombatInputNow(InputID, InputName, ConsumedEvaluation);
+	const bool bRestoredBufferedInput = !bConsumed
+		&& CombatActionContextComponent->RestoreBufferedInput(
+			BufferedInput,
+			FString::Printf(TEXT("%s.ActivationFailed"), *ConsumerName));
 	RecordCombatInputDebugEvent(
 		InputName,
 		bConsumed ? TEXT("BufferedConsumed") : TEXT("BufferedConsumeFailed"),
 		GetCombatInputConsumptionRouteName(ConsumedEvaluation.ConsumptionRoute),
 		bConsumed
 			? FString::Printf(TEXT("Buffered input was consumed successfully by %s."), *ConsumerName)
-			: FString::Printf(TEXT("Buffered input consumption by %s failed to activate a follow-up action."), *ConsumerName));
+			: FString::Printf(
+				TEXT("Buffered input consumption by %s failed to activate a follow-up action. Restored=%s."),
+				*ConsumerName,
+				bRestoredBufferedInput ? TEXT("true") : TEXT("false")));
 	return bConsumed;
 }
 

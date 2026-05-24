@@ -24,7 +24,8 @@
     "05-21-combat-semantic-layer-readiness",
     "05-23-normal-attack-weapon-switch",
     "05-24-combat-semantic-layer-postarchive-alignment",
-    "05-24-minimal-preinput-implementation"
+    "05-24-minimal-preinput-implementation",
+    "05-24-minimal-preinput-whitebox-test"
   ],
   "parent": null,
   "relatedFiles": [],

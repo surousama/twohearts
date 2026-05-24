@@ -236,6 +236,41 @@ bool UTwoHeartsCombatActionContextComponent::ConsumeBufferedInput(
 	return true;
 }
 
+bool UTwoHeartsCombatActionContextComponent::RestoreBufferedInput(
+	const FTwoHeartsBufferedCombatInput& InputToRestore,
+	const FString& Reason)
+{
+	if (!InputToRestore.bIsSet)
+	{
+		return false;
+	}
+
+	if (BufferedInput.bIsSet)
+	{
+		RecordContextEvent(
+			TEXT("RestoreBufferedInputSkipped"),
+			FString::Printf(
+				TEXT("reason=%s blocked_by=%s incoming=%s"),
+				*Reason,
+				*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(BufferedInput.IncomingActionType)),
+				*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(InputToRestore.IncomingActionType))));
+		return false;
+	}
+
+	BufferedInput = InputToRestore;
+	SyncBufferedInputToSnapshot();
+
+	RecordContextEvent(
+		TEXT("RestoreBufferedInput"),
+		FString::Printf(
+			TEXT("reason=%s input=%s route=%s original_reason=%s"),
+			*Reason,
+			*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(BufferedInput.IncomingActionType)),
+			*StaticEnum<ETwoHeartsCombatInputConsumptionRoute>()->GetNameStringByValue(static_cast<int64>(BufferedInput.ConsumptionRoute)),
+			*BufferedInput.Reason));
+	return true;
+}
+
 void UTwoHeartsCombatActionContextComponent::ClearBufferedInput(const FString& Reason)
 {
 	if (!BufferedInput.bIsSet)

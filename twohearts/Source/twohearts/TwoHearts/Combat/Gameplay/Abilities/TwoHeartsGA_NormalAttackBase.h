@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
 #include "TwoHearts/Combat/TwoHeartsCombatPhase.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGameplayAbility.h"
 #include "TwoHeartsGA_NormalAttackBase.generated.h"
@@ -102,6 +103,8 @@ private:
 	void FinishSegment(bool bWasCancelled);
 	void AttemptDeferredNextSegmentActivation();
 	bool TryConsumeLateBufferedNextSegment();
+	void ClearPendingLateBufferedInputRestore();
+	bool RestorePendingLateBufferedInput(const FString& Reason);
 	void UpdateDebugState(bool bIsActive) const;
 	void RecordAbilityEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false) const;
 	void RecordAbilityFailure(const TCHAR* EventName, const FString& Detail) const;
@@ -131,4 +134,6 @@ private:
 	FTimerHandle DeferredNextSegmentActivationTimerHandle;
 	FGameplayTag PendingNextSegmentAbilityTag;
 	int32 PendingNextSegmentSourceSegment = 0;
+	bool bHasPendingLateBufferedInputRestore = false;
+	FTwoHeartsBufferedCombatInput PendingLateBufferedInputToRestore;
 };

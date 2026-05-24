@@ -40,6 +40,7 @@ void UTwoHeartsGA_NormalAttackBase::ActivateAbility(
 	ActiveMontageTask = nullptr;
 	PendingNextSegmentAbilityTag = FGameplayTag();
 	PendingNextSegmentSourceSegment = 0;
+	ClearPendingLateBufferedInputRestore();
 
 	if (UWorld* World = GetWorld())
 	{
@@ -390,9 +391,12 @@ bool UTwoHeartsGA_NormalAttackBase::TryConsumeLateBufferedNextSegment()
 
 	if (BufferedInput.IncomingActionType != ETwoHeartsCombatActionType::NormalAttack)
 	{
-		ActionContextComponent->BufferInput(BufferedInput.IncomingActionType, BufferedInput.ConsumptionRoute, BufferedInput.Reason);
+		ActionContextComponent->RestoreBufferedInput(BufferedInput, TEXT("NormalAttackLateFollowUp.WrongActionType"));
 		return false;
 	}
+
+	PendingLateBufferedInputToRestore = BufferedInput;
+	bHasPendingLateBufferedInputRestore = true;
 
 	const FString Detail = FString::Printf(
 		TEXT("Consumed late buffered normal attack after segment %d; scheduling %s."),
@@ -637,6 +641,7 @@ void UTwoHeartsGA_NormalAttackBase::AttemptDeferredNextSegmentActivation()
 
 	if (!AbilitySystemComponent || !NextAbilityTag.IsValid())
 	{
+		RestorePendingLateBufferedInput(TEXT("NormalAttackAdvance.InvalidDeferredState"));
 		UpdateDebugState(false);
 		RecordAbilityFailure(
 			TEXT("AdvanceSegmentFailed"),
@@ -684,6 +689,7 @@ void UTwoHeartsGA_NormalAttackBase::AttemptDeferredNextSegmentActivation()
 
 		if (AbilitySystemComponent->TryActivateAbility(AbilitySpec.Handle))
 		{
+			ClearPendingLateBufferedInputRestore();
 			RecordAbilityEvent(
 				TEXT("AdvanceSegment"),
 				FString::Printf(
@@ -704,6 +710,7 @@ void UTwoHeartsGA_NormalAttackBase::AttemptDeferredNextSegmentActivation()
 
 	if (!bAttemptedActivation)
 	{
+		RestorePendingLateBufferedInput(TEXT("NormalAttackAdvance.NoMatchingAbility"));
 		RecordAbilityFailure(
 			TEXT("AdvanceSegmentFailed"),
 			FString::Printf(
@@ -713,6 +720,7 @@ void UTwoHeartsGA_NormalAttackBase::AttemptDeferredNextSegmentActivation()
 		return;
 	}
 
+	RestorePendingLateBufferedInput(TEXT("NormalAttackAdvance.TryActivateFailed"));
 	RecordAbilityFailure(
 		TEXT("AdvanceSegmentFailed"),
 		FString::Printf(
@@ -721,4 +729,44 @@ void UTwoHeartsGA_NormalAttackBase::AttemptDeferredNextSegmentActivation()
 			*NextAbilityTag.ToString(),
 			MatchingAbilityNames.IsEmpty() ? TEXT("None") : *FString::Join(MatchingAbilityNames, TEXT(", ")),
 			ActivationFailureReasons.IsEmpty() ? TEXT("None") : *FString::Join(ActivationFailureReasons, TEXT(" | "))));
+}
+
+void UTwoHeartsGA_NormalAttackBase::ClearPendingLateBufferedInputRestore()
+{
+	bHasPendingLateBufferedInputRestore = false;
+	PendingLateBufferedInputToRestore = FTwoHeartsBufferedCombatInput();
+}
+
+bool UTwoHeartsGA_NormalAttackBase::RestorePendingLateBufferedInput(const FString& Reason)
+{
+	if (!bHasPendingLateBufferedInputRestore)
+	{
+		return false;
+	}
+
+	UTwoHeartsCombatActionContextComponent* ActionContextComponent = GetCombatActionContextComponent();
+	AtwoheartsCharacter* Character = GetTwoHeartsCharacter();
+	const FTwoHeartsBufferedCombatInput BufferedInputToRestore = PendingLateBufferedInputToRestore;
+	ClearPendingLateBufferedInputRestore();
+
+	if (!ActionContextComponent)
+	{
+		return false;
+	}
+
+	const bool bRestored = ActionContextComponent->RestoreBufferedInput(BufferedInputToRestore, Reason);
+	if (Character)
+	{
+		Character->PushCombatInputDebugEvent(
+			TEXT("NormalAttack"),
+			bRestored ? TEXT("BufferedRestored") : TEXT("BufferedConsumeFailed"),
+			StaticEnum<ETwoHeartsCombatInputConsumptionRoute>()
+				? StaticEnum<ETwoHeartsCombatInputConsumptionRoute>()->GetNameStringByValue(static_cast<int64>(BufferedInputToRestore.ConsumptionRoute))
+				: TEXT("Unknown"),
+			bRestored
+				? FString::Printf(TEXT("Restored late buffered normal attack after deferred activation failure. Reason=%s."), *Reason)
+				: FString::Printf(TEXT("Late buffered normal attack could not be restored after deferred activation failure. Reason=%s."), *Reason));
+	}
+
+	return bRestored;
 }

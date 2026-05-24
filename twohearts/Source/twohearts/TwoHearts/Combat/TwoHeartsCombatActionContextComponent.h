@@ -215,6 +215,9 @@ public:
 	bool ConsumeBufferedInput(FTwoHeartsBufferedCombatInput& OutBufferedInput, const FString& ConsumerName);
 
 	UFUNCTION(BlueprintCallable, Category="Combat|Input Buffer")
+	bool RestoreBufferedInput(const FTwoHeartsBufferedCombatInput& InputToRestore, const FString& Reason);
+
+	UFUNCTION(BlueprintCallable, Category="Combat|Input Buffer")
 	void ClearBufferedInput(const FString& Reason);
 
 	UFUNCTION(BlueprintPure, Category="Combat|Action Context")
