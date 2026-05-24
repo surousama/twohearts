@@ -137,3 +137,36 @@ Refined combat input evaluation by separating evaluation result from consumption
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: 最小预输入正式实施
+
+**Date**: 2026-05-24
+**Task**: 最小预输入正式实施
+**Branch**: `master`
+
+### Summary
+
+完成最小预输入正式链路，打通普攻晚窗与 Dodge 后续输入的缓冲消费，并通过 UE 5.6 Editor Development 构建验证。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `767ace6` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

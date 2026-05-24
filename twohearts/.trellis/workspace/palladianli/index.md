@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 4
-- **Last Active**: 2026-05-23
+- **Total Sessions**: 5
+- **Last Active**: 2026-05-24
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~139 | Active |
+| `journal-1.md` | ~172 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | 日期 | 标题 | 提交 | 分支 |
 |---|------|-------|---------|--------|
+| 5 | 2026-05-24 | 最小预输入正式实施 | `767ace6` | `master` |
 | 4 | 2026-05-23 | Combat input evaluation polish wrap-up | `ede54cd` | `master` |
 | 3 | 2026-05-23 | 基础闪避语义桥接与打断统一 | `eb0a444` | `master` |
 | 2 | 2026-05-23 | 普通攻击语义桥接收尾 | `5024f1a` | `master` |
