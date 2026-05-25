@@ -13,6 +13,41 @@
 #include "twohearts.h"
 #include "twoheartsCharacter.h"
 
+namespace
+{
+void FinishDodgeCooldown(
+	TWeakObjectPtr<UAbilitySystemComponent> WeakAbilitySystemComponent,
+	TWeakObjectPtr<AtwoheartsCharacter> WeakCharacter)
+{
+	UAbilitySystemComponent* AbilitySystemComponent = WeakAbilitySystemComponent.Get();
+	if (!AbilitySystemComponent)
+	{
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Warning,
+			TEXT("[Dodge] event=DodgeCooldownClearFailed detail=\"Ability system component was invalid when cooldown timer completed.\""));
+		return;
+	}
+
+	AbilitySystemComponent->RemoveLooseGameplayTag(TAG_TwoHearts_Cooldown_Dodge);
+
+	if (AtwoheartsCharacter* Character = WeakCharacter.Get())
+	{
+		Character->SetDodgeDebugRuntimeState(
+			Character->IsDodgingDebugState(),
+			Character->IsDodgeInvulnerableDebugState(),
+			true,
+			Character->GetCurrentDodgeDirectionDebugState());
+		Character->PushDodgeDebugEvent(TEXT("DodgeCooldownReady"), TEXT("Dodge cooldown finished."));
+	}
+
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[Dodge] event=DodgeCooldownReady detail=\"Dodge cooldown finished and Cooldown.Dodge was removed from the ASC.\""));
+}
+}
+
 UTwoHeartsGA_Dodge::UTwoHeartsGA_Dodge()
 {
 	AddDefaultAssetTag(TAG_TwoHearts_Ability_Dodge);
@@ -433,15 +468,32 @@ void UTwoHeartsGA_Dodge::ApplyDodgeCooldown()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(DodgeCooldownTimerHandle);
-		World->GetTimerManager().SetTimer(DodgeCooldownTimerHandle, this, &UTwoHeartsGA_Dodge::HandleDodgeCooldownFinished, CooldownSeconds, false);
+
+		const TWeakObjectPtr<UAbilitySystemComponent> WeakAbilitySystemComponent(AbilitySystemComponent);
+		const TWeakObjectPtr<AtwoheartsCharacter> WeakCharacter(Cast<AtwoheartsCharacter>(GetAbilityCharacter()));
+		FTimerDelegate CooldownFinishedDelegate = FTimerDelegate::CreateLambda(
+			[WeakAbilitySystemComponent, WeakCharacter]()
+			{
+				FinishDodgeCooldown(WeakAbilitySystemComponent, WeakCharacter);
+			});
+		World->GetTimerManager().SetTimer(DodgeCooldownTimerHandle, CooldownFinishedDelegate, CooldownSeconds, false);
 	}
 }
 
 void UTwoHeartsGA_Dodge::ClearDodgeCooldown()
 {
-	if (UAbilitySystemComponent* AbilitySystemComponent = CachedAbilitySystemComponent.Get())
+	if (UWorld* World = GetWorld())
 	{
-		AbilitySystemComponent->RemoveLooseGameplayTag(TAG_TwoHearts_Cooldown_Dodge);
+		World->GetTimerManager().ClearTimer(DodgeCooldownTimerHandle);
+	}
+
+	if (UAbilitySystemComponent* CachedASC = CachedAbilitySystemComponent.Get())
+	{
+		CachedASC->RemoveLooseGameplayTag(TAG_TwoHearts_Cooldown_Dodge);
+	}
+	else if (UAbilitySystemComponent* LiveASC = GetTwoHeartsAbilitySystemComponent())
+	{
+		LiveASC->RemoveLooseGameplayTag(TAG_TwoHearts_Cooldown_Dodge);
 	}
 	else
 	{
@@ -728,12 +780,6 @@ void UTwoHeartsGA_Dodge::HandleMontageNotifyBegin(FName NotifyName, const FBranc
 	{
 		FinishDodge(false);
 	}
-}
-
-void UTwoHeartsGA_Dodge::HandleDodgeCooldownFinished()
-{
-	ClearDodgeCooldown();
-	RecordDodgeEvent(TEXT("DodgeCooldownReady"), TEXT("Dodge cooldown finished."));
 }
 
 void UTwoHeartsGA_Dodge::RestoreCharacterState()

@@ -73,9 +73,6 @@ private:
 	void HandleDodgeFinished();
 
 	UFUNCTION()
-	void HandleDodgeCooldownFinished();
-
-	UFUNCTION()
 	void HandleMontageCompleted();
 
 	UFUNCTION()
