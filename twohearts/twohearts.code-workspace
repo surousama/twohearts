@@ -26,21 +26,14 @@
             "**/Binaries/**": true,
             "**/DerivedDataCache/**": true,
             "**/Intermediate/**": true,
-            "**/Saved/**": true,
-            "**/UE_5.6/Engine/Binaries/**": true,
-            "**/UE_5.6/Engine/Intermediate/**": true,
-            "**/UE_5.6/Engine/Saved/**": true,
-            "**/UE_5.6/Engine/Source/ThirdParty/**": true,
-            "**/UE_5.6/Engine/Plugins/**/Binaries/**": true,
-            "**/UE_5.6/Engine/Plugins/**/Intermediate/**": true,
-            "**/UE_5.6/Engine/Plugins/**/Saved/**": true
+            "**/Saved/**": true
         },
         "typescript.tsc.autoDetect": "off",
         "npm.autoDetect": "off",
         "terminal.integrated.env.windows": {
-            "PATH": "H:\\UE_5.6\\Engine\\Binaries\\ThirdParty\\DotNet\\8.0.300\\win-x64;${env:PATH}",
-            "DOTNET_ROOT": "H:\\UE_5.6\\Engine\\Binaries\\ThirdParty\\DotNet\\8.0.300\\win-x64",
-            "DOTNET_HOST_PATH": "H:\\UE_5.6\\Engine\\Binaries\\ThirdParty\\DotNet\\8.0.300\\win-x64\\dotnet.exe",
+            "PATH": "${env:UE_ENGINE_ROOT}\\Engine\\Binaries\\ThirdParty\\DotNet\\8.0.300\\win-x64;${env:PATH}",
+            "DOTNET_ROOT": "${env:UE_ENGINE_ROOT}\\Engine\\Binaries\\ThirdParty\\DotNet\\8.0.300\\win-x64",
+            "DOTNET_HOST_PATH": "${env:UE_ENGINE_ROOT}\\Engine\\Binaries\\ThirdParty\\DotNet\\8.0.300\\win-x64\\dotnet.exe",
             "DOTNET_MULTILEVEL_LOOKUP": "0",
             "DOTNET_ROLL_FORWARD": "LatestMajor"
         },
@@ -57,15 +50,7 @@
             "**/Binaries/**": true,
             "**/DerivedDataCache/**": true,
             "**/Intermediate/**": true,
-            "**/Saved/**": true,
-            "**/UE_5.6/Engine/Binaries/**": true,
-            "**/UE_5.6/Engine/DerivedDataCache/**": true,
-            "**/UE_5.6/Engine/Intermediate/**": true,
-            "**/UE_5.6/Engine/Saved/**": true,
-            "**/UE_5.6/Engine/Source/ThirdParty/**": true,
-            "**/UE_5.6/Engine/Plugins/**/Binaries/**": true,
-            "**/UE_5.6/Engine/Plugins/**/Intermediate/**": true,
-            "**/UE_5.6/Engine/Plugins/**/Saved/**": true
+            "**/Saved/**": true
         },
         "search.exclude": {
             "**/Binaries": true,
