@@ -1,0 +1,7 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/combat/index.md", "reason": "审查时需要按战斗规范确认本轮没有破坏阶段边界与总框架。"}
+{"file": ".trellis/spec/project/current-progress.md", "reason": "审查时确认本轮仍属于第二章当前阶段允许的局部收口。"}
+{"file": ".trellis/spec/roles/senior-programmer.md", "reason": "按资深程序质量口径检查实现、调试口径和已知限制记录。"}
+{"file": ".trellis/tasks/05-19-chapter2-basic-combat/prd.md", "reason": "对照父 task 判断本轮是否越界改变阶段顺序。"}
+{"file": ".trellis/tasks/archive/2026-05/05-19-dodge-second-pass-polish/prd.md", "reason": "检查是否破坏既有 Dodge 方向和朝向规则。"}
+{"file": ".trellis/tasks/archive/2026-05/05-24-minimal-preinput-implementation/prd.md", "reason": "检查是否误伤最小预输入与 Dodge 后续输入承接链路。"}

@@ -1,0 +1,8 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/combat/index.md", "reason": "加载战斗规范索引，并继续追到 current-stage/system-framework，避免这次表现收口破坏第二章阶段边界。"}
+{"file": ".trellis/spec/project/current-progress.md", "reason": "确认当前已推进到最小预输入跑通后的阶段，不把本 task 扩成越界底座改造。"}
+{"file": ".trellis/spec/roles/lead-programmer.md", "reason": "保留主程序视角对模块边界、底座依赖和长期承载结构的约束。"}
+{"file": ".trellis/spec/roles/senior-programmer.md", "reason": "让执行者按资深程序口径直接实施，而不是回到模糊需求自行扩题。"}
+{"file": ".trellis/tasks/05-19-chapter2-basic-combat/prd.md", "reason": "读取父 task 的阶段背景和主顺序，确认这次只是最小预输入之后的局部手感收口。"}
+{"file": ".trellis/tasks/archive/2026-05/05-19-dodge-second-pass-polish/prd.md", "reason": "继承基础闪避方向与朝向的既有口径，避免回归先转身再闪。"}
+{"file": ".trellis/tasks/archive/2026-05/05-24-minimal-preinput-implementation/prd.md", "reason": "理解最小预输入已跑通后的输入承接背景，避免误改当前输入链路。"}

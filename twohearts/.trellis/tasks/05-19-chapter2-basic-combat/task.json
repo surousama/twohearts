@@ -25,7 +25,8 @@
     "05-23-normal-attack-weapon-switch",
     "05-24-combat-semantic-layer-postarchive-alignment",
     "05-24-minimal-preinput-implementation",
-    "05-24-minimal-preinput-whitebox-test"
+    "05-24-minimal-preinput-whitebox-test",
+    "05-25-dodge-post-move-animation-switch"
   ],
   "parent": null,
   "relatedFiles": [],
