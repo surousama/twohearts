@@ -142,20 +142,31 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 	if (CurrentContext.ActionType == ETwoHeartsCombatActionType::NormalAttack
 		&& IncomingActionType == ETwoHeartsCombatActionType::NormalAttack)
 	{
-		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::BufferInput;
-
 		if (CurrentContext.ActionPhase == ETwoHeartsCombatPhase::Startup
 			|| CurrentContext.ActionPhase == ETwoHeartsCombatPhase::Active)
 		{
+			Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::BufferInput;
 			Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ForwardToActiveAbility;
 			Evaluation.bShouldForwardToActiveAbility = true;
 			Evaluation.Reason = TEXT("Current normal attack can still consume combo queue input on the active ability.");
 			return Evaluation;
 		}
 
-		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ReserveForFutureBufferConsumer;
-		Evaluation.Reason = TEXT("Current normal attack accepted a late follow-up input for post-action buffered consumption.");
+		if (CurrentContext.ActionPhase == ETwoHeartsCombatPhase::Recovery && !CurrentContext.bHasLogicEnded)
+		{
+			Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::BufferInput;
+			Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ForwardToActiveAbility;
+			Evaluation.bShouldForwardToActiveAbility = true;
+			Evaluation.Reason = TEXT("Current normal attack is in its recovery combo handoff window and can still forward follow-up input to the active ability.");
+			return Evaluation;
+		}
+
+		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::Reject;
+		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::None;
+		Evaluation.bShouldForwardToActiveAbility = false;
+		Evaluation.Reason = TEXT("Current normal attack has already passed its combo handoff window.");
 		return Evaluation;
+
 	}
 
 	if (CurrentContext.ActionType == ETwoHeartsCombatActionType::Dodge)

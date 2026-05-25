@@ -233,3 +233,54 @@
    -> `normal-attack-semantic-bridge`
    -> `dodge-semantic-bridge-and-interrupt-unification`
    -> `combat-input-evaluation-preinput-hook`
+
+## 2026-05-25 格挡阶段入口评估
+
+1. 当前第二章的正式主顺序仍然成立：
+   普通攻击、闪避、公共战斗语义层、最小预输入已经完成首轮正式落地；
+   当前正在收口的是 `05-25-normal-attack-chain-continuity-polish` 这类局部手感问题。
+2. 主程序结论：
+   现在可以开始做“格挡前置拆分与入口规划”，
+   但还不建议把“基础格挡 Ability 正式实现”直接作为下一个立刻开工的子 task。
+3. 原因不是格挡方向错误，而是当前代码里还缺少“外来攻击 -> 玩家受击/伤害判定 -> 格挡改写结果”的最小闭环。
+   没有这个闭环，格挡只能停留在输入动作存在，无法形成可验收的战斗规则。
+4. 现有可复用前提已经具备：
+   `UTwoHeartsCombatActionContextComponent` 的 `ETwoHeartsCombatActionType` 已预留 `Guard`；
+   `ETwoHeartsAbilityInputID` 已预留 `Guard`；
+   `State.Action.Guard` Tag 已存在。
+5. 但格挡正式开工仍缺这些前提：
+   角色输入层尚未把 `Guard` 接到实际输入绑定；
+   还没有 `Ability.Guard` 对应的正式 Ability；
+   还没有最小敌人或攻击源去产生“可被格挡”的来袭事件；
+   还没有最小受击/伤害结果层去区分“命中 / 被格挡 / 穿透 / 失败”；
+   还没有攻击提示、命中时机和格挡成功反馈这一套最小验收口径。
+6. 因此，如果当前要为格挡继续拆子 task，更合理的顺序不是“先直接做 Guard Ability”，而是：
+   `minimal-hostile-attack-probe`
+   -> `player-hit-damage-minimum-loop`
+   -> `basic-guard-implementation`
+   -> `guard-feedback-and-whitebox-validation`
+7. 对这些候选子 task 的主程序定义如下：
+   `minimal-hostile-attack-probe`
+   目标：
+   提供一个最小敌方攻击来源，能稳定播出单段攻击、给出攻击时机，并把来袭事件送到玩家侧。
+   `player-hit-damage-minimum-loop`
+   目标：
+   在玩家侧建立最小命中结果闭环，至少能区分“正常吃招”和“后续可被格挡改写的命中入口”。
+   `basic-guard-implementation`
+   目标：
+   基于现有 `UE5 + GAS + C++` 结构接入 Guard 输入、Guard Ability、Guard 状态与最小判定窗口，正式把格挡纳入公共动作语义。
+   `guard-feedback-and-whitebox-validation`
+   目标：
+   补齐攻击前摇提示、格挡成功反馈、失败表现和白盒验收结论，确认格挡不是“逻辑存在但手感不可读”。
+8. 如果希望进一步细拆，也允许把 `minimal-hostile-attack-probe` 再拆成：
+   基础敌人承载；
+   单段攻击动作与命中时机；
+   攻击提示特效/提示语义。
+   但只有在这些内容已经明显超过单轮可验收工作量时才建议继续下拆。
+9. 当前不建议为了尽快开始格挡，而把“最小敌人 / 最小攻击 / 最小命中结果”伪装成格挡内部细节直接混做。
+   更好的做法是明确承认：它们其实是“受击与伤害”阶段的最小前置闭环，也是格挡能否成立的入口条件。
+10. 对应已正式创建的子 task 为：
+   `05-25-minimal-hostile-attack-probe`
+   -> `05-25-player-hit-damage-minimum-loop`
+   -> `05-25-basic-guard-implementation`
+   -> `05-25-guard-feedback-and-whitebox-validation`

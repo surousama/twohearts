@@ -40,6 +40,7 @@ void UTwoHeartsGA_NormalAttackBase::ActivateAbility(
 	ActiveMontageTask = nullptr;
 	PendingNextSegmentAbilityTag = FGameplayTag();
 	PendingNextSegmentSourceSegment = 0;
+	bHasOpenedNextSegmentAdvanceWindow = false;
 	ClearPendingLateBufferedInputRestore();
 
 	if (UWorld* World = GetWorld())
@@ -81,6 +82,7 @@ void UTwoHeartsGA_NormalAttackBase::InputPressed(
 	bHasQueuedNextSegment = true;
 	UpdateDebugState(true);
 	RecordAbilityEvent(TEXT("QueueNextSegment"), FString::Printf(TEXT("Queued next segment after %d."), NormalAttackSegment), true);
+	TryAdvanceToNextSegment(TEXT("ForwardedInput"), false);
 }
 
 void UTwoHeartsGA_NormalAttackBase::EndAbility(
@@ -186,6 +188,12 @@ void UTwoHeartsGA_NormalAttackBase::NotifyCombatPhaseByName(FName NotifyName)
 	if (NotifyName == LogicEndedPhaseNotifyName)
 	{
 		EnterCombatPhase(ETwoHeartsCombatPhase::LogicEnded, TEXT("MontageNotify"));
+		return;
+	}
+
+	if (NotifyName == NextSegmentAdvanceNotifyName)
+	{
+		OpenNextSegmentAdvanceWindow(TEXT("MontageNotify"), true);
 	}
 }
 
@@ -224,9 +232,17 @@ void UTwoHeartsGA_NormalAttackBase::HandleFallbackEnterLogicEnded()
 	EnterCombatPhase(ETwoHeartsCombatPhase::LogicEnded, TEXT("FallbackTime"));
 }
 
+void UTwoHeartsGA_NormalAttackBase::HandleFallbackOpenNextSegmentAdvanceWindow()
+{
+	OpenNextSegmentAdvanceWindow(TEXT("FallbackTime"), true);
+}
+
 bool UTwoHeartsGA_NormalAttackBase::CanQueueNextSegment() const
 {
-	const bool bCanAcceptQueueByPhase = CurrentCombatPhase == ETwoHeartsCombatPhase::Startup || CurrentCombatPhase == ETwoHeartsCombatPhase::Active;
+	const bool bCanAcceptQueueByPhase =
+		CurrentCombatPhase == ETwoHeartsCombatPhase::Startup
+		|| CurrentCombatPhase == ETwoHeartsCombatPhase::Active
+		|| CurrentCombatPhase == ETwoHeartsCombatPhase::Recovery;
 	return bCanAcceptQueueByPhase && !IsLogicEndedPhase() && NormalAttackSegment < 3 && NextSegmentAbilityTag.IsValid();
 }
 
@@ -429,6 +445,68 @@ void UTwoHeartsGA_NormalAttackBase::UpdateDebugState(bool bShouldBeActive) const
 	}
 }
 
+void UTwoHeartsGA_NormalAttackBase::OpenNextSegmentAdvanceWindow(const FString& Reason, bool bCanConsumeLateBufferedInput)
+{
+	if (bHasOpenedNextSegmentAdvanceWindow || !NextSegmentAbilityTag.IsValid() || NormalAttackSegment >= 3)
+	{
+		return;
+	}
+
+	bHasOpenedNextSegmentAdvanceWindow = true;
+	RecordAbilityEvent(
+		TEXT("AdvanceWindowOpened"),
+		FString::Printf(TEXT("Segment %d opened next-segment advance window. Reason=%s."), NormalAttackSegment, *Reason),
+		true);
+	TryAdvanceToNextSegment(Reason, bCanConsumeLateBufferedInput);
+}
+
+bool UTwoHeartsGA_NormalAttackBase::TryAdvanceToNextSegment(const FString& Reason, bool bCanConsumeLateBufferedInput)
+{
+	if (bHasFinishedSegment || !bHasOpenedNextSegmentAdvanceWindow || !NextSegmentAbilityTag.IsValid())
+	{
+		return false;
+	}
+
+	bool bConsumedLateBufferedNext = false;
+	if (!bHasQueuedNextSegment && bCanConsumeLateBufferedInput)
+	{
+		bConsumedLateBufferedNext = TryConsumeLateBufferedNextSegment();
+		if (bConsumedLateBufferedNext)
+		{
+			bHasQueuedNextSegment = true;
+		}
+	}
+
+	if (!bHasQueuedNextSegment)
+	{
+		return false;
+	}
+
+	RecordAbilityEvent(
+		TEXT("AdvanceSegmentReady"),
+		FString::Printf(
+			TEXT("Segment %d is advancing early. Reason=%s LateBuffered=%s."),
+			NormalAttackSegment,
+			*Reason,
+			bConsumedLateBufferedNext ? TEXT("true") : TEXT("false")),
+		true);
+
+	if (AtwoheartsCharacter* Character = GetTwoHeartsCharacter())
+	{
+		if (UAnimInstance* AnimInstance = Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr)
+		{
+			if (UAnimMontage* Montage = Character->GetNormalAttackMontage())
+			{
+				AnimInstance->Montage_Stop(0.05f, Montage);
+			}
+		}
+	}
+
+	EnterCombatPhase(ETwoHeartsCombatPhase::LogicEnded, FString::Printf(TEXT("AdvanceWindow.%s"), *Reason));
+	FinishSegment(false);
+	return true;
+}
+
 void UTwoHeartsGA_NormalAttackBase::RecordAbilityEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly) const
 {
 	if (AtwoheartsCharacter* Character = GetTwoHeartsCharacter())
@@ -600,6 +678,7 @@ void UTwoHeartsGA_NormalAttackBase::ClearPhaseFallbackTimers()
 		World->GetTimerManager().ClearTimer(ActivePhaseFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(RecoveryPhaseFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(LogicEndedFallbackTimerHandle);
+		World->GetTimerManager().ClearTimer(NextSegmentAdvanceFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(DeferredNextSegmentActivationTimerHandle);
 	}
 }
@@ -616,6 +695,7 @@ void UTwoHeartsGA_NormalAttackBase::SchedulePhaseFallbacks(float SectionLength)
 		FTimerManager& TimerManager = World->GetTimerManager();
 		TimerManager.SetTimer(ActivePhaseFallbackTimerHandle, this, &UTwoHeartsGA_NormalAttackBase::HandleFallbackEnterActive, SectionLength * ActivePhaseFallbackNormalizedTime, false);
 		TimerManager.SetTimer(RecoveryPhaseFallbackTimerHandle, this, &UTwoHeartsGA_NormalAttackBase::HandleFallbackEnterRecovery, SectionLength * RecoveryPhaseFallbackNormalizedTime, false);
+		TimerManager.SetTimer(NextSegmentAdvanceFallbackTimerHandle, this, &UTwoHeartsGA_NormalAttackBase::HandleFallbackOpenNextSegmentAdvanceWindow, SectionLength * NextSegmentAdvanceFallbackNormalizedTime, false);
 		TimerManager.SetTimer(LogicEndedFallbackTimerHandle, this, &UTwoHeartsGA_NormalAttackBase::HandleFallbackEnterLogicEnded, SectionLength * LogicEndedFallbackNormalizedTime, false);
 	}
 }

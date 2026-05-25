@@ -1,0 +1,4 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/roles/game-designer.md", "reason": "本任务当前以游戏设计师视角定义需求边界与验收口径"}
+{"file": ".trellis/spec/combat/current-stage.md", "reason": "确保普通攻击连续性优化仍服从第二章当前阶段顺序与边界"}
+{"file": ".trellis/spec/combat/system-framework.md", "reason": "确保普通攻击局部优化不与现有战斗系统框架冲突"}

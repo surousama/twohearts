@@ -28,7 +28,11 @@
     "05-24-minimal-preinput-whitebox-test",
     "05-25-dodge-post-move-animation-switch",
     "05-25-dodge-cooldown-stuck-fix",
-    "05-25-normal-attack-chain-continuity-polish"
+    "05-25-normal-attack-chain-continuity-polish",
+    "05-25-minimal-hostile-attack-probe",
+    "05-25-player-hit-damage-minimum-loop",
+    "05-25-guard-feedback-and-whitebox-validation",
+    "05-25-basic-guard-implementation"
   ],
   "parent": null,
   "relatedFiles": [],

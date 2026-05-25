@@ -64,6 +64,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase")
 	FName LogicEndedPhaseNotifyName = TEXT("CombatPhase_LogicEnded");
 
+	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase")
+	FName NextSegmentAdvanceNotifyName = TEXT("CombatPhase_AdvanceNextSegment");
+
 	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase", meta=(ClampMin="0.0", ClampMax="1.0"))
 	float ActivePhaseFallbackNormalizedTime = 0.20f;
 
@@ -72,6 +75,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase", meta=(ClampMin="0.0", ClampMax="1.0"))
 	float LogicEndedFallbackNormalizedTime = 0.85f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase", meta=(ClampMin="0.0", ClampMax="1.0"))
+	float NextSegmentAdvanceFallbackNormalizedTime = 0.70f;
 
 private:
 	UFUNCTION()
@@ -96,11 +102,16 @@ private:
 	void HandleFallbackEnterLogicEnded();
 
 	UFUNCTION()
+	void HandleFallbackOpenNextSegmentAdvanceWindow();
+
+	UFUNCTION()
 	void HandleDeferredNextSegmentActivation();
 
 	bool CanQueueNextSegment() const;
 	bool StartSegmentPlayback();
+	void OpenNextSegmentAdvanceWindow(const FString& Reason, bool bCanConsumeLateBufferedInput);
 	void FinishSegment(bool bWasCancelled);
+	bool TryAdvanceToNextSegment(const FString& Reason, bool bCanConsumeLateBufferedInput);
 	void AttemptDeferredNextSegmentActivation();
 	bool TryConsumeLateBufferedNextSegment();
 	void ClearPendingLateBufferedInputRestore();
@@ -131,9 +142,11 @@ private:
 	FTimerHandle ActivePhaseFallbackTimerHandle;
 	FTimerHandle RecoveryPhaseFallbackTimerHandle;
 	FTimerHandle LogicEndedFallbackTimerHandle;
+	FTimerHandle NextSegmentAdvanceFallbackTimerHandle;
 	FTimerHandle DeferredNextSegmentActivationTimerHandle;
 	FGameplayTag PendingNextSegmentAbilityTag;
 	int32 PendingNextSegmentSourceSegment = 0;
 	bool bHasPendingLateBufferedInputRestore = false;
+	bool bHasOpenedNextSegmentAdvanceWindow = false;
 	FTwoHeartsBufferedCombatInput PendingLateBufferedInputToRestore;
 };
