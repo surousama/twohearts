@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 7
+- **Total Sessions**: 8
 - **Last Active**: 2026-05-25
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~239 | Active |
+| `journal-1.md` | ~272 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | 日期 | 标题 | 提交 | 分支 |
 |---|------|-------|---------|--------|
+| 8 | 2026-05-25 | 修复 Dodge 冷却卡死 | `68a9127` | `master` |
 | 7 | 2026-05-25 | Normal attack weapon visual switching | `5a72375`, `5951f55` | `master` |
 | 6 | 2026-05-25 | Close minimal preinput whitebox test | `6989ad6` | `master` |
 | 5 | 2026-05-24 | 最小预输入正式实施 | `767ace6` | `master` |

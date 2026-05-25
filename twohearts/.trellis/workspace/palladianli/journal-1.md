@@ -237,3 +237,36 @@ Implemented character-side weapon visual switching, configured weapon assets and
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: 修复 Dodge 冷却卡死
+
+**Date**: 2026-05-25
+**Task**: 修复 Dodge 冷却卡死
+**Branch**: `master`
+
+### Summary
+
+修复 Dodge 首次成功后 Cooldown.Dodge 不回收的问题，稳定冷却清理路径并完成本地构建与 PIE 跑测通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `68a9127` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
