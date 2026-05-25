@@ -15,6 +15,8 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 class UAnimMontage;
+class UStaticMesh;
+class UStaticMeshComponent;
 class UTwoHeartsCombatActionContextComponent;
 enum class ETwoHeartsAbilityInputID : uint8;
 struct FInputActionValue;
@@ -130,6 +132,41 @@ struct FTwoHeartsCombatInputDebugEvent
 	FString Detail;
 };
 
+USTRUCT(BlueprintType)
+struct FTwoHeartsWeaponVisualConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Weapon")
+	TObjectPtr<UStaticMesh> WeaponMesh = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Weapon")
+	FName EquippedSocketName = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Weapon")
+	FTransform EquippedRelativeTransform = FTransform::Identity;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Weapon")
+	FName UnequippedSocketName = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Weapon")
+	FTransform UnequippedRelativeTransform = FTransform::Identity;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Weapon", meta=(ClampMin="0.0", UIMin="0.0"))
+	float MovementSpeedThreshold = 5.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Weapon")
+	bool bHideWhenUnequippedSocketMissing = true;
+};
+
+UENUM(BlueprintType)
+enum class ETwoHeartsWeaponVisualState : uint8
+{
+	Hidden = 0 UMETA(DisplayName="Hidden"),
+	Equipped UMETA(DisplayName="Equipped"),
+	Unequipped UMETA(DisplayName="Unequipped")
+};
+
 /**
  *  A simple player-controllable third person character
  *  Implements a controllable orbiting camera
@@ -152,6 +189,9 @@ class AtwoheartsCharacter : public ACharacter, public IAbilitySystemInterface
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UTwoHeartsCombatActionContextComponent> CombatActionContextComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UStaticMeshComponent> WeaponVisualComponent;
 	
 protected:
 
@@ -263,6 +303,12 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Input|Debug", meta=(AllowPrivateAccess="true"))
 	TArray<FTwoHeartsCombatInputDebugEvent> CombatInputDebugEvents;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Weapon", meta=(AllowPrivateAccess="true"))
+	FTwoHeartsWeaponVisualConfig WeaponVisualConfig;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Weapon", meta=(AllowPrivateAccess="true"))
+	ETwoHeartsWeaponVisualState CurrentWeaponVisualState = ETwoHeartsWeaponVisualState::Hidden;
+
 public:
 
 	/** Constructor */
@@ -342,6 +388,21 @@ public:
 	UFUNCTION(BlueprintPure, Category="Combat|Action Context")
 	UTwoHeartsCombatActionContextComponent* GetCombatActionContextComponent() const { return CombatActionContextComponent; }
 
+	UFUNCTION(BlueprintPure, Category="Combat|Weapon")
+	UStaticMeshComponent* GetWeaponVisualComponent() const { return WeaponVisualComponent; }
+
+	UFUNCTION(BlueprintPure, Category="Combat|Weapon")
+	const FTwoHeartsWeaponVisualConfig& GetWeaponVisualConfig() const { return WeaponVisualConfig; }
+
+	UFUNCTION(BlueprintPure, Category="Combat|Weapon")
+	ETwoHeartsWeaponVisualState GetCurrentWeaponVisualState() const { return CurrentWeaponVisualState; }
+
+	UFUNCTION(BlueprintPure, Category="Combat|Weapon")
+	bool IsWeaponShownAsEquipped() const { return CurrentWeaponVisualState == ETwoHeartsWeaponVisualState::Equipped; }
+
+	UFUNCTION(BlueprintCallable, Category="Combat|Weapon")
+	void RefreshWeaponVisualState();
+
 	UFUNCTION(BlueprintPure, Category="Combat|Normal Attack|Debug")
 	bool IsNormalAttackDebugPanelEnabled() const { return bShowNormalAttackDebugPanel; }
 
@@ -411,5 +472,9 @@ protected:
 	void RecordCombatInputDebugEvent(const FString& InputName, const FString& ResultName, const FString& RouteName, const FString& Detail);
 	bool ShouldEmitNormalAttackDebugLog(const TCHAR* EventName, bool bVerboseOnly) const;
 	void DrawNormalAttackDebugOverlay() const;
+	bool ShouldShowWeaponAsEquipped() const;
+	bool IsCharacterInMovingWeaponState() const;
+	void ApplyWeaponVisualState(ETwoHeartsWeaponVisualState NewState, bool bForceRefresh = false);
+	void AttachWeaponVisualToSocket(FName SocketName, const FTransform& RelativeTransform);
 };
 

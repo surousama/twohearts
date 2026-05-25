@@ -5,6 +5,7 @@
 #include "Abilities/GameplayAbility.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -124,6 +125,13 @@ AtwoheartsCharacter::AtwoheartsCharacter()
 	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AbilitySystemComponent->SetIsReplicated(true);
 	CombatActionContextComponent = CreateDefaultSubobject<UTwoHeartsCombatActionContextComponent>(TEXT("CombatActionContextComponent"));
+	WeaponVisualComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WeaponVisualComponent"));
+	WeaponVisualComponent->SetupAttachment(GetMesh());
+	WeaponVisualComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	WeaponVisualComponent->SetGenerateOverlapEvents(false);
+	WeaponVisualComponent->SetCanEverAffectNavigation(false);
+	WeaponVisualComponent->SetCastShadow(true);
+	WeaponVisualComponent->SetHiddenInGame(true);
 	PrimaryActorTick.bCanEverTick = true;
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
@@ -170,11 +178,14 @@ void AtwoheartsCharacter::BeginPlay()
 
 	InitializeAbilitySystem();
 	GrantDefaultCombatAbilities();
+	RefreshWeaponVisualState();
 }
 
 void AtwoheartsCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
+	RefreshWeaponVisualState();
 }
 
 void AtwoheartsCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -498,6 +509,112 @@ FString AtwoheartsCharacter::GetDesiredDodgeDirectionName() const
 	}
 
 	return TEXT("ForwardLeft");
+}
+
+void AtwoheartsCharacter::RefreshWeaponVisualState()
+{
+	if (!WeaponVisualComponent)
+	{
+		return;
+	}
+
+	if (!WeaponVisualConfig.WeaponMesh)
+	{
+		WeaponVisualComponent->SetStaticMesh(nullptr);
+		ApplyWeaponVisualState(ETwoHeartsWeaponVisualState::Hidden);
+		return;
+	}
+
+	if (WeaponVisualComponent->GetStaticMesh() != WeaponVisualConfig.WeaponMesh)
+	{
+		WeaponVisualComponent->SetStaticMesh(WeaponVisualConfig.WeaponMesh);
+	}
+
+	const ETwoHeartsWeaponVisualState DesiredState = ShouldShowWeaponAsEquipped()
+		? ETwoHeartsWeaponVisualState::Equipped
+		: ETwoHeartsWeaponVisualState::Unequipped;
+	ApplyWeaponVisualState(DesiredState);
+}
+
+bool AtwoheartsCharacter::ShouldShowWeaponAsEquipped() const
+{
+	if (CombatActionContextComponent)
+	{
+		const FTwoHeartsCombatActionContextSnapshot& CombatContext = CombatActionContextComponent->GetCurrentContext();
+		if (CombatContext.bIsActionActive && CombatContext.ActionType == ETwoHeartsCombatActionType::NormalAttack)
+		{
+			return true;
+		}
+	}
+
+	return !IsCharacterInMovingWeaponState();
+}
+
+bool AtwoheartsCharacter::IsCharacterInMovingWeaponState() const
+{
+	const float HorizontalSpeed = GetVelocity().Size2D();
+	const bool bHasMoveIntent = !CachedMoveInput.IsNearlyZero();
+	return bHasMoveIntent || HorizontalSpeed > WeaponVisualConfig.MovementSpeedThreshold;
+}
+
+void AtwoheartsCharacter::ApplyWeaponVisualState(ETwoHeartsWeaponVisualState NewState, bool bForceRefresh)
+{
+	if (!WeaponVisualComponent)
+	{
+		return;
+	}
+
+	if (!bForceRefresh && CurrentWeaponVisualState == NewState)
+	{
+		return;
+	}
+
+	CurrentWeaponVisualState = NewState;
+
+	if (NewState == ETwoHeartsWeaponVisualState::Hidden)
+	{
+		WeaponVisualComponent->SetHiddenInGame(true);
+		return;
+	}
+
+	if (NewState == ETwoHeartsWeaponVisualState::Equipped)
+	{
+		if (WeaponVisualConfig.EquippedSocketName.IsNone())
+		{
+			WeaponVisualComponent->SetHiddenInGame(true);
+			return;
+		}
+
+		AttachWeaponVisualToSocket(WeaponVisualConfig.EquippedSocketName, WeaponVisualConfig.EquippedRelativeTransform);
+		WeaponVisualComponent->SetHiddenInGame(false);
+		return;
+	}
+
+	if (WeaponVisualConfig.UnequippedSocketName.IsNone())
+	{
+		WeaponVisualComponent->SetHiddenInGame(WeaponVisualConfig.bHideWhenUnequippedSocketMissing);
+		if (!WeaponVisualConfig.bHideWhenUnequippedSocketMissing)
+		{
+			AttachWeaponVisualToSocket(WeaponVisualConfig.EquippedSocketName, WeaponVisualConfig.EquippedRelativeTransform);
+		}
+		return;
+	}
+
+	AttachWeaponVisualToSocket(WeaponVisualConfig.UnequippedSocketName, WeaponVisualConfig.UnequippedRelativeTransform);
+	WeaponVisualComponent->SetHiddenInGame(false);
+}
+
+void AtwoheartsCharacter::AttachWeaponVisualToSocket(FName SocketName, const FTransform& RelativeTransform)
+{
+	if (!WeaponVisualComponent || !GetMesh() || SocketName.IsNone())
+	{
+		return;
+	}
+
+	WeaponVisualComponent->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
+	WeaponVisualComponent->SetRelativeLocation(RelativeTransform.GetLocation());
+	WeaponVisualComponent->SetRelativeRotation(RelativeTransform.GetRotation().Rotator());
+	WeaponVisualComponent->SetRelativeScale3D(RelativeTransform.GetScale3D());
 }
 
 UAnimMontage* AtwoheartsCharacter::GetDodgeMontageForDirection(const FString& DirectionName) const
