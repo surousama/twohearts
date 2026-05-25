@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/combat/index.md", "reason": "确保这次修复仍服从第二章当前战斗阶段边界，不把冷却问题扩成无关底座重做。"}
+{"file": ".trellis/spec/implementation/index.md", "reason": "保持Dodge冷却修复继续沿用UE5 + GAS + C++正式承载，不回退成Character临时状态机。"}
+{"file": ".trellis/spec/roles/senior-programmer.md", "reason": "让执行者按资深程序口径收敛根因、真相源和调试口径。"}
+{"file": ".trellis/tasks/05-19-chapter2-basic-combat/prd.md", "reason": "读取父task的阶段背景，确认本轮只是基础战斗稳定性修复。"}
+{"file": ".trellis/tasks/archive/2026-05/05-21-dodge-resource-local-acceptance/info.md", "reason": "追溯Dodge冷却与HUD调试的既有验证口径，避免回归到不可定位失败原因的状态。"}
+{"file": ".trellis/tasks/archive/2026-05/05-23-dodge-semantic-bridge-and-interrupt-unification/prd.md", "reason": "检查现有Dodge生命周期、打断与公共动作上下文约束，避免修冷却时破坏既有承载。"}

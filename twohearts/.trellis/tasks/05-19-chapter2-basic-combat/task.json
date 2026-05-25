@@ -26,7 +26,9 @@
     "05-24-combat-semantic-layer-postarchive-alignment",
     "05-24-minimal-preinput-implementation",
     "05-24-minimal-preinput-whitebox-test",
-    "05-25-dodge-post-move-animation-switch"
+    "05-25-dodge-post-move-animation-switch",
+    "05-25-dodge-cooldown-stuck-fix",
+    "05-25-normal-attack-chain-continuity-polish"
   ],
   "parent": null,
   "relatedFiles": [],

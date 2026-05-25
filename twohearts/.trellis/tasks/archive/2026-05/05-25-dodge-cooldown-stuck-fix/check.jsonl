@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/combat/index.md", "reason": "审查冷却修复是否仍符合当前第二章战斗阶段边界。"}
+{"file": ".trellis/spec/implementation/index.md", "reason": "检查冷却真相源是否仍在正式C++承载路径内，没有散到蓝图或Character临时分支。"}
+{"file": ".trellis/spec/roles/senior-programmer.md", "reason": "按资深程序口径检查根因是否闭合、调试口径是否足够。"}
+{"file": ".trellis/tasks/archive/2026-05/05-21-dodge-resource-local-acceptance/info.md", "reason": "对照既有HUD与冷却联调口径，确认本轮修复后能重新稳定观察到冷却恢复。"}
+{"file": ".trellis/tasks/archive/2026-05/05-23-combat-semantic-layer-test-pass/info.md", "reason": "检查本轮是否误伤现有Dodge完成、打断、无敌帧与冷却的整体链路。"}
