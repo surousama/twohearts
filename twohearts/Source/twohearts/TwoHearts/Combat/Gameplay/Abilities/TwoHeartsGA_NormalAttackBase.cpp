@@ -35,6 +35,7 @@ void UTwoHeartsGA_NormalAttackBase::ActivateAbility(
 	bHasFinishedSegment = false;
 	bHasRegisteredCombatActionContext = false;
 	bPreserveDebugStateUntilNextSegment = false;
+	bAdvanceStopInProgress = false;
 	bInterruptedByDodge = false;
 	CurrentCombatPhase = ETwoHeartsCombatPhase::None;
 	ActiveMontageTask = nullptr;
@@ -204,11 +205,33 @@ void UTwoHeartsGA_NormalAttackBase::HandleMontageCompleted()
 
 void UTwoHeartsGA_NormalAttackBase::HandleMontageInterrupted()
 {
+	if (bAdvanceStopInProgress)
+	{
+		RecordAbilityEvent(
+			TEXT("AdvanceStopInterrupted"),
+			FString::Printf(
+				TEXT("Ignored montage interrupted callback while segment %d was intentionally stopping for early advance."),
+				NormalAttackSegment),
+			true);
+		return;
+	}
+
 	FinishSegment(true);
 }
 
 void UTwoHeartsGA_NormalAttackBase::HandleMontageCancelled()
 {
+	if (bAdvanceStopInProgress)
+	{
+		RecordAbilityEvent(
+			TEXT("AdvanceStopCancelled"),
+			FString::Printf(
+				TEXT("Ignored montage cancelled callback while segment %d was intentionally stopping for early advance."),
+				NormalAttackSegment),
+			true);
+		return;
+	}
+
 	FinishSegment(true);
 }
 
@@ -299,6 +322,29 @@ bool UTwoHeartsGA_NormalAttackBase::StartSegmentPlayback()
 	}
 
 	const float SectionLength = Character->GetNormalAttackSectionLength(NormalAttackSegment);
+	if (SectionLength <= 0.0f)
+	{
+		RecordAbilityFailure(
+			TEXT("PhaseFallbackMissing"),
+			FString::Printf(
+				TEXT("Segment %d resolved a non-positive section length from %s; fallback phase timers will not be scheduled."),
+				NormalAttackSegment,
+				*SectionName.ToString()));
+	}
+	else
+	{
+		RecordAbilityEvent(
+			TEXT("PhaseFallbackScheduled"),
+			FString::Printf(
+				TEXT("Segment %d scheduled fallback timers from section length %.3f (active=%.3f recovery=%.3f advance=%.3f logicEnded=%.3f)."),
+				NormalAttackSegment,
+				SectionLength,
+				SectionLength * ActivePhaseFallbackNormalizedTime,
+				SectionLength * RecoveryPhaseFallbackNormalizedTime,
+				SectionLength * NextSegmentAdvanceFallbackNormalizedTime,
+				SectionLength * LogicEndedFallbackNormalizedTime),
+			true);
+	}
 	SchedulePhaseFallbacks(SectionLength);
 
 	ActiveMontageTask->OnCompleted.AddDynamic(this, &UTwoHeartsGA_NormalAttackBase::HandleMontageCompleted);
@@ -317,6 +363,7 @@ void UTwoHeartsGA_NormalAttackBase::FinishSegment(bool bWasCancelled)
 	}
 
 	bHasFinishedSegment = true;
+	bAdvanceStopInProgress = false;
 	ClearPhaseFallbackTimers();
 
 	const FGameplayAbilitySpecHandle Handle = GetCurrentAbilitySpecHandle();
@@ -371,15 +418,13 @@ void UTwoHeartsGA_NormalAttackBase::FinishSegment(bool bWasCancelled)
 
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().SetTimerForNextTick(this, &UTwoHeartsGA_NormalAttackBase::HandleDeferredNextSegmentActivation);
 		RecordAbilityEvent(
-			TEXT("AdvanceSegmentDeferred"),
+			TEXT("AdvanceSegmentImmediate"),
 			FString::Printf(
-				TEXT("Queued deferred activation from segment %d to next segment tag %s."),
+				TEXT("Attempting immediate follow-up activation from segment %d to next segment tag %s after ending the current segment."),
 				NormalAttackSegment,
 				*NextSegmentAbilityTag.ToString()),
 			true);
-		return;
 	}
 
 	AttemptDeferredNextSegmentActivation();
@@ -497,7 +542,8 @@ bool UTwoHeartsGA_NormalAttackBase::TryAdvanceToNextSegment(const FString& Reaso
 		{
 			if (UAnimMontage* Montage = Character->GetNormalAttackMontage())
 			{
-				AnimInstance->Montage_Stop(0.05f, Montage);
+				bAdvanceStopInProgress = true;
+				AnimInstance->Montage_Stop(0.0f, Montage);
 			}
 		}
 	}

@@ -135,6 +135,7 @@ private:
 	bool bHasFinishedSegment = false;
 	bool bHasRegisteredCombatActionContext = false;
 	bool bPreserveDebugStateUntilNextSegment = false;
+	bool bAdvanceStopInProgress = false;
 	bool bInterruptedByDodge = false;
 	ETwoHeartsCombatPhase CurrentCombatPhase = ETwoHeartsCombatPhase::None;
 	TObjectPtr<UAbilityTask_PlayMontageAndWait> ActiveMontageTask;
