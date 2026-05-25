@@ -1,4 +1,25 @@
-# 首轮白盒测试报告
+# 最终白盒测试报告
+
+## 最终结论
+
+本 task 已完成。
+
+最终 PIE 复测确认：
+
+* `Dodge` 功能本身有效；
+* 最小预输入链路看起来符合当前正式实施目标；
+* 本轮对话中出现的“空闲 / 移动时按闪避完全无反馈”并不是当前业务代码回归，而是 Unreal Editor 实际加载的仍是旧版模块，导致运行态 HUD 与当前源码不一致。
+
+最终根因：
+
+* 工作区源码中的 `twoheartsDebugHUD.cpp` 已经包含 `Combat Debug / Public Action Context / Dodge / last_dodge_event`；
+* 但 PIE 当时实际运行的仍是旧版 `UnrealEditor-twohearts.dll`，HUD 仍显示旧文案 `Normal Attack Test Panel`；
+* 使用 `H:\\UE_5.6` 重编 `twoheartsEditor Win64 Development` 后，运行时模块追平当前源码，`Dodge` 与最小预输入恢复到正确观测结果。
+
+结论口径：
+
+* 本轮没有新增需要修改业务代码的正式问题；
+* 本轮新增的是一个调试流程经验：当运行态 HUD 文案与当前源码对不上时，必须先排除“PIE 正在跑旧 DLL / 旧构建产物”。
 
 ## 结论摘要
 
@@ -158,3 +179,10 @@
 1. Dodge 结束前输入普攻，确认 `buffered -> consumed` 是否稳定出现
 2. 普攻第 1 段晚到输入，确认是否稳定自动推进第 2 段
 3. 人为制造一次消费失败场景，观察 HUD 中 buffered slot 是否被直接清空
+
+## 本轮补充说明
+
+* 本次对话中一度误把“运行时跑旧模块”当成业务层回归方向，这是排查顺序错误，不应写成代码问题。
+* 当前工作区仍有与你本地联调相关的脏文件：
+  `Content/Chinese_Warrior/Animations/ABP/ABP_ChineseWarrior.uasset`
+  该文件不属于本轮 AI 文档收尾内容。
