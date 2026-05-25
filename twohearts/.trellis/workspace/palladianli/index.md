@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
-- **Last Active**: 2026-05-24
+- **Total Sessions**: 7
+- **Last Active**: 2026-05-25
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~172 | Active |
+| `journal-1.md` | ~239 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,8 @@
 <!-- @@@auto:session-history -->
 | # | 日期 | 标题 | 提交 | 分支 |
 |---|------|-------|---------|--------|
+| 7 | 2026-05-25 | Normal attack weapon visual switching | `5a72375`, `5951f55` | `master` |
+| 6 | 2026-05-25 | Close minimal preinput whitebox test | `6989ad6` | `master` |
 | 5 | 2026-05-24 | 最小预输入正式实施 | `767ace6` | `master` |
 | 4 | 2026-05-23 | Combat input evaluation polish wrap-up | `ede54cd` | `master` |
 | 3 | 2026-05-23 | 基础闪避语义桥接与打断统一 | `eb0a444` | `master` |

@@ -170,3 +170,70 @@ Refined combat input evaluation by separating evaluation result from consumption
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Close minimal preinput whitebox test
+
+**Date**: 2026-05-25
+**Task**: Close minimal preinput whitebox test
+**Branch**: `master`
+
+### Summary
+
+Validated that the dodge failure report was caused by PIE loading an outdated editor module, rebuilt twoheartsEditor with H:\UE_5.6, confirmed dodge and minimal preinput in PIE, updated the senior programmer guardrails, and archived the whitebox test task.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6989ad6` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 7: Normal attack weapon visual switching
+
+**Date**: 2026-05-25
+**Task**: Normal attack weapon visual switching
+**Branch**: `master`
+
+### Summary
+
+Implemented character-side weapon visual switching, configured weapon assets and sockets, and completed local validation for normal attack weapon display and movement pose switching.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5a72375` | (see git log) |
+| `5951f55` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
