@@ -19,3 +19,9 @@ If you're using Codex or another agent-capable tool, additional project-scoped h
 Managed by Trellis. Edits outside this block are preserved; edits inside may be overwritten by a future `trellis update`.
 
 <!-- TRELLIS:END -->
+
+## Project Local Notes
+
+- Windows PowerShell 5.1 下读取含中文的文本文件时，不要依赖默认 `Get-Content` 编码推断。
+- 优先使用 `.\Scripts\read_text.ps1 <path>` 读取文档、脚本、json/jsonl/toml/yaml。
+- 若必须使用原生命令，先在当前会话执行 `. .\.trellis\scripts\enable_utf8.ps1`，再显式写 `-Encoding UTF8`。

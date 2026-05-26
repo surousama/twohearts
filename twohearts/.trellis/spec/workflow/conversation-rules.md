@@ -29,10 +29,11 @@
 2. 不默认把全部项目文档读一遍
 3. 当前任务需要什么，就读什么
 4. 对 task 状态类请求，优先读取 `task.json`、`prd.md`、`info.md`、archive 记录与必要 spec，不为只读核对额外创建 task
-5. 在 Windows PowerShell 5.1 下读取中文 Markdown 时，优先使用 `Get-Content -Encoding UTF8`，不要依赖默认编码推断
-6. 若需要用 Python 输出中文文档内容，先显式设置 `PYTHONIOENCODING=utf-8`，避免标准输出按 `gbk` 写出后被误判为乱码
-7. 若当前终端仍频繁出现中文乱码，可先运行 `powershell -ExecutionPolicy Bypass -File .\.trellis\scripts\enable_utf8.ps1`，再执行 Trellis 脚本或人工排查命令
-8. 若当前在创建或改写 task，task 标题、`prd.md`、`info.md`、`research/`、提交确认提示等默认都使用中文；只有必要专有名词可保留英文
+5. 在 Windows PowerShell 5.1 下读取中文文本时，优先使用 `.\Scripts\read_text.ps1 <path>`，不要依赖默认 `Get-Content` 编码推断
+6. 若必须使用 PowerShell 原生命令读取文件，先在当前会话执行 `. .\.trellis\scripts\enable_utf8.ps1`，再显式写 `-Encoding UTF8`
+7. 若需要用 Python 输出中文文档内容，先显式设置 `PYTHONIOENCODING=utf-8`，避免标准输出按 `gbk` 写出后被误判为乱码
+8. 不要再建议使用 `powershell -ExecutionPolicy Bypass -File .\.trellis\scripts\enable_utf8.ps1` 作为“持久修复”；那只会影响子进程，不会把编码设置回写到当前终端
+9. 若当前在创建或改写 task，task 标题、`prd.md`、`info.md`、`research/`、提交确认提示等默认都使用中文；只有必要专有名词可保留英文
 
 ## 来源
 
