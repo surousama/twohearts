@@ -14,12 +14,18 @@ git status
 
 ## Step 2: 先判定当前角色，再读相关 spec
 
+在 Windows PowerShell 下读取中文文件时，优先使用：
+
+```powershell
+.\Scripts\read_text.ps1 <path>
+```
+
 至少读取：
 
-```bash
-cat .trellis/spec/workflow/index.md
-cat .trellis/spec/roles/index.md
-cat .trellis/spec/guides/index.md
+```powershell
+.\Scripts\read_text.ps1 .trellis/spec/workflow/index.md
+.\Scripts\read_text.ps1 .trellis/spec/roles/index.md
+.\Scripts\read_text.ps1 .trellis/spec/guides/index.md
 ```
 
 然后按任务类型补读：

@@ -7,6 +7,25 @@ description: "Initializes an AI development session by reading workflow guides, 
 
 Initialize a Trellis-managed development session. This platform has no session-start hook, so manually load the equivalent context by following these steps (each one mirrors a section the hook would otherwise inject).
 
+## Windows 读取约定
+
+在当前项目的 Windows PowerShell 环境里，读取中文 Markdown / 文本时不要再默认使用 `cat` / `Get-Content` 的系统默认编码。
+
+- 优先使用：
+  ```powershell
+  .\Scripts\read_text.ps1 <path>
+  ```
+- 若必须使用 PowerShell 原生命令，先执行：
+  ```powershell
+  . .\.trellis\scripts\enable_utf8.ps1
+  ```
+  再显式写：
+  ```powershell
+  Get-Content -Encoding UTF8 <path>
+  ```
+
+下面所有“读取文件”的步骤，在 Windows 下都按这个约定执行。
+
 ---
 
 ## Step 1: Current state
@@ -32,8 +51,8 @@ Discover packages + spec layers, then read each relevant index file.
 
 ```bash
 python ./.trellis/scripts/get_context.py --mode packages
-cat .trellis/spec/guides/index.md
-cat .trellis/spec/<package>/<layer>/index.md   # for each relevant layer
+.\Scripts\read_text.ps1 .trellis/spec/guides/index.md
+.\Scripts\read_text.ps1 .trellis/spec/<package>/<layer>/index.md   # Windows 下逐个读取每个 relevant layer
 ```
 
 Index files list the specific guideline docs to read when you actually start coding.

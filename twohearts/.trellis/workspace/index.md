@@ -55,8 +55,8 @@ python ./.trellis/scripts/init_developer.py <your-name>
    ```
 
 2. 阅读你的个人索引：
-   ```bash
-   cat .trellis/workspace/$(python ./.trellis/scripts/get_developer.py)/index.md
+   ```powershell
+   .\Scripts\read_text.ps1 ".trellis/workspace/$(python ./.trellis/scripts/get_developer.py)/index.md"
    ```
 
 ---

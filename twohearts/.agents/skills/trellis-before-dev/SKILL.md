@@ -19,10 +19,11 @@ description: "Discovers and injects project-specific coding guidelines from .tre
    ```
 
 3. **至少读取以下索引**
-   ```bash
-   cat .trellis/spec/workflow/index.md
-   cat .trellis/spec/roles/index.md
-   cat .trellis/spec/guides/index.md
+   Windows PowerShell 下读取中文文件时，优先使用：
+   ```powershell
+   .\Scripts\read_text.ps1 .trellis/spec/workflow/index.md
+   .\Scripts\read_text.ps1 .trellis/spec/roles/index.md
+   .\Scripts\read_text.ps1 .trellis/spec/guides/index.md
    ```
 
 4. **按角色补读**
