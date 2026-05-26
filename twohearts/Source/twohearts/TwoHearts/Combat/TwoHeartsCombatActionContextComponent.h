@@ -12,7 +12,8 @@ enum class ETwoHeartsCombatActionType : uint8
 	None = 0 UMETA(DisplayName="None"),
 	NormalAttack UMETA(DisplayName="NormalAttack"),
 	Dodge UMETA(DisplayName="Dodge"),
-	Guard UMETA(DisplayName="Guard")
+	Guard UMETA(DisplayName="Guard"),
+	HostileAttackProbe UMETA(DisplayName="HostileAttackProbe")
 };
 
 UENUM(BlueprintType)

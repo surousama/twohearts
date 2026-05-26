@@ -18,6 +18,7 @@ class UAnimMontage;
 class UStaticMesh;
 class UStaticMeshComponent;
 class UTwoHeartsCombatActionContextComponent;
+class UTwoHeartsHostileAttackReceiverComponent;
 enum class ETwoHeartsAbilityInputID : uint8;
 struct FInputActionValue;
 struct FTwoHeartsCombatInputEvaluation;
@@ -192,6 +193,9 @@ class AtwoheartsCharacter : public ACharacter, public IAbilitySystemInterface
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UStaticMeshComponent> WeaponVisualComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UTwoHeartsHostileAttackReceiverComponent> HostileAttackReceiverComponent;
 	
 protected:
 
@@ -387,6 +391,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Combat|Action Context")
 	UTwoHeartsCombatActionContextComponent* GetCombatActionContextComponent() const { return CombatActionContextComponent; }
+
+	UFUNCTION(BlueprintPure, Category="Combat|Hostile Attack")
+	UTwoHeartsHostileAttackReceiverComponent* GetHostileAttackReceiverComponent() const { return HostileAttackReceiverComponent; }
 
 	UFUNCTION(BlueprintPure, Category="Combat|Weapon")
 	UStaticMeshComponent* GetWeaponVisualComponent() const { return WeaponVisualComponent; }

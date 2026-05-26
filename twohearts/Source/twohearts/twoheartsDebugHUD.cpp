@@ -2,6 +2,7 @@
 
 #include "twoheartsDebugHUD.h"
 #include "twoheartsCharacter.h"
+#include "TwoHearts/Combat/Hostile/TwoHeartsHostileAttackReceiverComponent.h"
 #include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
 #include "CanvasItem.h"
 #include "Engine/Canvas.h"
@@ -66,7 +67,7 @@ void ATwoheartsDebugHUD::DrawHUD()
 		VisibleInputEvents.Add(&InputEvents[EventIndex]);
 	}
 
-	const float PanelHeight = 270.0f + (VisibleEvents.Num() * LineHeight) + (VisibleInputEvents.Num() * LineHeight * 2.0f);
+	const float PanelHeight = 360.0f + (VisibleEvents.Num() * LineHeight) + (VisibleInputEvents.Num() * LineHeight * 2.0f);
 	FCanvasTileItem Background(FVector2D(PanelX, PanelY), FVector2D(PanelWidth, PanelHeight), FLinearColor(0.02f, 0.02f, 0.02f, 0.78f));
 	Background.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(Background);
@@ -236,6 +237,59 @@ void ATwoheartsDebugHUD::DrawHUD()
 		CurrentY,
 		Character->GetLastDodgeDebugDetail().IsEmpty() ? MutedColor : TextColor);
 	CurrentY += LineHeight * 1.5f;
+
+	DrawDebugLine(TEXT("Incoming Hostile Attack"), PanelX + 12.0f, CurrentY, HeaderColor);
+	CurrentY += LineHeight;
+
+	if (const UTwoHeartsHostileAttackReceiverComponent* HostileAttackReceiver = Character->GetHostileAttackReceiverComponent())
+	{
+		if (!HostileAttackReceiver->HasReceivedHostileAttackSignal())
+		{
+			DrawDebugLine(TEXT("no_hostile_attack_signal_yet"), PanelX + 12.0f, CurrentY, MutedColor);
+			CurrentY += LineHeight * 1.5f;
+		}
+		else
+		{
+			const FTwoHeartsHostileAttackSignal& LastSignal = HostileAttackReceiver->GetLastSignal();
+			const UEnum* SignalEnum = StaticEnum<ETwoHeartsHostileAttackSignalType>();
+
+			DrawDebugLine(
+				FString::Printf(
+					TEXT("type=%s   attack=%s   hit_window=%s   contact=%s"),
+					SignalEnum ? *SignalEnum->GetNameStringByValue(static_cast<int64>(LastSignal.SignalType)) : TEXT("Unknown"),
+					*LastSignal.AttackInstanceName,
+					LastSignal.bIsHitWindowActive ? TEXT("YES") : TEXT("NO"),
+					LastSignal.bHasContact ? TEXT("YES") : TEXT("NO")),
+				PanelX + 12.0f,
+				CurrentY,
+				TextColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(
+					TEXT("source=%s   dir=(%.2f, %.2f, %.2f)"),
+					*GetNameSafe(LastSignal.SourceActor),
+					LastSignal.AttackDirection.X,
+					LastSignal.AttackDirection.Y,
+					LastSignal.AttackDirection.Z),
+				PanelX + 12.0f,
+				CurrentY,
+				TextColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(TEXT("detail=%s"), *LastSignal.Detail),
+				PanelX + 12.0f,
+				CurrentY,
+				MutedColor);
+			CurrentY += LineHeight * 1.5f;
+		}
+	}
+	else
+	{
+		DrawDebugLine(TEXT("hostile_attack_receiver=None"), PanelX + 12.0f, CurrentY, FailureColor);
+		CurrentY += LineHeight * 1.5f;
+	}
 
 	DrawDebugLine(TEXT("Recent Key Events"), PanelX + 12.0f, CurrentY, HeaderColor);
 	CurrentY += LineHeight;

@@ -20,6 +20,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
+#include "TwoHearts/Combat/Hostile/TwoHeartsHostileAttackReceiverComponent.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsAbilityGrant.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_NormalAttack_1.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_NormalAttack_2.h"
@@ -129,6 +130,7 @@ AtwoheartsCharacter::AtwoheartsCharacter()
 	AbilitySystemComponent->SetIsReplicated(true);
 	CombatActionContextComponent = CreateDefaultSubobject<UTwoHeartsCombatActionContextComponent>(TEXT("CombatActionContextComponent"));
 	WeaponVisualComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WeaponVisualComponent"));
+	HostileAttackReceiverComponent = CreateDefaultSubobject<UTwoHeartsHostileAttackReceiverComponent>(TEXT("HostileAttackReceiverComponent"));
 	WeaponVisualComponent->SetupAttachment(GetMesh());
 	WeaponVisualComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	WeaponVisualComponent->SetGenerateOverlapEvents(false);
