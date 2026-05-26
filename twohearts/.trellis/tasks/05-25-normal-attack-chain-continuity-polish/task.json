@@ -2,7 +2,7 @@
   "id": "normal-attack-chain-continuity-polish",
   "name": "normal-attack-chain-continuity-polish",
   "title": "普通攻击三段连续性优化",
-  "description": "优化普通攻击123三段之间的连续性感知与连段衔接需求",
+  "description": "优化普通攻击三段之间的连续性感知与连段衔接。",
   "status": "in_progress",
   "dev_type": null,
   "scope": null,

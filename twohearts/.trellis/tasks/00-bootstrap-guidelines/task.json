@@ -1,8 +1,8 @@
 {
   "id": "00-bootstrap-guidelines",
   "name": "00-bootstrap-guidelines",
-  "title": "Bootstrap Guidelines",
-  "description": "Fill in project development guidelines for AI agents",
+  "title": "基础规范引导",
+  "description": "为 AI 代理补齐项目开发规范",
   "status": "in_progress",
   "dev_type": "docs",
   "scope": null,
@@ -24,6 +24,6 @@
     ".trellis/spec/backend/",
     ".trellis/spec/frontend/"
   ],
-  "notes": "First-time setup task created by trellis init (fullstack project)",
+  "notes": "由 trellis init 创建的首次规范初始化 task（模板默认说明）",
   "meta": {}
 }

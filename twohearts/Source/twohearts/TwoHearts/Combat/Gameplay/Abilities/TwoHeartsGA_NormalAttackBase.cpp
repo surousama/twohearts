@@ -2,6 +2,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Animation/AnimCompositeBase.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimNotifies/AnimNotify.h"
@@ -11,6 +12,49 @@
 #include "TwoHearts/Combat/Gameplay/Tags/TwoHeartsGameplayTags.h"
 #include "twohearts.h"
 #include "twoheartsCharacter.h"
+
+namespace
+{
+FString BuildMontageSourceAnimSnapshot(const UAnimMontage* Montage, float PositionSeconds)
+{
+	if (!Montage)
+	{
+		return TEXT("SourceAnim=None");
+	}
+
+	TArray<FString> ActiveSegments;
+
+	for (const FSlotAnimationTrack& SlotTrack : Montage->SlotAnimTracks)
+	{
+		for (const FAnimSegment& AnimSegment : SlotTrack.AnimTrack.AnimSegments)
+		{
+			if (!AnimSegment.IsInRange(PositionSeconds))
+			{
+				continue;
+			}
+
+			const UAnimSequenceBase* AnimReference = AnimSegment.GetAnimReference();
+			ActiveSegments.Add(
+				FString::Printf(
+					TEXT("Slot=%s Anim=%s SegmentStart=%.3f SegmentEnd=%.3f AnimStart=%.3f AnimEnd=%.3f PlayRate=%.3f"),
+					*SlotTrack.SlotName.ToString(),
+					*GetNameSafe(AnimReference),
+					AnimSegment.StartPos,
+					AnimSegment.GetEndPos(),
+					AnimSegment.AnimStartTime,
+					AnimSegment.AnimEndTime,
+					AnimSegment.AnimPlayRate));
+		}
+	}
+
+	if (ActiveSegments.IsEmpty())
+	{
+		return TEXT("SourceAnim=NoneMatchedAtCurrentPosition");
+	}
+
+	return FString::Printf(TEXT("SourceAnim=[%s]"), *FString::Join(ActiveSegments, TEXT(" | ")));
+}
+}
 
 UTwoHeartsGA_NormalAttackBase::UTwoHeartsGA_NormalAttackBase()
 {
@@ -681,15 +725,17 @@ FString UTwoHeartsGA_NormalAttackBase::BuildMontageDebugSnapshot() const
 	const FName CurrentSectionName = SectionIndex != INDEX_NONE ? Montage->GetSectionName(SectionIndex) : NAME_None;
 	const float SectionLength = SectionIndex != INDEX_NONE ? Montage->GetSectionLength(SectionIndex) : 0.0f;
 	const float SectionNormalizedTime = SectionLength > KINDA_SMALL_NUMBER ? SectionLocalTime / SectionLength : 0.0f;
+	const FString SourceAnimSnapshot = BuildMontageSourceAnimSnapshot(Montage, PositionSeconds);
 	return FString::Printf(
-		TEXT("Montage=%s Position=%.3f Section=%s Local=%.3f Length=%.3f Normalized=%.3f IsPlaying=%s"),
+		TEXT("Montage=%s Position=%.3f Section=%s Local=%.3f Length=%.3f Normalized=%.3f IsPlaying=%s %s"),
 		*GetNameSafe(Montage),
 		PositionSeconds,
 		*CurrentSectionName.ToString(),
 		SectionLocalTime,
 		SectionLength,
 		SectionNormalizedTime,
-		AnimInstance->Montage_IsPlaying(Montage) ? TEXT("true") : TEXT("false"));
+		AnimInstance->Montage_IsPlaying(Montage) ? TEXT("true") : TEXT("false"),
+		*SourceAnimSnapshot);
 }
 
 AtwoheartsCharacter* UTwoHeartsGA_NormalAttackBase::GetTwoHeartsCharacter() const

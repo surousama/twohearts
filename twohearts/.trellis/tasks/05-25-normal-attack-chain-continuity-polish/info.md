@@ -80,29 +80,138 @@
 2. 先把第 1 段和第 2 段各配一个大致合理的位置，再进 PIE 看体感。
 3. 如果仍有停顿，再优先微调 Notify 位置，而不是先改程序逻辑。
 4. 只有当 Notify 位置已经合理，但停顿仍明显存在时，才考虑剩余问题是否主要来自动画资产尾巴本身过长。
-## 2026-05-26 Notify Probe Summary
+## 2026-05-26 Notify 探针总结
 
-1. This round added stronger runtime logs in normal attack ability and character debug flow, including:
+1. 本轮新增了更强的普攻运行时日志，覆盖：
    `PlaySegment`
    `MontageNotifyBegin`
    `MontageNotify`
    `AdvanceWindowOpened`
    `AdvanceSegmentReady`
    `AdvanceSegmentAttempt`
-   and a file log at `Saved/CombatDebug/normal-attack-debug.log`.
-2. File log verification confirmed runtime is playing the edited montage asset:
+   并新增文件日志：
+   `Saved/CombatDebug/normal-attack-debug.log`
+2. 文件日志已经确认，运行时播放的确实是本轮编辑过的 Montage 资源：
    `/Game/Chinese_Warrior/Animations/Combat_Montage/AM_Melee_NormalAttackCombo.AM_Melee_NormalAttackCombo`
-3. However, during the probe no `MontageNotifyBegin` or `MontageNotify` events were received at all.
-   This means the current normal-attack phase/advance logic is not being driven by the placed animation notify objects.
-4. Current behavior is still entirely driven by fallback timers:
-   `Attack_1` advance window opened at normalized time about `0.714` with `Reason=FallbackTime`
-   `Attack_2` advance window opened at normalized time about `0.703` with `Reason=FallbackTime`
-5. Because the notify callback never fires, editor-side timing changes on the current notify objects do not currently affect the combo handoff result.
-6. The most likely cause is notify type mismatch:
-   the current placed markers were created through `Add Notify -> New Notify...`
-   while code listens through `OnPlayMontageNotifyBegin`, which appears to require real montage notify / branching-point style events for this path.
-7. Next probe direction:
-   replace the current phase markers with true `Montage Notify` entries instead of `New Notify...`
-   prioritize `CombatPhase_AdvanceNextSegment`, `CombatPhase_Recovery`, and `CombatPhase_LogicEnded`
-   set `CombatPhase_AdvanceNextSegment` to `Branching Point`
-   rerun PIE and verify that file log now contains `MontageNotifyBegin`, `MontageNotify`, and `AdvanceWindowOpened ... Reason=MontageNotify`.
+3. 但这轮探针跑测里，没有收到任何：
+   `MontageNotifyBegin`
+   `MontageNotify`
+4. 这说明当前普攻阶段推进与提前切段逻辑，并没有被已经放置的动画 notify 对象驱动起来。
+5. 当前行为仍然完全由 fallback 定时器驱动：
+   `Attack_1` 的 advance window 大约在归一化时间 `0.714` 打开，原因为 `Reason=FallbackTime`
+   `Attack_2` 的 advance window 大约在归一化时间 `0.703` 打开，原因为 `Reason=FallbackTime`
+6. 因为 notify 回调根本没有触发，所以当前在编辑器里挪动这些 notify 对象的时机，并不会实际影响连段切换结果。
+7. 当前最可能的根因是 notify 类型不匹配：
+   现在放进去的标记是通过 `Add Notify -> New Notify...` 创建的；
+   但代码监听的是 `OnPlayMontageNotifyBegin`，这条链路看起来需要真正的 montage notify / branching-point 风格事件。
+8. 下一步探针方向应当是：
+   把现有 phase 标记替换成真正的 `Montage Notify`，而不是继续使用 `New Notify...`
+   优先处理 `CombatPhase_AdvanceNextSegment`、`CombatPhase_Recovery`、`CombatPhase_LogicEnded`
+   将 `CombatPhase_AdvanceNextSegment` 设为 `Branching Point`
+   然后重新跑一次 PIE，验证文件日志里是否出现：
+   `MontageNotifyBegin`
+   `MontageNotify`
+   `AdvanceWindowOpened ... Reason=MontageNotify`
+
+## 2026-05-26 Notify 修正执行单
+
+### 当前根因
+
+1. 现有代码监听的是 `UAnimInstance::OnPlayMontageNotifyBegin`。
+2. 本轮日志已经证明运行时确实在播放：
+   `/Game/Chinese_Warrior/Animations/Combat_Montage/AM_Melee_NormalAttackCombo.AM_Melee_NormalAttackCombo`
+3. 但整轮跑测里没有任何：
+   `MontageNotifyBegin`
+   `MontageNotify`
+4. 因此当前问题不是“代码没播到正确 Montage”，而是“当前 Montage 里的 phase / advance 标记类型不对，没走进这条 notify 回调链”。
+5. 现阶段最可信的修正方向就是：
+   把当前通过 `Add Notify -> New Notify...` 放进去的标记，替换成真正的 `Montage Notify`；
+   其中 `CombatPhase_AdvanceNextSegment` 优先设成 `Branching Point`。
+
+### 在 Unreal Editor 里的具体改法
+
+1. 打开：
+   `Content/Chinese_Warrior/Animations/Combat_Montage/AM_Melee_NormalAttackCombo`
+2. 先找到当前已经放进去的普通攻击 phase / advance 标记。
+   如果它们是通过 `Add Notify -> New Notify...` 创建的，先不要继续沿用。
+3. 在 Montage 的 Notify 轨道上重新添加真正的 `Montage Notify`。
+4. 需要优先补齐的名字：
+   `CombatPhase_Recovery`
+   `CombatPhase_LogicEnded`
+   `CombatPhase_AdvanceNextSegment`
+5. `CombatPhase_AdvanceNextSegment` 至少在 `Attack_1` 和 `Attack_2` 两段都要有。
+   `Attack_3` 没有后续段，通常不需要这个标记。
+6. `CombatPhase_AdvanceNextSegment` 的细节里优先检查：
+   `Montage Tick Type = Branching Point`
+7. `CombatPhase_Recovery` 与 `CombatPhase_LogicEnded` 也建议一并改成真正的 `Montage Notify`，避免当前阶段推进继续只靠 fallback。
+8. 名字必须和 C++ 完全一致，不能改大小写，也不要额外加前后缀：
+   `CombatPhase_Recovery`
+   `CombatPhase_LogicEnded`
+   `CombatPhase_AdvanceNextSegment`
+
+### 摆放口径
+
+1. `CombatPhase_AdvanceNextSegment`：
+   放在“主要攻击表达已经完成，但还没进入明显硬收尾”的位置。
+2. `CombatPhase_Recovery`：
+   放在角色开始进入可读收招 / 可被后续规则判断为恢复阶段的位置。
+3. `CombatPhase_LogicEnded`：
+   放在这一段逻辑上已经算结束、只剩尾巴表现的位置。
+4. 如果当前目标是先验证 notify 链路通不通，第一轮可以先不追求极致手感，只要顺序正确、时机大致合理即可。
+5. 先让 notify 真正进回调，再微调位置；不要在“错误的 notify 类型”上反复挪时间点。
+
+### 改完后的验证口径
+
+1. 重新进 PIE，连续按普攻，观察日志里必须出现：
+   `MontageNotifyBegin`
+   `MontageNotify`
+2. `AdvanceWindowOpened` 的原因应从：
+   `Reason=FallbackTime`
+   变成：
+   `Reason=MontageNotify`
+3. 若 `Recovery` / `LogicEnded` 也改对了，阶段推进日志应优先体现 notify 驱动，而不是只靠 fallback 定时器。
+4. 若改完后仍完全没有 `MontageNotifyBegin`，优先重新检查：
+   是否真的添加的是 `Montage Notify`
+   是否改的是 `AM_Melee_NormalAttackCombo`
+   是否保存了 Montage 和角色蓝图
+   是否 PIE 前完成了最新编译 / 资源保存
+
+### 本轮执行建议
+
+1. 先只修 notify 类型，不先改 C++。
+2. 第一轮至少把 `Attack_1`、`Attack_2` 的 `CombatPhase_AdvanceNextSegment` 换成正确类型。
+3. 同轮把 `CombatPhase_Recovery`、`CombatPhase_LogicEnded` 一并换掉，减少闪避打断继续被 fallback 掩盖的干扰。
+4. 跑完一次 PIE 后，把新的日志结果再对照：
+   是否出现 `MontageNotifyBegin`
+   是否出现 `AdvanceWindowOpened ... Reason=MontageNotify`
+   `1 -> 2`、`2 -> 3` 是否明显早于旧的段尾衔接
+
+## 2026-05-26 最终收口结论
+
+1. 本 task 当前目标已完成：
+   普攻 `1 -> 2 -> 3` 的切段不再依赖段尾 `FinishSegment`，而是由显式的 `CombatPhase_AdvanceNextSegment` notify 驱动。
+2. 第一类问题最终确认为资源时机问题，不是代码继续绕过预输入规则：
+   当 `CombatPhase_AdvanceNextSegment` 放得过早时，体感会像“连续点击后立刻连播两次普攻”；
+   将 notify 调整到“主攻击表达完成后、但未进入硬收尾”的位置后，衔接体感恢复正常。
+3. 第二类问题最终确认为视觉误判来源于 Montage 混合，不是段资源播错：
+   新增日志已经证明 `Segment2` 运行时实际命中的底层动画是
+   `AS_Melee_NormalAttack_02`
+   而不是 `AS_Melee_NormalAttack_01`。
+4. 第二段“看起来像第一段”的直接原因是：
+   第二段起手被 Montage 的混合表现吞掉；
+   将 Montage 的 `Blend In` 调小后，`AS_Melee_NormalAttack_02` 的上挑起手能够被正常读出。
+5. 当前任务范围内的可交付结论是：
+   `Montage Notify` 类型、notify 时机、以及 Montage 混合参数三者都已纳入正式联调口径。
+
+## 本轮最终验证结果
+
+1. 日志确认：
+   `Segment1` 对应 `AS_Melee_NormalAttack_01`
+   `Segment2` 对应 `AS_Melee_NormalAttack_02`
+   `Segment3` 对应 `AS_Melee_NormalAttack_03`
+2. `CombatPhase_AdvanceNextSegment` 已能够以 `Reason=MontageNotify` 打开切段窗口。
+3. 经过资源时机和 Montage 混合参数调整后：
+   `1 -> 2`
+   `2 -> 3`
+   的衔接体感恢复到当前任务可接受状态。
+4. 仍存在的其他战斗问题，建议另起 task 单独处理，不与本任务继续混写。

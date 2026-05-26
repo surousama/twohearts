@@ -9,6 +9,6 @@ try {
 } catch {
 }
 
-Write-Host "UTF-8 console mode enabled for this PowerShell session."
+Write-Host "已为当前 PowerShell 会话启用 UTF-8 控制台模式。"
 Write-Host "PYTHONIOENCODING=utf-8"
 Write-Host "PYTHONUTF8=1"

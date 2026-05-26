@@ -901,6 +901,16 @@ bool AtwoheartsCharacter::HandleBufferedCombatInput(ETwoHeartsAbilityInputID Inp
 {
 	const int32 NumericInputID = static_cast<int32>(InputID);
 	bool bForwardedToActiveAbility = false;
+	FGameplayTag ForwardTargetAbilityTag;
+	FString ForwardTargetInstanceName = TEXT("None");
+
+	if (InputEvaluation.ConsumptionRoute == ETwoHeartsCombatInputConsumptionRoute::ForwardToActiveAbility
+		&& CombatActionContextComponent)
+	{
+		const FTwoHeartsCombatActionContextSnapshot& CurrentContext = CombatActionContextComponent->GetCurrentContext();
+		ForwardTargetAbilityTag = CurrentContext.AbilityTag;
+		ForwardTargetInstanceName = CurrentContext.ActionInstanceName;
+	}
 
 	if (InputEvaluation.ConsumptionRoute == ETwoHeartsCombatInputConsumptionRoute::ForwardToActiveAbility)
 	{
@@ -911,13 +921,33 @@ bool AtwoheartsCharacter::HandleBufferedCombatInput(ETwoHeartsAbilityInputID Inp
 				continue;
 			}
 
+			if (ForwardTargetAbilityTag.IsValid()
+				&& (!AbilitySpec.Ability || !AbilitySpec.Ability->GetAssetTags().HasTagExact(ForwardTargetAbilityTag)))
+			{
+				RecordAbilityInputDebugEvent(
+					InputID,
+					TEXT("SkipForwardToNonContextAbility"),
+					FString::Printf(
+						TEXT("Skipped forwarding buffered input to active ability %s because current action context targets %s (%s)."),
+						*GetNameSafe(AbilitySpec.Ability),
+						*ForwardTargetInstanceName,
+						*ForwardTargetAbilityTag.ToString()),
+					true);
+				continue;
+			}
+
 			bForwardedToActiveAbility = true;
 			AbilitySystemComponent->AbilitySpecInputPressed(AbilitySpec);
 			RecordAbilityInputDebugEvent(
 				InputID,
 				TEXT("ForwardInputToActiveAbility"),
-				FString::Printf(TEXT("Forwarded buffered input to active ability %s."), *GetNameSafe(AbilitySpec.Ability)),
+				FString::Printf(
+					TEXT("Forwarded buffered input to active ability %s. ContextTarget=%s (%s)."),
+					*GetNameSafe(AbilitySpec.Ability),
+					*ForwardTargetInstanceName,
+					ForwardTargetAbilityTag.IsValid() ? *ForwardTargetAbilityTag.ToString() : TEXT("NoAbilityTag")),
 				true);
+			break;
 		}
 	}
 
