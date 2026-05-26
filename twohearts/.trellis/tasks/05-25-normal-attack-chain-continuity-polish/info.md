@@ -80,3 +80,29 @@
 2. 先把第 1 段和第 2 段各配一个大致合理的位置，再进 PIE 看体感。
 3. 如果仍有停顿，再优先微调 Notify 位置，而不是先改程序逻辑。
 4. 只有当 Notify 位置已经合理，但停顿仍明显存在时，才考虑剩余问题是否主要来自动画资产尾巴本身过长。
+## 2026-05-26 Notify Probe Summary
+
+1. This round added stronger runtime logs in normal attack ability and character debug flow, including:
+   `PlaySegment`
+   `MontageNotifyBegin`
+   `MontageNotify`
+   `AdvanceWindowOpened`
+   `AdvanceSegmentReady`
+   `AdvanceSegmentAttempt`
+   and a file log at `Saved/CombatDebug/normal-attack-debug.log`.
+2. File log verification confirmed runtime is playing the edited montage asset:
+   `/Game/Chinese_Warrior/Animations/Combat_Montage/AM_Melee_NormalAttackCombo.AM_Melee_NormalAttackCombo`
+3. However, during the probe no `MontageNotifyBegin` or `MontageNotify` events were received at all.
+   This means the current normal-attack phase/advance logic is not being driven by the placed animation notify objects.
+4. Current behavior is still entirely driven by fallback timers:
+   `Attack_1` advance window opened at normalized time about `0.714` with `Reason=FallbackTime`
+   `Attack_2` advance window opened at normalized time about `0.703` with `Reason=FallbackTime`
+5. Because the notify callback never fires, editor-side timing changes on the current notify objects do not currently affect the combo handoff result.
+6. The most likely cause is notify type mismatch:
+   the current placed markers were created through `Add Notify -> New Notify...`
+   while code listens through `OnPlayMontageNotifyBegin`, which appears to require real montage notify / branching-point style events for this path.
+7. Next probe direction:
+   replace the current phase markers with true `Montage Notify` entries instead of `New Notify...`
+   prioritize `CombatPhase_AdvanceNextSegment`, `CombatPhase_Recovery`, and `CombatPhase_LogicEnded`
+   set `CombatPhase_AdvanceNextSegment` to `Branching Point`
+   rerun PIE and verify that file log now contains `MontageNotifyBegin`, `MontageNotify`, and `AdvanceWindowOpened ... Reason=MontageNotify`.

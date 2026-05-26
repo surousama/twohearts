@@ -471,6 +471,9 @@ protected:
 	bool TryExecuteCombatInputNow(ETwoHeartsAbilityInputID InputID, const FString& InputName, const FTwoHeartsCombatInputEvaluation& InputEvaluation);
 	void RecordCombatInputDebugEvent(const FString& InputName, const FString& ResultName, const FString& RouteName, const FString& Detail);
 	bool ShouldEmitNormalAttackDebugLog(const TCHAR* EventName, bool bVerboseOnly) const;
+	FString GetCombatDebugLogFilePath() const;
+	void ResetCombatDebugLogFile();
+	void AppendCombatDebugLogLine(const FString& Line) const;
 	void DrawNormalAttackDebugOverlay() const;
 	bool ShouldShowWeaponAsEquipped() const;
 	bool IsCharacterInMovingWeaponState() const;

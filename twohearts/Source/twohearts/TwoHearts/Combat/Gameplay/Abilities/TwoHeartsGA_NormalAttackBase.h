@@ -119,6 +119,7 @@ private:
 	void UpdateDebugState(bool bIsActive) const;
 	void RecordAbilityEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly = false) const;
 	void RecordAbilityFailure(const TCHAR* EventName, const FString& Detail) const;
+	FString BuildMontageDebugSnapshot() const;
 	AtwoheartsCharacter* GetTwoHeartsCharacter() const;
 	UTwoHeartsCombatActionContextComponent* GetCombatActionContextComponent() const;
 	void SyncCombatActionContextOnPhaseEntered(ETwoHeartsCombatPhase NewPhase, const FString& Reason);

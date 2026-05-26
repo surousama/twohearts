@@ -124,11 +124,26 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 	Evaluation.ActiveActionType = CurrentContext.ActionType;
 	Evaluation.ActiveActionPhase = CurrentContext.ActionPhase;
 
+	auto FinalizeEvaluation = [this](FTwoHeartsCombatInputEvaluation&& InEvaluation) -> FTwoHeartsCombatInputEvaluation
+	{
+		RecordContextEvent(
+			TEXT("EvaluateInput"),
+			FString::Printf(
+				TEXT("incoming=%s result=%s route=%s forward=%s reason=%s context={%s}"),
+				*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(InEvaluation.IncomingActionType)),
+				*StaticEnum<ETwoHeartsCombatInputEvaluationResult>()->GetNameStringByValue(static_cast<int64>(InEvaluation.Result)),
+				*StaticEnum<ETwoHeartsCombatInputConsumptionRoute>()->GetNameStringByValue(static_cast<int64>(InEvaluation.ConsumptionRoute)),
+				InEvaluation.bShouldForwardToActiveAbility ? TEXT("true") : TEXT("false"),
+				*InEvaluation.Reason,
+				*BuildCurrentContextDebugString()));
+		return MoveTemp(InEvaluation);
+	};
+
 	if (IncomingActionType == ETwoHeartsCombatActionType::None)
 	{
 		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::Reject;
 		Evaluation.Reason = TEXT("Incoming action type was invalid.");
-		return Evaluation;
+		return FinalizeEvaluation(MoveTemp(Evaluation));
 	}
 
 	if (!CurrentContext.bIsActionActive)
@@ -136,7 +151,7 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::ExecuteNow;
 		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ActivateMatchingAbility;
 		Evaluation.Reason = TEXT("No active combat action is currently registered.");
-		return Evaluation;
+		return FinalizeEvaluation(MoveTemp(Evaluation));
 	}
 
 	if (CurrentContext.ActionType == ETwoHeartsCombatActionType::NormalAttack
@@ -149,7 +164,7 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 			Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ForwardToActiveAbility;
 			Evaluation.bShouldForwardToActiveAbility = true;
 			Evaluation.Reason = TEXT("Current normal attack can still consume combo queue input on the active ability.");
-			return Evaluation;
+			return FinalizeEvaluation(MoveTemp(Evaluation));
 		}
 
 		if (CurrentContext.ActionPhase == ETwoHeartsCombatPhase::Recovery && !CurrentContext.bHasLogicEnded)
@@ -158,14 +173,14 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 			Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ForwardToActiveAbility;
 			Evaluation.bShouldForwardToActiveAbility = true;
 			Evaluation.Reason = TEXT("Current normal attack is in its recovery combo handoff window and can still forward follow-up input to the active ability.");
-			return Evaluation;
+			return FinalizeEvaluation(MoveTemp(Evaluation));
 		}
 
 		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::Reject;
 		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::None;
 		Evaluation.bShouldForwardToActiveAbility = false;
 		Evaluation.Reason = TEXT("Current normal attack has already passed its combo handoff window.");
-		return Evaluation;
+		return FinalizeEvaluation(MoveTemp(Evaluation));
 
 	}
 
@@ -181,12 +196,12 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 			Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::BufferInput;
 			Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ReserveForFutureBufferConsumer;
 			Evaluation.Reason = TEXT("Current dodge accepted a buffered follow-up input for post-action consumption.");
-			return Evaluation;
+			return FinalizeEvaluation(MoveTemp(Evaluation));
 		}
 
 		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::Reject;
 		Evaluation.Reason = TEXT("Current dodge has not reached its buffered follow-up window yet.");
-		return Evaluation;
+		return FinalizeEvaluation(MoveTemp(Evaluation));
 	}
 
 	if (CanCurrentActionBeInterruptedBy(IncomingActionType))
@@ -194,12 +209,12 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::ExecuteNow;
 		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ActivateMatchingAbility;
 		Evaluation.Reason = TEXT("Current combat action can be interrupted by the incoming action.");
-		return Evaluation;
+		return FinalizeEvaluation(MoveTemp(Evaluation));
 	}
 
 	Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::Reject;
 	Evaluation.Reason = TEXT("Current combat action neither exposes a buffer window nor allows this interrupt.");
-	return Evaluation;
+	return FinalizeEvaluation(MoveTemp(Evaluation));
 }
 
 void UTwoHeartsCombatActionContextComponent::BufferInput(

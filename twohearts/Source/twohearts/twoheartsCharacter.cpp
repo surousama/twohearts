@@ -16,6 +16,9 @@
 #include "Engine/Engine.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "HAL/FileManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsAbilityGrant.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_NormalAttack_1.h"
@@ -176,6 +179,7 @@ void AtwoheartsCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	ResetCombatDebugLogFile();
 	InitializeAbilitySystem();
 	GrantDefaultCombatAbilities();
 	RefreshWeaponVisualState();
@@ -751,6 +755,23 @@ void AtwoheartsCharacter::RecordNormalAttackDebugEvent(const TCHAR* EventName, c
 		NormalAttackDebugEvents.RemoveAt(0, ExcessEvents);
 	}
 
+	const FNormalAttackDebugEvent& LoggedEvent = NormalAttackDebugEvents.Last();
+
+	AppendCombatDebugLogLine(
+		FString::Printf(
+			TEXT("[NormalAttack] time=%.3f event=%s segment=%d phase=%s attacking=%s queued_next=%s interruptible_by_dodge=%s logic_ended=%s section=%s verbose=%s detail=\"%s\""),
+			LoggedEvent.TimestampSeconds,
+			*LoggedEvent.EventName,
+			LoggedEvent.Segment,
+			*LoggedEvent.PhaseName,
+			LoggedEvent.bIsAttacking ? TEXT("true") : TEXT("false"),
+			LoggedEvent.bHasQueuedNextSegment ? TEXT("true") : TEXT("false"),
+			LoggedEvent.bInterruptibleByDodge ? TEXT("true") : TEXT("false"),
+			LoggedEvent.bLogicEnded ? TEXT("true") : TEXT("false"),
+			*LoggedEvent.SectionName,
+			LoggedEvent.bVerboseOnly ? TEXT("true") : TEXT("false"),
+			*LoggedEvent.Detail));
+
 	if (!bEnableNormalAttackDebugLogging)
 	{
 		return;
@@ -788,6 +809,12 @@ bool AtwoheartsCharacter::ShouldEmitNormalAttackDebugLog(const TCHAR* EventName,
 
 	const FString EventNameString = EventName;
 	return
+		EventNameString == TEXT("PlaySegment") ||
+		EventNameString == TEXT("MontageNotifyBegin") ||
+		EventNameString == TEXT("MontageNotify") ||
+		EventNameString == TEXT("AdvanceWindowOpened") ||
+		EventNameString == TEXT("AdvanceSegmentReady") ||
+		EventNameString == TEXT("AdvanceSegmentAttempt") ||
 		EventNameString == TEXT("EnterPhase") ||
 		EventNameString == TEXT("LogicEnded") ||
 		EventNameString == TEXT("InterruptCheck") ||
@@ -807,6 +834,12 @@ bool AtwoheartsCharacter::ShouldDisplayNormalAttackDebugEvent(const FNormalAttac
 	}
 
 	return
+		Event.EventName == TEXT("PlaySegment") ||
+		Event.EventName == TEXT("MontageNotifyBegin") ||
+		Event.EventName == TEXT("MontageNotify") ||
+		Event.EventName == TEXT("AdvanceWindowOpened") ||
+		Event.EventName == TEXT("AdvanceSegmentReady") ||
+		Event.EventName == TEXT("AdvanceSegmentAttempt") ||
 		Event.EventName == TEXT("EnterPhase") ||
 		Event.EventName == TEXT("LogicEnded") ||
 		Event.EventName == TEXT("InterruptCheck") ||
@@ -1130,6 +1163,17 @@ void AtwoheartsCharacter::RecordCombatInputDebugEvent(const FString& InputName, 
 		CombatInputDebugEvents.RemoveAt(0, ExcessEvents);
 	}
 
+	const FTwoHeartsCombatInputDebugEvent& LoggedEvent = CombatInputDebugEvents.Last();
+
+	AppendCombatDebugLogLine(
+		FString::Printf(
+			TEXT("[CombatInputEval] time=%.3f input=%s result=%s route=%s detail=\"%s\""),
+			LoggedEvent.TimestampSeconds,
+			*LoggedEvent.InputName,
+			*LoggedEvent.ResultName,
+			*LoggedEvent.RouteName,
+			*LoggedEvent.Detail));
+
 	UE_LOG(
 		LogtwoheartsCombatTest,
 		Display,
@@ -1140,6 +1184,35 @@ void AtwoheartsCharacter::RecordCombatInputDebugEvent(const FString& InputName, 
 		*CombatInputDebugEvents.Last().ResultName,
 		*CombatInputDebugEvents.Last().RouteName,
 		*CombatInputDebugEvents.Last().Detail);
+}
+
+FString AtwoheartsCharacter::GetCombatDebugLogFilePath() const
+{
+	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("CombatDebug"), TEXT("normal-attack-debug.log"));
+}
+
+void AtwoheartsCharacter::ResetCombatDebugLogFile()
+{
+	const FString LogFilePath = GetCombatDebugLogFilePath();
+	IFileManager::Get().MakeDirectory(*FPaths::GetPath(LogFilePath), true);
+
+	const FString Header = FString::Printf(
+		TEXT("=== Combat Debug Session Start actor=%s utc=%s ===\n"),
+		*GetNameSafe(this),
+		*FDateTime::UtcNow().ToString());
+	FFileHelper::SaveStringToFile(Header, *LogFilePath, FFileHelper::EEncodingOptions::AutoDetect);
+}
+
+void AtwoheartsCharacter::AppendCombatDebugLogLine(const FString& Line) const
+{
+	const FString LogFilePath = GetCombatDebugLogFilePath();
+	IFileManager::Get().MakeDirectory(*FPaths::GetPath(LogFilePath), true);
+	FFileHelper::SaveStringToFile(
+		Line + LINE_TERMINATOR,
+		*LogFilePath,
+		FFileHelper::EEncodingOptions::AutoDetect,
+		&IFileManager::Get(),
+		FILEWRITE_Append);
 }
 
 void AtwoheartsCharacter::DrawNormalAttackDebugOverlay() const

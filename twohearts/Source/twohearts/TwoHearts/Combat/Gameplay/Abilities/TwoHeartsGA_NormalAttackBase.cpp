@@ -4,6 +4,7 @@
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/AnimNotifies/AnimNotify.h"
 #include "GameplayTagContainer.h"
 #include "TimerManager.h"
 #include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
@@ -174,6 +175,15 @@ bool UTwoHeartsGA_NormalAttackBase::TryInterruptByDodge()
 
 void UTwoHeartsGA_NormalAttackBase::NotifyCombatPhaseByName(FName NotifyName)
 {
+	RecordAbilityEvent(
+		TEXT("MontageNotify"),
+		FString::Printf(
+			TEXT("Segment %d received notify %s. %s"),
+			NormalAttackSegment,
+			*NotifyName.ToString(),
+			*BuildMontageDebugSnapshot()),
+		false);
+
 	if (NotifyName == ActivePhaseNotifyName)
 	{
 		EnterCombatPhase(ETwoHeartsCombatPhase::Active, TEXT("MontageNotify"));
@@ -237,6 +247,26 @@ void UTwoHeartsGA_NormalAttackBase::HandleMontageCancelled()
 
 void UTwoHeartsGA_NormalAttackBase::HandleMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointNotifyPayload)
 {
+	const FString NotifyAssetName = GetNameSafe(BranchingPointNotifyPayload.SequenceAsset);
+	const FString NotifyAssetPath = BranchingPointNotifyPayload.SequenceAsset
+		? BranchingPointNotifyPayload.SequenceAsset->GetPathName()
+		: TEXT("None");
+	const FString NotifyObjectName =
+		(BranchingPointNotifyPayload.NotifyEvent && BranchingPointNotifyPayload.NotifyEvent->Notify)
+			? BranchingPointNotifyPayload.NotifyEvent->Notify->GetName()
+			: TEXT("None");
+	RecordAbilityEvent(
+		TEXT("MontageNotifyBegin"),
+		FString::Printf(
+			TEXT("Segment %d notify callback begin. Notify=%s NotifyObject=%s Sequence=%s SequencePath=%s MontageInstanceID=%d ReachedEnd=%s. %s"),
+			NormalAttackSegment,
+			*NotifyName.ToString(),
+			*NotifyObjectName,
+			*NotifyAssetName,
+			*NotifyAssetPath,
+			BranchingPointNotifyPayload.MontageInstanceID,
+			BranchingPointNotifyPayload.bReachedEnd ? TEXT("true") : TEXT("false"),
+			*BuildMontageDebugSnapshot()));
 	NotifyCombatPhaseByName(NotifyName);
 }
 
@@ -304,7 +334,12 @@ bool UTwoHeartsGA_NormalAttackBase::StartSegmentPlayback()
 	Character->SetLastNormalAttackDebugFailureReason(TEXT(""));
 	RecordAbilityEvent(
 		TEXT("PlaySegment"),
-		FString::Printf(TEXT("Started segment %d with section %s."), NormalAttackSegment, *SectionName.ToString()));
+		FString::Printf(
+			TEXT("Started segment %d with section %s using montage %s path=%s."),
+			NormalAttackSegment,
+			*SectionName.ToString(),
+			*GetNameSafe(Montage),
+			*Montage->GetPathName()));
 
 	ActiveMontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
 		this,
@@ -365,6 +400,18 @@ void UTwoHeartsGA_NormalAttackBase::FinishSegment(bool bWasCancelled)
 	bHasFinishedSegment = true;
 	bAdvanceStopInProgress = false;
 	ClearPhaseFallbackTimers();
+
+	RecordAbilityEvent(
+		TEXT("FinishSegmentBegin"),
+		FString::Printf(
+			TEXT("Finishing segment %d. Cancelled=%s QueuedNext=%s AdvanceWindowOpened=%s PendingNextTag=%s. %s"),
+			NormalAttackSegment,
+			bWasCancelled ? TEXT("true") : TEXT("false"),
+			bHasQueuedNextSegment ? TEXT("true") : TEXT("false"),
+			bHasOpenedNextSegmentAdvanceWindow ? TEXT("true") : TEXT("false"),
+			*NextSegmentAbilityTag.ToString(),
+			*BuildMontageDebugSnapshot()),
+		true);
 
 	const FGameplayAbilitySpecHandle Handle = GetCurrentAbilitySpecHandle();
 	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
@@ -494,14 +541,30 @@ void UTwoHeartsGA_NormalAttackBase::OpenNextSegmentAdvanceWindow(const FString& 
 {
 	if (bHasOpenedNextSegmentAdvanceWindow || !NextSegmentAbilityTag.IsValid() || NormalAttackSegment >= 3)
 	{
+		RecordAbilityEvent(
+			TEXT("AdvanceWindowIgnored"),
+			FString::Printf(
+				TEXT("Ignored advance window open for segment %d. Reason=%s AlreadyOpened=%s NextTagValid=%s SegmentCanAdvance=%s. %s"),
+				NormalAttackSegment,
+				*Reason,
+				bHasOpenedNextSegmentAdvanceWindow ? TEXT("true") : TEXT("false"),
+				NextSegmentAbilityTag.IsValid() ? TEXT("true") : TEXT("false"),
+				NormalAttackSegment < 3 ? TEXT("true") : TEXT("false"),
+				*BuildMontageDebugSnapshot()),
+			true);
 		return;
 	}
 
 	bHasOpenedNextSegmentAdvanceWindow = true;
 	RecordAbilityEvent(
 		TEXT("AdvanceWindowOpened"),
-		FString::Printf(TEXT("Segment %d opened next-segment advance window. Reason=%s."), NormalAttackSegment, *Reason),
-		true);
+		FString::Printf(
+			TEXT("Segment %d opened next-segment advance window. Reason=%s CanConsumeLateBuffered=%s QueuedNext=%s. %s"),
+			NormalAttackSegment,
+			*Reason,
+			bCanConsumeLateBufferedInput ? TEXT("true") : TEXT("false"),
+			bHasQueuedNextSegment ? TEXT("true") : TEXT("false"),
+			*BuildMontageDebugSnapshot()));
 	TryAdvanceToNextSegment(Reason, bCanConsumeLateBufferedInput);
 }
 
@@ -509,6 +572,17 @@ bool UTwoHeartsGA_NormalAttackBase::TryAdvanceToNextSegment(const FString& Reaso
 {
 	if (bHasFinishedSegment || !bHasOpenedNextSegmentAdvanceWindow || !NextSegmentAbilityTag.IsValid())
 	{
+		RecordAbilityEvent(
+			TEXT("AdvanceSegmentBlocked"),
+			FString::Printf(
+				TEXT("Blocked early advance for segment %d. Reason=%s Finished=%s WindowOpened=%s NextTagValid=%s. %s"),
+				NormalAttackSegment,
+				*Reason,
+				bHasFinishedSegment ? TEXT("true") : TEXT("false"),
+				bHasOpenedNextSegmentAdvanceWindow ? TEXT("true") : TEXT("false"),
+				NextSegmentAbilityTag.IsValid() ? TEXT("true") : TEXT("false"),
+				*BuildMontageDebugSnapshot()),
+			true);
 		return false;
 	}
 
@@ -524,17 +598,27 @@ bool UTwoHeartsGA_NormalAttackBase::TryAdvanceToNextSegment(const FString& Reaso
 
 	if (!bHasQueuedNextSegment)
 	{
+		RecordAbilityEvent(
+			TEXT("AdvanceSegmentWaitingInput"),
+			FString::Printf(
+				TEXT("Advance window is open for segment %d but no next input is ready yet. Reason=%s CanConsumeLateBuffered=%s. %s"),
+				NormalAttackSegment,
+				*Reason,
+				bCanConsumeLateBufferedInput ? TEXT("true") : TEXT("false"),
+				*BuildMontageDebugSnapshot()),
+			true);
 		return false;
 	}
 
 	RecordAbilityEvent(
 		TEXT("AdvanceSegmentReady"),
 		FString::Printf(
-			TEXT("Segment %d is advancing early. Reason=%s LateBuffered=%s."),
+			TEXT("Segment %d is advancing early. Reason=%s LateBuffered=%s NextTag=%s. %s"),
 			NormalAttackSegment,
 			*Reason,
-			bConsumedLateBufferedNext ? TEXT("true") : TEXT("false")),
-		true);
+			bConsumedLateBufferedNext ? TEXT("true") : TEXT("false"),
+			*NextSegmentAbilityTag.ToString(),
+			*BuildMontageDebugSnapshot()));
 
 	if (AtwoheartsCharacter* Character = GetTwoHeartsCharacter())
 	{
@@ -579,6 +663,33 @@ void UTwoHeartsGA_NormalAttackBase::RecordAbilityFailure(const TCHAR* EventName,
 		*GetNameSafe(GetAbilityAvatarActor()),
 		EventName,
 		*Detail);
+}
+
+FString UTwoHeartsGA_NormalAttackBase::BuildMontageDebugSnapshot() const
+{
+	const AtwoheartsCharacter* Character = GetTwoHeartsCharacter();
+	const UAnimInstance* AnimInstance = Character && Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr;
+	UAnimMontage* Montage = Character ? Character->GetNormalAttackMontage() : nullptr;
+	if (!AnimInstance || !Montage)
+	{
+		return TEXT("MontageState=Unavailable");
+	}
+
+	const float PositionSeconds = AnimInstance->Montage_GetPosition(Montage);
+	float SectionLocalTime = 0.0f;
+	const int32 SectionIndex = Montage->GetAnimCompositeSectionIndexFromPos(PositionSeconds, SectionLocalTime);
+	const FName CurrentSectionName = SectionIndex != INDEX_NONE ? Montage->GetSectionName(SectionIndex) : NAME_None;
+	const float SectionLength = SectionIndex != INDEX_NONE ? Montage->GetSectionLength(SectionIndex) : 0.0f;
+	const float SectionNormalizedTime = SectionLength > KINDA_SMALL_NUMBER ? SectionLocalTime / SectionLength : 0.0f;
+	return FString::Printf(
+		TEXT("Montage=%s Position=%.3f Section=%s Local=%.3f Length=%.3f Normalized=%.3f IsPlaying=%s"),
+		*GetNameSafe(Montage),
+		PositionSeconds,
+		*CurrentSectionName.ToString(),
+		SectionLocalTime,
+		SectionLength,
+		SectionNormalizedTime,
+		AnimInstance->Montage_IsPlaying(Montage) ? TEXT("true") : TEXT("false"));
 }
 
 AtwoheartsCharacter* UTwoHeartsGA_NormalAttackBase::GetTwoHeartsCharacter() const
@@ -739,6 +850,17 @@ void UTwoHeartsGA_NormalAttackBase::SchedulePhaseFallbacks(float SectionLength)
 	if (UWorld* World = GetWorld())
 	{
 		FTimerManager& TimerManager = World->GetTimerManager();
+		RecordAbilityEvent(
+			TEXT("PhaseFallbackScheduleDetail"),
+			FString::Printf(
+				TEXT("Scheduling segment %d fallback timers. SectionLength=%.3f Active=%.3f Recovery=%.3f Advance=%.3f LogicEnded=%.3f."),
+				NormalAttackSegment,
+				SectionLength,
+				SectionLength * ActivePhaseFallbackNormalizedTime,
+				SectionLength * RecoveryPhaseFallbackNormalizedTime,
+				SectionLength * NextSegmentAdvanceFallbackNormalizedTime,
+				SectionLength * LogicEndedFallbackNormalizedTime),
+			true);
 		TimerManager.SetTimer(ActivePhaseFallbackTimerHandle, this, &UTwoHeartsGA_NormalAttackBase::HandleFallbackEnterActive, SectionLength * ActivePhaseFallbackNormalizedTime, false);
 		TimerManager.SetTimer(RecoveryPhaseFallbackTimerHandle, this, &UTwoHeartsGA_NormalAttackBase::HandleFallbackEnterRecovery, SectionLength * RecoveryPhaseFallbackNormalizedTime, false);
 		TimerManager.SetTimer(NextSegmentAdvanceFallbackTimerHandle, this, &UTwoHeartsGA_NormalAttackBase::HandleFallbackOpenNextSegmentAdvanceWindow, SectionLength * NextSegmentAdvanceFallbackNormalizedTime, false);
@@ -777,6 +899,14 @@ void UTwoHeartsGA_NormalAttackBase::AttemptDeferredNextSegmentActivation()
 		return;
 	}
 
+	RecordAbilityEvent(
+		TEXT("AdvanceSegmentAttempt"),
+		FString::Printf(
+			TEXT("Deferred activation from segment %d targeting %s with %d activatable abilities."),
+			SourceSegment,
+			*NextAbilityTag.ToString(),
+			AbilitySystemComponent->GetActivatableAbilities().Num()));
+
 	TArray<FString> MatchingAbilityNames;
 	TArray<FString> ActivationFailureReasons;
 	bool bAttemptedActivation = false;
@@ -797,6 +927,16 @@ void UTwoHeartsGA_NormalAttackBase::AttemptDeferredNextSegmentActivation()
 
 		MatchingAbilityNames.Add(GetNameSafe(AbilitySpec.Ability));
 		bAttemptedActivation = true;
+		RecordAbilityEvent(
+			TEXT("AdvanceSegmentCandidate"),
+			FString::Printf(
+				TEXT("Evaluating deferred candidate %s for segment %d. InputID=%d Active=%s Tags=%s."),
+				*GetNameSafe(AbilitySpec.Ability),
+				SourceSegment,
+				AbilitySpec.InputID,
+				AbilitySpec.IsActive() ? TEXT("true") : TEXT("false"),
+				*AbilitySpec.Ability->GetAssetTags().ToStringSimple()),
+			true);
 
 		FGameplayTagContainer FailureTags;
 		const bool bCanActivate = AbilitySpec.Ability->CanActivateAbility(
