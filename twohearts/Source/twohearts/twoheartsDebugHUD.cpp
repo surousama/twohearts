@@ -67,7 +67,7 @@ void ATwoheartsDebugHUD::DrawHUD()
 		VisibleInputEvents.Add(&InputEvents[EventIndex]);
 	}
 
-	const float PanelHeight = 360.0f + (VisibleEvents.Num() * LineHeight) + (VisibleInputEvents.Num() * LineHeight * 2.0f);
+	const float PanelHeight = 450.0f + (VisibleEvents.Num() * LineHeight) + (VisibleInputEvents.Num() * LineHeight * 2.0f);
 	FCanvasTileItem Background(FVector2D(PanelX, PanelY), FVector2D(PanelWidth, PanelHeight), FLinearColor(0.02f, 0.02f, 0.02f, 0.78f));
 	Background.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(Background);
@@ -279,6 +279,63 @@ void ATwoheartsDebugHUD::DrawHUD()
 
 			DrawDebugLine(
 				FString::Printf(TEXT("detail=%s"), *LastSignal.Detail),
+				PanelX + 12.0f,
+				CurrentY,
+				MutedColor);
+			CurrentY += LineHeight * 1.5f;
+		}
+
+		DrawDebugLine(TEXT("Player Hit Result"), PanelX + 12.0f, CurrentY, HeaderColor);
+		CurrentY += LineHeight;
+
+		if (!HostileAttackReceiver->HasPlayerHitResult())
+		{
+			DrawDebugLine(TEXT("no_player_hit_result_yet"), PanelX + 12.0f, CurrentY, MutedColor);
+			CurrentY += LineHeight * 1.5f;
+		}
+		else
+		{
+			const FTwoHeartsPlayerHitResult& LastHitResult = HostileAttackReceiver->GetLastPlayerHitResult();
+			const UEnum* ResultEnum = StaticEnum<ETwoHeartsPlayerHitResultType>();
+			const UEnum* SignalEnum = StaticEnum<ETwoHeartsHostileAttackSignalType>();
+			const FLinearColor ResultColor = LastHitResult.bHitConfirmed
+				? FLinearColor(1.0f, 0.65f, 0.35f, 1.0f)
+				: (LastHitResult.ResultType == ETwoHeartsPlayerHitResultType::SignalInvalid ? FailureColor : TextColor);
+
+			DrawDebugLine(
+				FString::Printf(
+					TEXT("result=%s   hit=%s   guard_rewrite=%s"),
+					ResultEnum ? *ResultEnum->GetNameStringByValue(static_cast<int64>(LastHitResult.ResultType)) : TEXT("Unknown"),
+					LastHitResult.bHitConfirmed ? TEXT("YES") : TEXT("NO"),
+					LastHitResult.bCanBeRewrittenByGuard ? TEXT("YES") : TEXT("NO")),
+				PanelX + 12.0f,
+				CurrentY,
+				ResultColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(
+					TEXT("attack=%s   source=%s   time=%.2f"),
+					*LastHitResult.AttackInstanceName,
+					*GetNameSafe(LastHitResult.SourceActor),
+					LastHitResult.ResultTimestampSeconds),
+				PanelX + 12.0f,
+				CurrentY,
+				TextColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(
+					TEXT("source_signal=%s   contact_time=%.2f"),
+					SignalEnum ? *SignalEnum->GetNameStringByValue(static_cast<int64>(LastHitResult.SourceSignalType)) : TEXT("Unknown"),
+					LastHitResult.ContactTimestampSeconds),
+				PanelX + 12.0f,
+				CurrentY,
+				MutedColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(TEXT("detail=%s"), *LastHitResult.Detail),
 				PanelX + 12.0f,
 				CurrentY,
 				MutedColor);
