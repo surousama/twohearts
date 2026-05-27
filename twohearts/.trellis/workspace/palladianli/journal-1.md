@@ -270,3 +270,39 @@ Implemented character-side weapon visual switching, configured weapon assets and
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: 收尾普通攻击三段连续性优化
+
+**Date**: 2026-05-27
+**Task**: 收尾普通攻击三段连续性优化
+**Branch**: `master`
+
+### Summary
+
+完成 05-25-normal-attack-chain-continuity-polish 收尾：补充普攻 Montage Notify 联调规范，归档任务，并保留并行任务改动不纳入本次提交。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `58b9459` | (see git log) |
+| `042bfc4` | (see git log) |
+| `3598492` | (see git log) |
+| `3f8f7e7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
