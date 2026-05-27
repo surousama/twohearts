@@ -306,3 +306,37 @@ Implemented character-side weapon visual switching, configured weapon assets and
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: 最小敌对攻击探针收尾与策划配置
+
+**Date**: 2026-05-27
+**Task**: 最小敌对攻击探针收尾与策划配置
+**Branch**: `master`
+
+### Summary
+
+完成最小敌对攻击探针的策划侧 BP 包装、PIE 白盒日志验证与 AttackFinished 收尾边界修复，归档当前子任务。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0ee0330` | (see git log) |
+| `c00224f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

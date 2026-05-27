@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
+- **Total Sessions**: 10
 - **Last Active**: 2026-05-27
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~308 | Active |
+| `journal-1.md` | ~342 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | 日期 | 标题 | 提交 | 分支 |
 |---|------|-------|---------|--------|
+| 10 | 2026-05-27 | 最小敌对攻击探针收尾与策划配置 | `0ee0330`, `c00224f` | `master` |
 | 9 | 2026-05-27 | 收尾普通攻击三段连续性优化 | `58b9459`, `042bfc4`, `3598492`, `3f8f7e7` | `master` |
 | 8 | 2026-05-25 | 修复 Dodge 冷却卡死 | `68a9127` | `master` |
 | 7 | 2026-05-25 | Normal attack weapon visual switching | `5a72375`, `5951f55` | `master` |
