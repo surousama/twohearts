@@ -26,7 +26,7 @@ function New-StrictEncoding($Name) {
     )
 }
 
-function Decode-Bytes([byte[]]$Bytes) {
+function ConvertFrom-Bytes([byte[]]$Bytes) {
     if ($Bytes.Length -ge 3 -and $Bytes[0] -eq 0xEF -and $Bytes[1] -eq 0xBB -and $Bytes[2] -eq 0xBF) {
         return @{
             Name = "utf-8-bom"
@@ -87,7 +87,7 @@ function Decode-Bytes([byte[]]$Bytes) {
 try {
     $resolvedPath = Resolve-Path -LiteralPath $Path -ErrorAction Stop
     $bytes = [System.IO.File]::ReadAllBytes($resolvedPath.Path)
-    $decoded = Decode-Bytes $bytes
+    $decoded = ConvertFrom-Bytes $bytes
     $lines = [regex]::Split($decoded.Text, "`r`n|`n|`r")
 
     if ($lines.Length -gt 0 -and $lines[-1] -eq "") {

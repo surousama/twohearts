@@ -801,6 +801,17 @@ void AtwoheartsCharacter::PushGuardDebugEvent(const TCHAR* EventName, const FStr
 	LastGuardDebugEventName = EventName;
 	LastGuardDebugDetail = Detail;
 	LastGuardEventTimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+
+	AppendCombatDebugLogLine(
+		FString::Printf(
+			TEXT("[Guard] time=%.3f event=%s active=%s window=%s phase=%s hold_reserved=%s detail=\"%s\""),
+			LastGuardEventTimeSeconds,
+			EventName,
+			bIsGuardAbilityActive ? TEXT("true") : TEXT("false"),
+			bIsGuardWindowActive ? TEXT("true") : TEXT("false"),
+			*CurrentGuardPhaseName,
+			bGuardHoldInputReserved ? TEXT("true") : TEXT("false"),
+			*Detail));
 }
 
 void AtwoheartsCharacter::RecordNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly)

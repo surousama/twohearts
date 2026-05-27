@@ -1,0 +1,7 @@
+{"file":".trellis/spec/testing/index.md","reason":"白盒 review 与验收需先读取测试规范索引。"}
+{"file":".trellis/spec/testing/whitebox-testing-guidelines.md","reason":"问题记录需要按白盒问题单口径输出，保证可复现、可回归。"}
+{"file":".trellis/spec/combat/index.md","reason":"复核 Guard 是否仍符合当前战斗模块边界。"}
+{"file":".trellis/spec/combat/system-framework.md","reason":"检查 Guard 是否真正复用公共动作语义，而非私造规则。"}
+{"file":".trellis/spec/combat/current-stage.md","reason":"检查本轮实现是否越过第二章当前阶段边界。"}
+{"file":".trellis/spec/roles/senior-tester.md","reason":"当前主角色为资深测试工程师，输出应以问题记录和验收结论为主。"}
+{"file":".trellis/spec/workflow/index.md","reason":"复核过程需遵守双心印工作流与角色职责边界。"}

@@ -109,7 +109,9 @@ bool UTwoHeartsCombatActionContextComponent::CanCurrentActionBeInterruptedBy(ETw
 	case ETwoHeartsCombatActionType::NormalAttack:
 		if (IncomingActionType == ETwoHeartsCombatActionType::Guard)
 		{
-			return true;
+			return CurrentContext.ActionPhase == ETwoHeartsCombatPhase::Recovery
+				|| CurrentContext.ActionPhase == ETwoHeartsCombatPhase::LogicEnded
+				|| CurrentContext.bHasLogicEnded;
 		}
 
 		return IncomingActionType == ETwoHeartsCombatActionType::Dodge
@@ -171,9 +173,24 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 			return FinalizeEvaluation(MoveTemp(Evaluation));
 		}
 
-		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::ExecuteNow;
-		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ActivateMatchingAbility;
-		Evaluation.Reason = TEXT("Current basic guard rules allow Guard to enter immediately from any existing player action state.");
+		if (CurrentContext.ActionType == ETwoHeartsCombatActionType::NormalAttack
+			|| CurrentContext.ActionType == ETwoHeartsCombatActionType::Dodge)
+		{
+			if (CanCurrentActionBeInterruptedBy(ETwoHeartsCombatActionType::Guard))
+			{
+				Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::ExecuteNow;
+				Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ActivateMatchingAbility;
+				Evaluation.Reason = TEXT("Current basic guard rules allow Guard from normal attack recovery/logic end or the current basic dodge.");
+				return FinalizeEvaluation(MoveTemp(Evaluation));
+			}
+
+			Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::Reject;
+			Evaluation.Reason = TEXT("Current active action has not reached a Guard-allowed interrupt window.");
+			return FinalizeEvaluation(MoveTemp(Evaluation));
+		}
+
+		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::Reject;
+		Evaluation.Reason = TEXT("Current basic guard only supports no-action entry, normal attack recovery/logic end, and the current basic dodge.");
 		return FinalizeEvaluation(MoveTemp(Evaluation));
 	}
 

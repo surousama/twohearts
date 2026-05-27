@@ -325,9 +325,12 @@ void ATwoheartsDebugHUD::DrawHUD()
 			const FTwoHeartsPlayerHitResult& LastHitResult = HostileAttackReceiver->GetLastPlayerHitResult();
 			const UEnum* ResultEnum = StaticEnum<ETwoHeartsPlayerHitResultType>();
 			const UEnum* SignalEnum = StaticEnum<ETwoHeartsHostileAttackSignalType>();
-			const FLinearColor ResultColor = LastHitResult.bHitConfirmed
-				? FLinearColor(1.0f, 0.65f, 0.35f, 1.0f)
-				: (LastHitResult.ResultType == ETwoHeartsPlayerHitResultType::SignalInvalid ? FailureColor : TextColor);
+			const FLinearColor ResultColor =
+				LastHitResult.ResultType == ETwoHeartsPlayerHitResultType::GuardRewritten
+					? FLinearColor(0.35f, 1.0f, 0.55f, 1.0f)
+					: (LastHitResult.bHitConfirmed
+						? FLinearColor(1.0f, 0.65f, 0.35f, 1.0f)
+						: (LastHitResult.ResultType == ETwoHeartsPlayerHitResultType::SignalInvalid ? FailureColor : TextColor));
 
 			DrawDebugLine(
 				FString::Printf(

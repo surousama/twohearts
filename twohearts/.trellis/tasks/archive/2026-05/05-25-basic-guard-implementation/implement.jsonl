@@ -1,0 +1,6 @@
+{"file":".trellis/spec/combat/index.md","reason":"格挡实现属于基础战斗模块，先从战斗规范索引进入相关规则。"}
+{"file":".trellis/spec/combat/system-framework.md","reason":"Guard 必须接入公共动作上下文，并遵守动作阶段、打断关系和状态标签语义。"}
+{"file":".trellis/spec/combat/current-stage.md","reason":"本任务要服从第二章当前阶段顺序与当前允许的过渡实现边界。"}
+{"file":".trellis/spec/workflow/index.md","reason":"实施前需遵守双心印工作流、角色边界和迁移期文档规则。"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Guard 逻辑跨越输入、Ability、动作上下文、受击结果和调试观察口。"}
+{"file":".trellis/spec/guides/stage-order-thinking-guide.md","reason":"避免为局部 Guard 需求提前扩写后续完整防御体系。"}

@@ -139,6 +139,7 @@ bool UTwoHeartsHostileAttackReceiverComponent::RewriteLastPlayerHitResultForGuar
 	}
 
 	LastPlayerHitResult.ResultType = NewResultType;
+	LastPlayerHitResult.bHitConfirmed = NewResultType == ETwoHeartsPlayerHitResultType::HitConfirmed;
 	LastPlayerHitResult.bCanBeRewrittenByGuard = false;
 	LastPlayerHitResult.Detail = Detail.IsEmpty() ? TEXT("Guard rewrote the pending hit result.") : Detail;
 	LastPlayerHitResult.SourceSignalType = ETwoHeartsHostileAttackSignalType::AttackContact;

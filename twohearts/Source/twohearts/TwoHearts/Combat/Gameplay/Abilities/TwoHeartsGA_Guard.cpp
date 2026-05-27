@@ -180,7 +180,13 @@ bool UTwoHeartsGA_Guard::CanInterruptCurrentActionByGuard() const
 	if (CurrentContext.ActionType != ETwoHeartsCombatActionType::NormalAttack
 		&& CurrentContext.ActionType != ETwoHeartsCombatActionType::Dodge)
 	{
-		return true;
+		RecordGuardEvent(
+			TEXT("GuardRejected"),
+			FString::Printf(
+				TEXT("Current action %s is outside the current basic guard whitelist."),
+				*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(CurrentContext.ActionType))),
+			true);
+		return false;
 	}
 
 	if (!ActionContextComponent->CanCurrentActionBeInterruptedBy(ETwoHeartsCombatActionType::Guard))

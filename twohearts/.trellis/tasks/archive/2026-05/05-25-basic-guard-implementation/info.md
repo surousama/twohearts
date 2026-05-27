@@ -48,13 +48,21 @@
 ### 已完成验证
 
 1. 已成功通过本地 Unreal 编译：
-   `Build.bat twoheartsEditor Win64 Development -Project=H:\twohearts\twohearts\twohearts.uproject -WaitMutex -NoHotReloadFromIDE`
+   `Build.bat twoheartsEditor Win64 Development -Project=G:\twohearts\twohearts\twohearts.uproject -WaitMutex -NoHotReloadFromIDE`
+2. 已完成 PIE 白盒跑测，并确认以下关键结论：
+   Guard 可在空闲态稳定进入；
+   Guard 可在普通攻击 `Recovery` 成功打断；
+   Guard 在 `Startup / Active` 不再越权打断普通攻击；
+   Guard 可将最小敌对攻击探针的 `HitConfirmed` 改写为 `GuardRewritten`。
+3. 已通过日志确认 Guard 改写闭环实际发生：
+   `AttackContact -> HitConfirmed -> GuardRewrite -> GuardRewritten -> GuardRewriteSuccess`
+4. 为便于调试验证，曾临时把 Guard 活动窗口放大到 `1.00s`；
+   在确认改写链路稳定命中后，当前已收回到更紧的临时值 `0.45s`。
 
 ### 尚未完成
 
-1. 尚未做 PIE 白盒实际跑测。
-2. 尚未验证 Guard 在编辑器内对最小敌对攻击探针的完整交互手感。
-3. 尚未补 `05-25-guard-feedback-and-whitebox-validation` 所需的表现与验收结论。
+1. 尚未验证 `0.45s` 窗口下的最终手感是否满足后续设计预期。
+2. 尚未补 `05-25-guard-feedback-and-whitebox-validation` 所需的表现与验收结论。
 
 ### 补充说明
 
@@ -62,3 +70,10 @@
    `TwoHeartsHostileAttackReceiverComponent.cpp` 与 `TwoHeartsHostileAttackProbeCharacter.cpp` 的本地 `LexToString` 命名在构建条件下发生冲突；
    同时修正了 `HostileAttackReceiver` 内一处旧的格式化字符串问题。
 2. 当前 `task.json` 的变更主要来自本轮 `task.py start` 将任务切到 `in_progress`。
+3. 本轮额外修正了 Guard 成功改写后的伴随状态与调试显示：
+   `GuardRewritten` 不再保留 `bHitConfirmed=true`；
+   HUD 可将 Guard 成功与普通命中明确区分。
+4. 本轮额外收紧了 Guard 打断白名单：
+   当前只允许从无动作态进入；
+   或在普通攻击 `Recovery / LogicEnded`；
+   或在当前基础 Dodge 中进入。

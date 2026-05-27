@@ -131,7 +131,7 @@ struct FTwoHeartsGuardConfig
 	float GuardStartupSeconds = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Guard", meta=(ClampMin="0.01", UIMin="0.01"))
-	float GuardWindowSeconds = 0.18f;
+	float GuardWindowSeconds = 0.45f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Guard", meta=(ClampMin="0.0", UIMin="0.0"))
 	float GuardRecoverySeconds = 0.10f;
