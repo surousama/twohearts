@@ -340,3 +340,37 @@ Implemented character-side weapon visual switching, configured weapon assets and
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: 玩家受击最小闭环实现与白盒验收
+
+**Date**: 2026-05-27
+**Task**: 玩家受击最小闭环实现与白盒验收
+**Branch**: `master`
+
+### Summary
+
+完成玩家受击最小结果闭环实现，补齐 HUD 与结构化日志，经过两轮 PIE 白盒验收后修复收尾信号污染问题并归档任务。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b0c2150` | (see git log) |
+| `b9f1f20` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
