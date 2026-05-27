@@ -111,6 +111,11 @@
    玩家进入 TriggerSphere 后自动触发；
    若玩家留在范围内，探针可按冷却重复攻击；
    也可手动调用 `TriggerProbeAttack()`。
+5. 当前已提供给策划直接使用的基础 Blueprint：
+   `/Game/Characters/HostileAttackProbe/BP_HostileAttackProbe`
+6. 当前已提供两个策划预设 Blueprint：
+   `/Game/Characters/HostileAttackProbe/BP_HostileAttackProbe_SlowSingle`
+   `/Game/Characters/HostileAttackProbe/BP_HostileAttackProbe_LoopPressure`
 
 ## 当前默认参数
 
@@ -142,19 +147,152 @@
    来源 actor；
    攻击方向；
    detail。
+6. 基础 BP 与两个策划预设 BP 都继承自同一 `C++` 父类，因此以下可调项会继续暴露在 Blueprint 默认值与关卡实例 Details 中：
+   `TriggerRadius`
+   `AttackReach`
+   `AttackRadius`
+   `StartupSeconds`
+   `HitWindowSeconds`
+   `RecoverySeconds`
+   `RepeatCooldownSeconds`
+   `bAutoTriggerWhenTargetEntersRange`
+   `bLoopAttackWhileTargetStaysInRange`
+   `bEnableScreenDebugOutput`
+   `bDrawDebugShapes`
+
+## 策划侧 PIE 配置步骤
+
+1. 打开用于白盒验证的测试关卡，确认当前关卡使用项目默认 `GameMode`，这样 `ATwoheartsDebugHUD` 会自动生效，不需要策划额外切 HUD。
+2. 策划侧默认不要直接使用 `C++` 类；优先从内容浏览器拖 Blueprint 资产进关卡。
+3. 当前推荐使用顺序是：
+   首选 `BP_HostileAttackProbe_SlowSingle` 做单次白盒观察；
+   首选 `BP_HostileAttackProbe_LoopPressure` 做格挡节奏与持续压迫测试；
+   只有需要自定义一整套新参数口径时，再使用基础版 `BP_HostileAttackProbe`。
+4. 首次放置时，把 Probe 摆在玩家出生点正前方，建议和玩家相距 `120` 到 `180` Unreal Units，且 Probe 正面朝向玩家，先保证攻击前方判定球能够覆盖玩家站位。
+5. 当前玩家角色已默认挂上 `UTwoHeartsHostileAttackReceiverComponent`，所以只要 PIE 使用的是现有主角，不需要策划再手动补任何接收组件。
+6. 选中 Probe 后，在 Details 面板优先检查以下分组：
+   `Combat|Hostile Attack Probe|Animation`
+   `Combat|Hostile Attack Probe`
+   `Combat|Hostile Attack Probe|Debug`
+7. 若只是进入首轮验证，优先保持默认动画资源不改：
+   IdleAnimation = `/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle`
+   AttackAnimation = `/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01`
+8. 若 Probe 放下后朝向或判定看起来不对，先通过旋转 Actor 修正整体朝向；只有在确认朝向正确但还是打不到人时，再调 `AttackReach` 和 `AttackRadius`，不要一开始就同时改很多参数。
+
+## 当前策划预设说明
+
+1. `BP_HostileAttackProbe`
+   这是基础承载 Blueprint，参数基本跟随 `C++` 默认值，适合技术验证或做新的策划衍生版本。
+2. `BP_HostileAttackProbe_SlowSingle`
+   这是给策划做单次白盒观察的预设版本；
+   默认更长前摇；
+   默认不循环；
+   更适合先观察 `AttackStarted -> HitWindowOpened -> AttackFinished` 的完整单轮时序。
+3. `BP_HostileAttackProbe_LoopPressure`
+   这是给策划做持续压迫与格挡节奏测试的预设版本；
+   默认前摇更短；
+   默认会持续循环攻击；
+   默认攻击判定略大，减少“刚好擦边没测到”的白盒噪音。
+4. 若没有明确新需求，策划不建议从基础版手工起配；优先复制或直接使用已有预设，能减少实例参数飘散。
+
+## 建议的首轮策划参数
+
+1. 基线验证配置：
+   `TriggerRadius = 220`
+   `AttackReach = 140`
+   `AttackRadius = 75`
+   `StartupSeconds = 0.5`
+   `HitWindowSeconds = 0.15`
+   `RecoverySeconds = 0.45`
+   `RepeatCooldownSeconds = 0.8`
+   `bAutoTriggerWhenTargetEntersRange = true`
+   `bLoopAttackWhileTargetStaysInRange = true`
+   `bEnableScreenDebugOutput = true`
+   `bDrawDebugShapes = true`
+2. 若策划想先看单次攻击，而不是角色站在原地被反复打，先只改两项：
+   `bLoopAttackWhileTargetStaysInRange = false`
+   保持 `bAutoTriggerWhenTargetEntersRange = true`
+3. 若策划想测试“靠近不自动开打，由外部手动触发”，使用以下组合：
+   `bAutoTriggerWhenTargetEntersRange = false`
+   `bLoopAttackWhileTargetStaysInRange = false`
+   然后在 Blueprint 或 Level Blueprint 里手动调用 `TriggerProbeAttack()`
+4. 若策划想先把可读前摇拉长，便于观察格挡窗口，优先只增加 `StartupSeconds`，建议先调到 `0.7` 或 `0.8`，不要先动命中半径。
+5. 若策划想提高“明明碰到了却没打中”的容错，优先小幅增加：
+   `AttackReach` 每次加 `20`
+   `AttackRadius` 每次加 `10`
+   每次只改一项后重新 PIE 观察。
+
+## PIE 白盒操作步骤
+
+1. 进入 PIE 前，先确认玩家出生后会出现在 Probe 的触发圈附近，否则本轮看不到自动攻击。
+2. 点击 Play 进入 PIE 后，把玩家走进 Probe 周围的青色 Trigger 球范围。
+3. 若使用默认自动触发配置，预期会立即进入一次完整攻击流程，不需要额外按键。
+4. 观察屏幕上的 Debug HUD，重点看 `Incoming Hostile Attack` 区块。
+5. 一次完整攻击的推荐观察顺序是：
+   `AttackStarted`
+   `HitWindowOpened`
+   `AttackContact`（若命中到玩家）
+   `HitWindowClosed`
+   `AttackFinished`
+6. 如果当前站位没有进入命中球，但已经进了 Trigger 球，那么你通常会看到：
+   有 `AttackStarted`
+   有 `HitWindowOpened`
+   但没有 `AttackContact`
+   这说明配置已经跑通，只是攻击判定没覆盖到玩家。
+7. 如果玩家持续留在 Trigger 范围内，且 `bLoopAttackWhileTargetStaysInRange = true`，那么 Probe 会在一次攻击结束并经过 `RepeatCooldownSeconds` 后再次攻击；这就是后续格挡节奏测试的默认循环入口。
+8. 如果你只想观察单轮信号，攻击结束后把玩家拉出 Trigger 球，或者直接把循环开关关掉再 PIE。
+
+## PIE 验收口径
+
+1. HUD 中 `Incoming Hostile Attack` 不再显示 `no_hostile_attack_signal_yet`，说明玩家已成功收到至少一次来袭信号。
+2. `type` 字段能按时序变化，说明 Probe 的阶段流转正常，不是只打出了一次静态 overlap。
+3. `attack` 字段会显示类似 `HostileProbe_1`、`HostileProbe_2` 的实例名，说明本次攻击实例有被正确编号，后续可以用于格挡或受击调试对齐。
+4. `hit_window=YES` 时对应的就是当前允许命中的窗口；若此时玩家身处前方攻击球内，应该同时或随后看到 `contact=YES`。
+5. 屏幕调试与场景调试球都能看到时，说明当前适合策划白盒调参；如果这些信息太吵，再进入收口阶段时再逐项关闭 Debug 开关。
+
+## 常见策划调参建议
+
+1. 现阶段优先把 Probe 当成“攻击样本发生器”，不要急着把它包装成完整敌人；能稳定复现时序，比外观完整更重要。
+2. 想做“更容易格挡”的版本，优先从 `BP_HostileAttackProbe_SlowSingle` 开始，再继续加大 `StartupSeconds`；不要每次都从基础版重新手调。
+3. 想做“更有压迫感”的版本，优先从 `BP_HostileAttackProbe_LoopPressure` 开始，再缩短 `StartupSeconds` 或增大 `AttackReach`，但要同步确认玩家是否还有读招空间。
+4. 如果需要多套白盒方案，建议直接复制现有预设 Blueprint 再改，例如从 `BP_HostileAttackProbe_SlowSingle` 或 `BP_HostileAttackProbe_LoopPressure` 派生，而不是让每个关卡实例都手改一遍。
+5. 当前玩家侧接口已经固定在 `UTwoHeartsHostileAttackReceiverComponent`，所以策划调参时应尽量只动 Probe 侧参数，不要改玩家收信号的结构。
+
+## 手动触发配置补充
+
+1. 若要给策划一个“按键触发一次 Probe 攻击”的验证入口，推荐创建 Probe 的 Blueprint 子类，而不是改 `C++` 默认行为。
+2. 在 Level Blueprint 中保存该 Probe 实例引用，绑定一个临时输入事件后调用 `TriggerProbeAttack()` 即可。
+3. 如果要反复切回默认自动攻击验证，直接恢复：
+   `bAutoTriggerWhenTargetEntersRange = true`
+   `bLoopAttackWhileTargetStaysInRange = true`
+4. 若 Probe 被手动测试打乱状态，可直接调用 `ResetProbeToIdle()`，让它清掉阶段计时器并回到 Idle。
 
 ## 已知限制
 
 1. 本轮没有接正式 Montage Notify，而是使用 `C++` 阶段时序和 overlap 命中窗口；后续若进入更正式敌人攻击制作，可再替换为 Montage/Notify 驱动，但不必推翻当前玩家侧接收接口。
 2. 当前命中只发送来袭/接触信号，不做正式伤害、硬直或格挡结果改写。
 3. 当前默认资源采用直接内容引用，属于当前阶段为确保探针可立即放置与复现而接受的过渡实现；若后续敌人体系正式化，可再收束为蓝图/数据配置。
+4. 当前仍主要依赖日志、HUD 与调试绘制做白盒验证，还没有上升到正式敌人调试面板或自动化测试。
 
 ## 验证记录
 
 1. 已执行 `Development Editor | Win64` 整编。
 2. 结果：通过。
-3. 当前未做 PIE 白盒跑关；需要进入编辑器把探针放入关卡后，结合 HUD 观察来袭信号。
-4. 本机当前确认使用的构建入口：
+3. 已完成 PIE 白盒验证，并实际放置策划侧推荐预设 `BP_HostileAttackProbe_SlowSingle` 进行多轮观察。
+4. 已验证“命中命中球”分支：
+   Probe 按顺序输出 `AttackStarted -> HitWindowOpened -> AttackContact -> HitWindowClosed -> AttackFinished`；
+   玩家侧 `UTwoHeartsHostileAttackReceiverComponent` 同步收到完整来袭与接触信号。
+5. 已验证“进入 Trigger 但未进入命中球”分支：
+   Probe 仍会正常输出 `AttackStarted -> HitWindowOpened -> HitWindowClosed -> AttackFinished`；
+   日志会明确出现 `ContactMiss`，说明探针与命中窗口正常，只是玩家不在命中范围内。
+6. 已修复并验证一个收尾边界：
+   玩家若在攻击尚未结束前离开 TriggerSphere，
+   Probe 仍会基于本轮锁定目标补发 `AttackFinished`，
+   不再因为 `CurrentTargetActor` 被清空而让玩家侧丢失结束信号。
+7. 白盒验证当前主要依赖：
+   `Saved/Logs/twohearts.log` 中的 `[HostileAttackProbe]` 与 `[HostileAttackSignal]` 日志；
+   屏幕 Debug HUD 中的 `Incoming Hostile Attack` 区块。
+8. 本机当前确认使用的构建入口：
    Unreal Engine：`G:\UE_5.6`
    MSBuild：`D:\VS2022\MSBuild\Current\Bin\MSBuild.exe`
 
