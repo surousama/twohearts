@@ -78,6 +78,7 @@ void UTwoHeartsGA_Dodge::ActivateAbility(
 	bHasMarkedCombatLogicEnded = false;
 	bHasReceivedInvulnerabilityBeginNotify = false;
 	bHasReceivedInvulnerabilityEndNotify = false;
+	bInterruptedByGuard = false;
 	bShouldRestoreCharacterState = false;
 
 	if (!ResolveDodgeDirection(DodgeDirection, DodgeDirectionName))
@@ -289,6 +290,56 @@ bool UTwoHeartsGA_Dodge::TryInterruptCurrentActionByDodge()
 	return true;
 }
 
+bool UTwoHeartsGA_Dodge::CanBeInterruptedByAction(ETwoHeartsCombatActionType InterruptingActionType) const
+{
+	return InterruptingActionType == ETwoHeartsCombatActionType::Guard;
+}
+
+bool UTwoHeartsGA_Dodge::TryInterruptByAction(ETwoHeartsCombatActionType InterruptingActionType, const FString& InterruptReason)
+{
+	const UEnum* ActionTypeEnum = StaticEnum<ETwoHeartsCombatActionType>();
+	const FString InterruptingActionName = ActionTypeEnum
+		? ActionTypeEnum->GetNameStringByValue(static_cast<int64>(InterruptingActionType))
+		: TEXT("Unknown");
+	const bool bCanInterrupt = CanBeInterruptedByAction(InterruptingActionType);
+
+	RecordDodgeEvent(
+		TEXT("DodgeInterruptCheck"),
+		FString::Printf(
+			TEXT("%s interrupt check on dodge during phase %s. Allowed=%s."),
+			*InterruptingActionName,
+			*StaticEnum<ETwoHeartsCombatPhase>()->GetNameStringByValue(static_cast<int64>(
+				GetCombatActionContextComponent() ? GetCombatActionContextComponent()->GetCurrentContext().ActionPhase : ETwoHeartsCombatPhase::None)),
+			bCanInterrupt ? TEXT("true") : TEXT("false")),
+		!bCanInterrupt);
+
+	if (!bCanInterrupt)
+	{
+		return false;
+	}
+
+	bInterruptedByGuard = InterruptingActionType == ETwoHeartsCombatActionType::Guard;
+	MarkCombatActionLogicEnded(InterruptReason);
+	RecordDodgeEvent(
+		TEXT("DodgeInterruptedByAction"),
+		FString::Printf(TEXT("Dodge was interrupted by %s."), *InterruptingActionName));
+
+	if (AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter()))
+	{
+		if (UAnimInstance* AnimInstance = Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr)
+		{
+			if (ActiveDodgeMontage)
+			{
+				AnimInstance->Montage_Stop(0.05f, ActiveDodgeMontage);
+				return true;
+			}
+		}
+	}
+
+	FinishDodge(true);
+	return true;
+}
+
 bool UTwoHeartsGA_Dodge::ResolveDodgeDirection(FVector& OutDirection, FString& OutDirectionName) const
 {
 	const AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter());
@@ -438,7 +489,11 @@ void UTwoHeartsGA_Dodge::FinishDodge(bool bWasCancelled)
 	bDodgeFinished = true;
 	bDodgeStarted = false;
 	MarkCombatActionLogicEnded(bWasCancelled ? TEXT("DodgeCancelled") : TEXT("DodgeFinished"));
-	RecordDodgeEvent(TEXT("DodgeFinished"), bWasCancelled ? TEXT("Dodge was cancelled.") : TEXT("Dodge finished and can chain into follow-up actions."));
+	RecordDodgeEvent(
+		TEXT("DodgeFinished"),
+		bInterruptedByGuard
+			? TEXT("Dodge ended because Guard interrupted it.")
+			: (bWasCancelled ? TEXT("Dodge was cancelled.") : TEXT("Dodge finished and can chain into follow-up actions.")));
 
 	EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, bWasCancelled);
 }
@@ -625,11 +680,17 @@ void UTwoHeartsGA_Dodge::FinishCombatActionContext(bool bWasCancelled)
 
 	if (UTwoHeartsCombatActionContextComponent* ActionContextComponent = GetCombatActionContextComponent())
 	{
-		const ETwoHeartsCombatActionEndReason EndReason = bWasCancelled
-			? ETwoHeartsCombatActionEndReason::Cancelled
-			: ETwoHeartsCombatActionEndReason::Completed;
-		const FString FinishReason = bWasCancelled ? TEXT("DodgeCancelled") : TEXT("DodgeEnded");
-		ActionContextComponent->FinishAction(EndReason, FinishReason);
+		const FTwoHeartsCombatActionContextSnapshot& CurrentContext = ActionContextComponent->GetCurrentContext();
+		if (CurrentContext.ActionType == ETwoHeartsCombatActionType::Dodge)
+		{
+			const ETwoHeartsCombatActionEndReason EndReason = bInterruptedByGuard
+				? ETwoHeartsCombatActionEndReason::Interrupted
+				: (bWasCancelled ? ETwoHeartsCombatActionEndReason::Cancelled : ETwoHeartsCombatActionEndReason::Completed);
+			const FString FinishReason = bInterruptedByGuard
+				? TEXT("InterruptedByGuard")
+				: (bWasCancelled ? TEXT("DodgeCancelled") : TEXT("DodgeEnded"));
+			ActionContextComponent->FinishAction(EndReason, FinishReason);
+		}
 	}
 
 	if (!bWasCancelled)
@@ -642,6 +703,7 @@ void UTwoHeartsGA_Dodge::FinishCombatActionContext(bool bWasCancelled)
 
 	bHasRegisteredCombatActionContext = false;
 	bHasMarkedCombatLogicEnded = false;
+	bInterruptedByGuard = false;
 }
 
 void UTwoHeartsGA_Dodge::BindMontageNotifyDelegates(UAnimInstance* AnimInstance)

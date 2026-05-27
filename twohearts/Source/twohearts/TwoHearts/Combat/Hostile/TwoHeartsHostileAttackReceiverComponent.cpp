@@ -4,7 +4,7 @@
 
 namespace
 {
-	const TCHAR* LexToString(const ETwoHeartsHostileAttackSignalType SignalType)
+	const TCHAR* LexHostileAttackSignalTypeToString(const ETwoHeartsHostileAttackSignalType SignalType)
 	{
 		switch (SignalType)
 		{
@@ -24,7 +24,7 @@ namespace
 		}
 	}
 
-	const TCHAR* LexToString(const ETwoHeartsPlayerHitResultType ResultType)
+	const TCHAR* LexPlayerHitResultTypeToString(const ETwoHeartsPlayerHitResultType ResultType)
 	{
 		switch (ResultType)
 		{
@@ -88,7 +88,7 @@ void UTwoHeartsHostileAttackReceiverComponent::ReceiveHostileAttackSignal(const 
 		Display,
 		TEXT("[HostileAttackSignal] receiver=%s type=%s attack=%s source=%s target=%s hit_window=%s contact=%s time=%.2f detail=\"%s\""),
 		*GetNameSafe(GetOwner()),
-		LexToString(Signal.SignalType),
+		LexHostileAttackSignalTypeToString(Signal.SignalType),
 		*Signal.AttackInstanceName,
 		*GetNameSafe(Signal.SourceActor),
 		*GetNameSafe(Signal.TargetActor),
@@ -102,7 +102,7 @@ void UTwoHeartsHostileAttackReceiverComponent::ReceiveHostileAttackSignal(const 
 		Display,
 		TEXT("[PlayerHitEval] receiver=%s stage=SignalAccepted signal=%s attack=%s source=%s target=%s %s"),
 		*GetNameSafe(GetOwner()),
-		LexToString(Signal.SignalType),
+		LexHostileAttackSignalTypeToString(Signal.SignalType),
 		*Signal.AttackInstanceName,
 		*GetNameSafe(Signal.SourceActor),
 		*GetNameSafe(Signal.TargetActor),
@@ -155,7 +155,7 @@ bool UTwoHeartsHostileAttackReceiverComponent::RewriteLastPlayerHitResultForGuar
 		TEXT("[PlayerHitResult] receiver=%s event=GuardRewrite attack=%s result=%s hit=%s rewritable=%s detail=\"%s\""),
 		*GetNameSafe(GetOwner()),
 		*LastPlayerHitResult.AttackInstanceName,
-		LexToString(LastPlayerHitResult.ResultType),
+		LexPlayerHitResultTypeToString(LastPlayerHitResult.ResultType),
 		LastPlayerHitResult.bHitConfirmed ? TEXT("true") : TEXT("false"),
 		LastPlayerHitResult.bCanBeRewrittenByGuard ? TEXT("true") : TEXT("false"),
 		*LastPlayerHitResult.Detail);
@@ -166,7 +166,7 @@ bool UTwoHeartsHostileAttackReceiverComponent::RewriteLastPlayerHitResultForGuar
 		TEXT("[PlayerHitEval] receiver=%s stage=GuardRewrite attack=%s result=%s time=%.2f"),
 		*GetNameSafe(GetOwner()),
 		*LastPlayerHitResult.AttackInstanceName,
-		LexToString(LastPlayerHitResult.ResultType),
+		LexPlayerHitResultTypeToString(LastPlayerHitResult.ResultType),
 		LastPlayerHitResult.ResultTimestampSeconds);
 
 	OnPlayerHitResultUpdated.Broadcast(LastPlayerHitResult);
@@ -189,7 +189,7 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 		Display,
 		TEXT("[PlayerHitEval] receiver=%s stage=EvaluateSignal signal=%s attack=%s can_start=%s starts_new=%s %s"),
 		*GetNameSafe(GetOwner()),
-		LexToString(Signal.SignalType),
+		LexHostileAttackSignalTypeToString(Signal.SignalType),
 		*Signal.AttackInstanceName,
 		bCanStartTrackedAttackFromSignal ? TEXT("true") : TEXT("false"),
 		bStartsNewAttackInstance ? TEXT("true") : TEXT("false"),
@@ -243,7 +243,7 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 			TEXT("[PlayerHitEval] receiver=%s stage=PendingOpened attack=%s source_signal=%s target=%s time=%.2f"),
 			*GetNameSafe(GetOwner()),
 			*PendingResult.AttackInstanceName,
-			LexToString(PendingResult.SourceSignalType),
+			LexHostileAttackSignalTypeToString(PendingResult.SourceSignalType),
 			*GetNameSafe(PendingResult.TargetActor),
 			PendingResult.ResultTimestampSeconds);
 
@@ -272,9 +272,9 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 				Display,
 				TEXT("[PlayerHitEval] receiver=%s stage=LateLifecycleSignalIgnored signal=%s attack=%s last_result=%s"),
 				*GetNameSafe(GetOwner()),
-				LexToString(Signal.SignalType),
+				LexHostileAttackSignalTypeToString(Signal.SignalType),
 				*Signal.AttackInstanceName,
-				LexToString(LastPlayerHitResult.ResultType));
+				LexPlayerHitResultTypeToString(LastPlayerHitResult.ResultType));
 			return;
 		}
 
@@ -290,7 +290,7 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 		InvalidResult.SourceSignalType = Signal.SignalType;
 		InvalidResult.Detail = FString::Printf(
 			TEXT("Received %s without a tracked hostile attack instance. %s"),
-			LexToString(Signal.SignalType),
+			LexHostileAttackSignalTypeToString(Signal.SignalType),
 			Signal.Detail.IsEmpty() ? TEXT("No detail.") : *Signal.Detail);
 
 		UE_LOG(
@@ -298,7 +298,7 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 			Warning,
 			TEXT("[PlayerHitEval] receiver=%s stage=InvalidSignal signal=%s attack=%s reason=\"%s\""),
 			*GetNameSafe(GetOwner()),
-			LexToString(Signal.SignalType),
+			LexHostileAttackSignalTypeToString(Signal.SignalType),
 			*Signal.AttackInstanceName,
 			*InvalidResult.Detail);
 
@@ -388,8 +388,8 @@ void UTwoHeartsHostileAttackReceiverComponent::FinalizeCurrentPendingAttack(
 		TEXT("[PlayerHitEval] receiver=%s stage=Finalize attack=%s final_result=%s source_signal=%s hit=%s rewritable=%s finalize_time=%.2f contact_time=%.2f pending_lifetime=%.2f"),
 		*GetNameSafe(GetOwner()),
 		*Result.AttackInstanceName,
-		LexToString(Result.ResultType),
-		LexToString(Result.SourceSignalType),
+		LexPlayerHitResultTypeToString(Result.ResultType),
+		LexHostileAttackSignalTypeToString(Result.SourceSignalType),
 		Result.bHitConfirmed ? TEXT("true") : TEXT("false"),
 		Result.bCanBeRewrittenByGuard ? TEXT("true") : TEXT("false"),
 		Result.ResultTimestampSeconds,
@@ -422,11 +422,11 @@ void UTwoHeartsHostileAttackReceiverComponent::PushPlayerHitResult(const FTwoHea
 		TEXT("[PlayerHitResult] receiver=%s attack=%s result=%s hit=%s rewritable=%s time=%.2f source_signal=%s detail=\"%s\""),
 		*GetNameSafe(GetOwner()),
 		*HitResult.AttackInstanceName,
-		LexToString(HitResult.ResultType),
+		LexPlayerHitResultTypeToString(HitResult.ResultType),
 		HitResult.bHitConfirmed ? TEXT("true") : TEXT("false"),
 		HitResult.bCanBeRewrittenByGuard ? TEXT("true") : TEXT("false"),
 		HitResult.ResultTimestampSeconds,
-		LexToString(HitResult.SourceSignalType),
+		LexHostileAttackSignalTypeToString(HitResult.SourceSignalType),
 		*HitResult.Detail);
 
 	UE_LOG(
@@ -435,7 +435,7 @@ void UTwoHeartsHostileAttackReceiverComponent::PushPlayerHitResult(const FTwoHea
 		TEXT("[PlayerHitEval] receiver=%s stage=ResultCommitted attack=%s result=%s history_count=%d"),
 		*GetNameSafe(GetOwner()),
 		*HitResult.AttackInstanceName,
-		LexToString(HitResult.ResultType),
+		LexPlayerHitResultTypeToString(HitResult.ResultType),
 		PlayerHitResultHistory.Num());
 
 	OnPlayerHitResultUpdated.Broadcast(HitResult);

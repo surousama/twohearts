@@ -6,6 +6,7 @@
 
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_TwoHearts_Ability_NormalAttack);
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_TwoHearts_Ability_Dodge);
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_TwoHearts_Ability_Guard);
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_TwoHearts_Ability_HostileAttackProbe);
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_TwoHearts_Ability_NormalAttack_Segment1);
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_TwoHearts_Ability_NormalAttack_Segment2);
@@ -24,6 +25,7 @@ struct FTwoHeartsGameplayTags
 {
 	static FGameplayTag Ability_NormalAttack();
 	static FGameplayTag Ability_Dodge();
+	static FGameplayTag Ability_Guard();
 	static FGameplayTag Ability_HostileAttackProbe();
 	static FGameplayTag Ability_NormalAttack_Segment1();
 	static FGameplayTag Ability_NormalAttack_Segment2();

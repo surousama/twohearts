@@ -112,6 +112,31 @@ struct FTwoHeartsDodgeConfig
 	float DodgeInvulnerableDurationSeconds = 0.22f;
 };
 
+UENUM(BlueprintType)
+enum class ETwoHeartsGuardInputMode : uint8
+{
+	TapWindowOnly = 0 UMETA(DisplayName="TapWindowOnly"),
+	HoldReserved UMETA(DisplayName="HoldReserved")
+};
+
+USTRUCT(BlueprintType)
+struct FTwoHeartsGuardConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Guard")
+	ETwoHeartsGuardInputMode InputMode = ETwoHeartsGuardInputMode::TapWindowOnly;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Guard", meta=(ClampMin="0.0", UIMin="0.0"))
+	float GuardStartupSeconds = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Guard", meta=(ClampMin="0.01", UIMin="0.01"))
+	float GuardWindowSeconds = 0.18f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Guard", meta=(ClampMin="0.0", UIMin="0.0"))
+	float GuardRecoverySeconds = 0.10f;
+};
+
 USTRUCT(BlueprintType)
 struct FTwoHeartsCombatInputDebugEvent
 {
@@ -223,6 +248,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input|Combat")
 	UInputAction* DodgeAction;
 
+	/** Guard Input Action */
+	UPROPERTY(EditAnywhere, Category="Input|Combat")
+	UInputAction* GuardAction;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combat|Ability System", meta=(AllowPrivateAccess="true"))
 	TArray<FTwoHeartsAbilityGrant> DefaultCombatAbilities;
 
@@ -277,6 +306,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge", meta=(AllowPrivateAccess="true"))
 	FTwoHeartsDodgeConfig DodgeConfig;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Guard", meta=(AllowPrivateAccess="true"))
+	FTwoHeartsGuardConfig GuardConfig;
+
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Dodge|Debug", meta=(AllowPrivateAccess="true"))
 	bool bIsDodgeAbilityActive = false;
 
@@ -297,6 +329,27 @@ protected:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Dodge|Debug", meta=(AllowPrivateAccess="true"))
 	float LastDodgeEventTimeSeconds = 0.0f;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Guard|Debug", meta=(AllowPrivateAccess="true"))
+	bool bIsGuardAbilityActive = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Guard|Debug", meta=(AllowPrivateAccess="true"))
+	bool bIsGuardWindowActive = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Guard|Debug", meta=(AllowPrivateAccess="true"))
+	bool bGuardHoldInputReserved = true;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Guard|Debug", meta=(AllowPrivateAccess="true"))
+	FString CurrentGuardPhaseName = TEXT("None");
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Guard|Debug", meta=(AllowPrivateAccess="true"))
+	FString LastGuardDebugEventName = TEXT("None");
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Guard|Debug", meta=(AllowPrivateAccess="true"))
+	FString LastGuardDebugDetail;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Guard|Debug", meta=(AllowPrivateAccess="true"))
+	float LastGuardEventTimeSeconds = 0.0f;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Input", meta=(AllowPrivateAccess="true"))
 	FVector2D CachedMoveInput = FVector2D::ZeroVector;
@@ -343,9 +396,14 @@ protected:
 	/** Called for dodge input */
 	void Dodge(const FInputActionValue& Value);
 
+	/** Called for guard input */
+	void Guard(const FInputActionValue& Value);
+	void GuardReleased(const FInputActionValue& Value);
+
 	void InitializeAbilitySystem();
 	void GrantDefaultCombatAbilities();
 	bool HandleAbilityInputPressed(ETwoHeartsAbilityInputID InputID);
+	void HandleAbilityInputReleased(ETwoHeartsAbilityInputID InputID);
 
 public:
 
@@ -379,6 +437,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Combat|Dodge")
 	const FTwoHeartsDodgeConfig& GetDodgeConfig() const { return DodgeConfig; }
+
+	UFUNCTION(BlueprintPure, Category="Combat|Guard")
+	const FTwoHeartsGuardConfig& GetGuardConfig() const { return GuardConfig; }
 
 	UFUNCTION(BlueprintPure, Category="Combat|Dodge")
 	FVector GetDesiredDodgeDirectionWorld() const;
@@ -437,6 +498,8 @@ public:
 	void PushNormalAttackDebugFailure(const TCHAR* EventName, const FString& Detail);
 	void SetDodgeDebugRuntimeState(bool bIsActive, bool bIsInvulnerable, bool bIsCooldownReady, const FString& DirectionName);
 	void PushDodgeDebugEvent(const TCHAR* EventName, const FString& Detail);
+	void SetGuardDebugRuntimeState(bool bIsActive, bool bIsWindowActive, const FString& PhaseName, bool bHoldReserved);
+	void PushGuardDebugEvent(const TCHAR* EventName, const FString& Detail);
 
 	bool IsNormalAttackingDebugState() const { return bIsNormalAttackAbilityActive; }
 	int32 GetCurrentNormalAttackSegmentDebugState() const { return CurrentNormalAttackAbilitySegment; }
@@ -456,6 +519,13 @@ public:
 	const FString& GetLastDodgeDebugEventName() const { return LastDodgeDebugEventName; }
 	const FString& GetLastDodgeDebugDetail() const { return LastDodgeDebugDetail; }
 	float GetLastDodgeEventTimeSeconds() const { return LastDodgeEventTimeSeconds; }
+	bool IsGuardingDebugState() const { return bIsGuardAbilityActive; }
+	bool IsGuardWindowActiveDebugState() const { return bIsGuardWindowActive; }
+	bool IsGuardHoldInputReservedDebugState() const { return bGuardHoldInputReserved; }
+	const FString& GetCurrentGuardPhaseDebugState() const { return CurrentGuardPhaseName; }
+	const FString& GetLastGuardDebugEventName() const { return LastGuardDebugEventName; }
+	const FString& GetLastGuardDebugDetail() const { return LastGuardDebugDetail; }
+	float GetLastGuardEventTimeSeconds() const { return LastGuardEventTimeSeconds; }
 	const TArray<FTwoHeartsCombatInputDebugEvent>& GetCombatInputDebugEvents() const { return CombatInputDebugEvents; }
 	void PushCombatInputDebugEvent(const FString& InputName, const FString& ResultName, const FString& RouteName, const FString& Detail);
 	bool TryConsumeReservedCombatInput(const FString& ConsumerName);

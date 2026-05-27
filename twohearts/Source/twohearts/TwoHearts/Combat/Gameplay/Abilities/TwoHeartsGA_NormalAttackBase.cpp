@@ -82,6 +82,7 @@ void UTwoHeartsGA_NormalAttackBase::ActivateAbility(
 	bPreserveDebugStateUntilNextSegment = false;
 	bAdvanceStopInProgress = false;
 	bInterruptedByDodge = false;
+	bInterruptedByGuard = false;
 	CurrentCombatPhase = ETwoHeartsCombatPhase::None;
 	ActiveMontageTask = nullptr;
 	PendingNextSegmentAbilityTag = FGameplayTag();
@@ -168,10 +169,22 @@ bool UTwoHeartsGA_NormalAttackBase::TryInterruptByAction(ETwoHeartsCombatActionT
 	const FString InterruptingActionName = ActionTypeEnum
 		? ActionTypeEnum->GetNameStringByValue(static_cast<int64>(InterruptingActionType))
 		: TEXT("Unknown");
-	const bool bCanInterrupt =
-		InterruptingActionType == ETwoHeartsCombatActionType::Dodge
-			? CanBeInterruptedByDodge()
-			: false;
+	bool bCanInterrupt = false;
+	if (InterruptingActionType == ETwoHeartsCombatActionType::Dodge)
+	{
+		bCanInterrupt = CanBeInterruptedByDodge();
+	}
+	else if (InterruptingActionType == ETwoHeartsCombatActionType::Guard)
+	{
+		if (const UTwoHeartsCombatActionContextComponent* ActionContextComponent = GetCombatActionContextComponent())
+		{
+			bCanInterrupt = ActionContextComponent->CanCurrentActionBeInterruptedBy(ETwoHeartsCombatActionType::Guard);
+		}
+		else
+		{
+			bCanInterrupt = true;
+		}
+	}
 
 	RecordAbilityEvent(
 		TEXT("InterruptCheck"),
@@ -188,6 +201,7 @@ bool UTwoHeartsGA_NormalAttackBase::TryInterruptByAction(ETwoHeartsCombatActionT
 	}
 
 	bInterruptedByDodge = InterruptingActionType == ETwoHeartsCombatActionType::Dodge;
+	bInterruptedByGuard = InterruptingActionType == ETwoHeartsCombatActionType::Guard;
 	EnterCombatPhase(ETwoHeartsCombatPhase::LogicEnded, InterruptReason);
 	RecordAbilityEvent(
 		TEXT("InterruptedByAction"),
@@ -793,20 +807,26 @@ void UTwoHeartsGA_NormalAttackBase::FinishCombatActionContext(bool bWasCancelled
 
 	if (UTwoHeartsCombatActionContextComponent* ActionContextComponent = GetCombatActionContextComponent())
 	{
-		const ETwoHeartsCombatActionEndReason EndReason =
-			!bWasCancelled ? ETwoHeartsCombatActionEndReason::Completed :
-			bInterruptedByDodge ? ETwoHeartsCombatActionEndReason::Interrupted :
-			ETwoHeartsCombatActionEndReason::Cancelled;
+		const FTwoHeartsCombatActionContextSnapshot& CurrentContext = ActionContextComponent->GetCurrentContext();
+		if (CurrentContext.ActionType == ETwoHeartsCombatActionType::NormalAttack)
+		{
+			const ETwoHeartsCombatActionEndReason EndReason =
+				!bWasCancelled ? ETwoHeartsCombatActionEndReason::Completed :
+				(bInterruptedByDodge || bInterruptedByGuard) ? ETwoHeartsCombatActionEndReason::Interrupted :
+				ETwoHeartsCombatActionEndReason::Cancelled;
 
-		const FString FinishReason =
-			!bWasCancelled ? TEXT("NormalAttackEnded") :
-			bInterruptedByDodge ? TEXT("InterruptedByDodge") :
-			TEXT("NormalAttackCancelled");
+			const FString FinishReason =
+				!bWasCancelled ? TEXT("NormalAttackEnded") :
+				bInterruptedByDodge ? TEXT("InterruptedByDodge") :
+				bInterruptedByGuard ? TEXT("InterruptedByGuard") :
+				TEXT("NormalAttackCancelled");
 
-		ActionContextComponent->FinishAction(EndReason, FinishReason);
+			ActionContextComponent->FinishAction(EndReason, FinishReason);
+		}
 	}
 
 	bHasRegisteredCombatActionContext = false;
+	bInterruptedByGuard = false;
 }
 
 void UTwoHeartsGA_NormalAttackBase::EnterCombatPhase(ETwoHeartsCombatPhase NewPhase, const FString& Reason)

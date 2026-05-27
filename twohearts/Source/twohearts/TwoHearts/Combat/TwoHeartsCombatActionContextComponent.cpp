@@ -107,9 +107,17 @@ bool UTwoHeartsCombatActionContextComponent::CanCurrentActionBeInterruptedBy(ETw
 	switch (CurrentContext.ActionType)
 	{
 	case ETwoHeartsCombatActionType::NormalAttack:
+		if (IncomingActionType == ETwoHeartsCombatActionType::Guard)
+		{
+			return true;
+		}
+
 		return IncomingActionType == ETwoHeartsCombatActionType::Dodge
 			&& (CurrentContext.ActionPhase == ETwoHeartsCombatPhase::Recovery
 				|| CurrentContext.ActionPhase == ETwoHeartsCombatPhase::LogicEnded);
+
+	case ETwoHeartsCombatActionType::Dodge:
+		return IncomingActionType == ETwoHeartsCombatActionType::Guard;
 
 	default:
 		return false;
@@ -151,6 +159,21 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::ExecuteNow;
 		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ActivateMatchingAbility;
 		Evaluation.Reason = TEXT("No active combat action is currently registered.");
+		return FinalizeEvaluation(MoveTemp(Evaluation));
+	}
+
+	if (IncomingActionType == ETwoHeartsCombatActionType::Guard)
+	{
+		if (CurrentContext.ActionType == ETwoHeartsCombatActionType::Guard)
+		{
+			Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::Reject;
+			Evaluation.Reason = TEXT("Current basic guard action is already active.");
+			return FinalizeEvaluation(MoveTemp(Evaluation));
+		}
+
+		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::ExecuteNow;
+		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ActivateMatchingAbility;
+		Evaluation.Reason = TEXT("Current basic guard rules allow Guard to enter immediately from any existing player action state.");
 		return FinalizeEvaluation(MoveTemp(Evaluation));
 	}
 

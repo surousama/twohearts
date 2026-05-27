@@ -26,6 +26,7 @@
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_NormalAttack_2.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_NormalAttack_3.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_Dodge.h"
+#include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_Guard.h"
 #include "TwoHearts/Combat/Gameplay/Input/TwoHeartsAbilityInputID.h"
 #include "TwoHearts/Combat/Gameplay/Tags/TwoHeartsGameplayTags.h"
 #include "twohearts.h"
@@ -42,6 +43,9 @@ ETwoHeartsCombatActionType GetCombatActionTypeForInputID(ETwoHeartsAbilityInputI
 	case ETwoHeartsAbilityInputID::Dodge:
 		return ETwoHeartsCombatActionType::Dodge;
 
+	case ETwoHeartsAbilityInputID::Guard:
+		return ETwoHeartsCombatActionType::Guard;
+
 	default:
 		return ETwoHeartsCombatActionType::None;
 	}
@@ -56,6 +60,9 @@ FString GetCombatInputName(ETwoHeartsAbilityInputID InputID)
 
 	case ETwoHeartsAbilityInputID::Dodge:
 		return TEXT("Dodge");
+
+	case ETwoHeartsAbilityInputID::Guard:
+		return TEXT("Guard");
 
 	default:
 		return FString::Printf(TEXT("Input_%d"), static_cast<int32>(InputID));
@@ -72,6 +79,10 @@ bool TryGetCombatInputIDForActionType(ETwoHeartsCombatActionType ActionType, ETw
 
 	case ETwoHeartsCombatActionType::Dodge:
 		OutInputID = ETwoHeartsAbilityInputID::Dodge;
+		return true;
+
+	case ETwoHeartsCombatActionType::Guard:
+		OutInputID = ETwoHeartsAbilityInputID::Guard;
 		return true;
 
 	default:
@@ -169,6 +180,11 @@ AtwoheartsCharacter::AtwoheartsCharacter()
 		DodgeGrant.AbilityClass = UTwoHeartsGA_Dodge::StaticClass();
 		DodgeGrant.InputID = ETwoHeartsAbilityInputID::Dodge;
 		DefaultCombatAbilities.Add(DodgeGrant);
+
+		FTwoHeartsAbilityGrant GuardGrant;
+		GuardGrant.AbilityClass = UTwoHeartsGA_Guard::StaticClass();
+		GuardGrant.InputID = ETwoHeartsAbilityInputID::Guard;
+		DefaultCombatAbilities.Add(GuardGrant);
 	}
 }
 
@@ -222,6 +238,13 @@ void AtwoheartsCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 		{
 			EnhancedInputComponent->BindAction(DodgeAction, ETriggerEvent::Started, this, &AtwoheartsCharacter::Dodge);
 		}
+
+		if (GuardAction)
+		{
+			EnhancedInputComponent->BindAction(GuardAction, ETriggerEvent::Started, this, &AtwoheartsCharacter::Guard);
+			EnhancedInputComponent->BindAction(GuardAction, ETriggerEvent::Completed, this, &AtwoheartsCharacter::GuardReleased);
+			EnhancedInputComponent->BindAction(GuardAction, ETriggerEvent::Canceled, this, &AtwoheartsCharacter::GuardReleased);
+		}
 	}
 	else
 	{
@@ -270,6 +293,21 @@ void AtwoheartsCharacter::Dodge(const FInputActionValue& Value)
 	}
 
 	UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[AbilityInput] Dodge input did not activate any ability on %s."), *GetNameSafe(this));
+}
+
+void AtwoheartsCharacter::Guard(const FInputActionValue& Value)
+{
+	if (HandleAbilityInputPressed(ETwoHeartsAbilityInputID::Guard))
+	{
+		return;
+	}
+
+	UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[AbilityInput] Guard input did not activate any ability on %s."), *GetNameSafe(this));
+}
+
+void AtwoheartsCharacter::GuardReleased(const FInputActionValue& Value)
+{
+	HandleAbilityInputReleased(ETwoHeartsAbilityInputID::Guard);
 }
 
 void AtwoheartsCharacter::InitializeAbilitySystem()
@@ -388,6 +426,21 @@ bool AtwoheartsCharacter::HandleAbilityInputPressed(ETwoHeartsAbilityInputID Inp
 	}
 
 	return TryExecuteCombatInputNow(InputID, InputName, InputEvaluation);
+}
+
+void AtwoheartsCharacter::HandleAbilityInputReleased(ETwoHeartsAbilityInputID InputID)
+{
+	if (InputID != ETwoHeartsAbilityInputID::Guard)
+	{
+		return;
+	}
+
+	const bool bHoldReserved = GuardConfig.InputMode == ETwoHeartsGuardInputMode::HoldReserved;
+	const FString Detail = bHoldReserved
+		? TEXT("Guard release was received while HoldReserved mode is configured for future extension.")
+		: TEXT("Guard release was received, but current basic guard uses tap-only timing.");
+	PushGuardDebugEvent(TEXT("GuardInputReleased"), Detail);
+	RecordCombatInputDebugEvent(TEXT("GuardRelease"), TEXT("Observed"), TEXT("ReleaseOnly"), Detail);
 }
 
 void AtwoheartsCharacter::DoMove(float Right, float Forward)
@@ -718,6 +771,14 @@ void AtwoheartsCharacter::SetDodgeDebugRuntimeState(bool bIsActive, bool bIsInvu
 	CurrentDodgeDirectionName = DirectionName;
 }
 
+void AtwoheartsCharacter::SetGuardDebugRuntimeState(bool bIsActive, bool bIsWindowActive, const FString& PhaseName, bool bHoldReserved)
+{
+	bIsGuardAbilityActive = bIsActive;
+	bIsGuardWindowActive = bIsWindowActive;
+	CurrentGuardPhaseName = PhaseName;
+	bGuardHoldInputReserved = bHoldReserved;
+}
+
 void AtwoheartsCharacter::PushNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly)
 {
 	RecordNormalAttackDebugEvent(EventName, Detail, bVerboseOnly);
@@ -733,6 +794,13 @@ void AtwoheartsCharacter::PushDodgeDebugEvent(const TCHAR* EventName, const FStr
 	LastDodgeDebugEventName = EventName;
 	LastDodgeDebugDetail = Detail;
 	LastDodgeEventTimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+}
+
+void AtwoheartsCharacter::PushGuardDebugEvent(const TCHAR* EventName, const FString& Detail)
+{
+	LastGuardDebugEventName = EventName;
+	LastGuardDebugDetail = Detail;
+	LastGuardEventTimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 }
 
 void AtwoheartsCharacter::RecordNormalAttackDebugEvent(const TCHAR* EventName, const FString& Detail, bool bVerboseOnly)
@@ -879,6 +947,19 @@ void AtwoheartsCharacter::RecordAbilityInputDebugEvent(ETwoHeartsAbilityInputID 
 		return;
 	}
 
+	if (InputID == ETwoHeartsAbilityInputID::Guard)
+	{
+		PushGuardDebugEvent(EventName, Detail);
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Display,
+			TEXT("[GuardInput] actor=%s event=%s detail=\"%s\""),
+			*GetNameSafe(this),
+			EventName,
+			*Detail);
+		return;
+	}
+
 	RecordNormalAttackDebugEvent(EventName, Detail, bVerboseOnly);
 }
 
@@ -891,6 +972,18 @@ void AtwoheartsCharacter::RecordAbilityInputFailure(ETwoHeartsAbilityInputID Inp
 			LogtwoheartsCombatTest,
 			Warning,
 			TEXT("[DodgeInputFailure] actor=%s detail=\"%s\""),
+			*GetNameSafe(this),
+			*Detail);
+		return;
+	}
+
+	if (InputID == ETwoHeartsAbilityInputID::Guard)
+	{
+		PushGuardDebugEvent(EventName, Detail);
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Warning,
+			TEXT("[GuardInputFailure] actor=%s detail=\"%s\""),
 			*GetNameSafe(this),
 			*Detail);
 		return;
@@ -995,6 +1088,7 @@ bool AtwoheartsCharacter::TryExecuteCombatInputNow(ETwoHeartsAbilityInputID Inpu
 	const int32 NumericInputID = static_cast<int32>(InputID);
 	const bool bIsNormalAttackInput = InputID == ETwoHeartsAbilityInputID::NormalAttack;
 	const bool bIsDodgeInput = InputID == ETwoHeartsAbilityInputID::Dodge;
+	const bool bIsGuardInput = InputID == ETwoHeartsAbilityInputID::Guard;
 	const FGameplayTag StarterAbilityTag = TAG_TwoHearts_Ability_NormalAttack_Segment1;
 	bool bAttemptedActivation = false;
 	bool bActivatedAbility = false;
@@ -1101,6 +1195,15 @@ bool AtwoheartsCharacter::TryExecuteCombatInputNow(ETwoHeartsAbilityInputID Inpu
 			MatchingAbilityNames.IsEmpty()
 				? TEXT("Dodge input found no bound dodge ability.")
 				: TEXT("Dodge input matched abilities but none were eligible for activation."));
+	}
+	else if (bIsGuardInput)
+	{
+		RecordAbilityInputFailure(
+			InputID,
+			TEXT("ActivateFailed"),
+			MatchingAbilityNames.IsEmpty()
+				? TEXT("Guard input found no bound guard ability.")
+				: TEXT("Guard input matched abilities but none were eligible for activation."));
 	}
 	else if (!MatchingAbilityNames.IsEmpty())
 	{

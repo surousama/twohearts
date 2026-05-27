@@ -2,6 +2,7 @@
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Ability_NormalAttack, "Ability.NormalAttack", "Normal attack ability tag.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Ability_Dodge, "Ability.Dodge", "Dodge ability tag.");
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Ability_Guard, "Ability.Guard", "Guard ability tag.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Ability_HostileAttackProbe, "Ability.HostileAttackProbe", "Minimal hostile attack probe tag.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Ability_NormalAttack_Segment1, "Ability.NormalAttack.Segment1", "First normal attack segment ability tag.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Ability_NormalAttack_Segment2, "Ability.NormalAttack.Segment2", "Second normal attack segment ability tag.");
@@ -24,6 +25,11 @@ FGameplayTag FTwoHeartsGameplayTags::Ability_NormalAttack()
 FGameplayTag FTwoHeartsGameplayTags::Ability_Dodge()
 {
 	return TAG_TwoHearts_Ability_Dodge;
+}
+
+FGameplayTag FTwoHeartsGameplayTags::Ability_Guard()
+{
+	return TAG_TwoHearts_Ability_Guard;
 }
 
 FGameplayTag FTwoHeartsGameplayTags::Ability_HostileAttackProbe()

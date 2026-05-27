@@ -12,6 +12,7 @@ class UAbilitySystemComponent;
 class UAnimMontage;
 class UAnimInstance;
 class UAbilityTask_PlayMontageAndWait;
+enum class ETwoHeartsCombatActionType : uint8;
 enum class ETwoHeartsCombatPhase : uint8;
 struct FBranchingPointNotifyPayload;
 
@@ -36,12 +37,15 @@ public:
 		bool bReplicateEndAbility,
 		bool bWasCancelled) override;
 
+	bool TryInterruptByAction(ETwoHeartsCombatActionType InterruptingActionType, const FString& InterruptReason);
+
 private:
 	UTwoHeartsGA_NormalAttackBase* FindActiveNormalAttackAbility() const;
 	UTwoHeartsCombatActionContextComponent* GetCombatActionContextComponent() const;
 	bool CanStartDodgeExecution() const;
 	bool CanInterruptCurrentActionByDodge() const;
 	bool TryInterruptCurrentActionByDodge();
+	bool CanBeInterruptedByAction(ETwoHeartsCombatActionType InterruptingActionType) const;
 	bool ResolveDodgeDirection(FVector& OutDirection, FString& OutDirectionName) const;
 	bool StartDodgeExecution();
 	void SyncCombatActionContextOnPhaseEntered(ETwoHeartsCombatPhase NewPhase, const FString& Reason);
@@ -95,6 +99,7 @@ private:
 	bool bHasMarkedCombatLogicEnded = false;
 	bool bHasReceivedInvulnerabilityBeginNotify = false;
 	bool bHasReceivedInvulnerabilityEndNotify = false;
+	bool bInterruptedByGuard = false;
 	bool bCachedOrientRotationToMovement = false;
 	bool bCachedUseControllerDesiredRotation = false;
 	bool bCachedUseControllerRotationYaw = false;

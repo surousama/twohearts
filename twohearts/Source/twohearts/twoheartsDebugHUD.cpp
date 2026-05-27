@@ -67,7 +67,7 @@ void ATwoheartsDebugHUD::DrawHUD()
 		VisibleInputEvents.Add(&InputEvents[EventIndex]);
 	}
 
-	const float PanelHeight = 450.0f + (VisibleEvents.Num() * LineHeight) + (VisibleInputEvents.Num() * LineHeight * 2.0f);
+	const float PanelHeight = 520.0f + (VisibleEvents.Num() * LineHeight) + (VisibleInputEvents.Num() * LineHeight * 2.0f);
 	FCanvasTileItem Background(FVector2D(PanelX, PanelY), FVector2D(PanelWidth, PanelHeight), FLinearColor(0.02f, 0.02f, 0.02f, 0.78f));
 	Background.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(Background);
@@ -127,12 +127,13 @@ void ATwoheartsDebugHUD::DrawHUD()
 
 		DrawDebugLine(
 			FString::Printf(
-				TEXT("active=%s   type=%s   phase=%s   logic_end=%s   dodge_interrupt=%s   end=%s"),
+				TEXT("active=%s   type=%s   phase=%s   logic_end=%s   dodge_interrupt=%s   guard_interrupt=%s   end=%s"),
 				ActionContext.bIsActionActive ? TEXT("YES") : TEXT("NO"),
 				ActionTypeEnum ? *ActionTypeEnum->GetNameStringByValue(static_cast<int64>(ActionContext.ActionType)) : TEXT("Unknown"),
 				*Character->GetCombatPhaseDebugName(ActionContext.ActionPhase),
 				ActionContext.bHasLogicEnded ? TEXT("YES") : TEXT("NO"),
 				ActionContextComponent->CanCurrentActionBeInterruptedBy(ETwoHeartsCombatActionType::Dodge) ? TEXT("YES") : TEXT("NO"),
+				ActionContextComponent->CanCurrentActionBeInterruptedBy(ETwoHeartsCombatActionType::Guard) ? TEXT("YES") : TEXT("NO"),
 				EndReasonEnum ? *EndReasonEnum->GetNameStringByValue(static_cast<int64>(ActionContext.LastEndReason)) : TEXT("Unknown")),
 			PanelX + 12.0f,
 			CurrentY,
@@ -236,6 +237,32 @@ void ATwoheartsDebugHUD::DrawHUD()
 		PanelX + 12.0f,
 		CurrentY,
 		Character->GetLastDodgeDebugDetail().IsEmpty() ? MutedColor : TextColor);
+	CurrentY += LineHeight * 1.5f;
+
+	DrawDebugLine(TEXT("Guard"), PanelX + 12.0f, CurrentY, HeaderColor);
+	CurrentY += LineHeight;
+
+	DrawDebugLine(
+		FString::Printf(
+			TEXT("guarding=%s   window=%s   phase=%s   hold_reserved=%s"),
+			Character->IsGuardingDebugState() ? TEXT("YES") : TEXT("NO"),
+			Character->IsGuardWindowActiveDebugState() ? TEXT("YES") : TEXT("NO"),
+			*Character->GetCurrentGuardPhaseDebugState(),
+			Character->IsGuardHoldInputReservedDebugState() ? TEXT("YES") : TEXT("NO")),
+		PanelX + 12.0f,
+		CurrentY,
+		TextColor);
+	CurrentY += LineHeight;
+
+	DrawDebugLine(
+		FString::Printf(
+			TEXT("last_guard_event=[%.2f] %s | %s"),
+			Character->GetLastGuardEventTimeSeconds(),
+			*Character->GetLastGuardDebugEventName(),
+			Character->GetLastGuardDebugDetail().IsEmpty() ? TEXT("None") : *Character->GetLastGuardDebugDetail()),
+		PanelX + 12.0f,
+		CurrentY,
+		Character->GetLastGuardDebugDetail().IsEmpty() ? MutedColor : TextColor);
 	CurrentY += LineHeight * 1.5f;
 
 	DrawDebugLine(TEXT("Incoming Hostile Attack"), PanelX + 12.0f, CurrentY, HeaderColor);
