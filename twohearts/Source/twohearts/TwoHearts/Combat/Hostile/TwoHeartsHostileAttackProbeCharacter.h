@@ -57,6 +57,7 @@ private:
 	void HandleRepeatAttackTimerElapsed();
 	void RestoreIdleAnimation() const;
 	void NotifyCurrentTarget(ETwoHeartsHostileAttackSignalType SignalType, const FString& Detail, bool bHasContact) const;
+	void NotifyTargetActor(AActor* TargetActor, ETwoHeartsHostileAttackSignalType SignalType, const FString& Detail, bool bHasContact) const;
 	void NotifyHitTargets();
 	FTwoHeartsHostileAttackSignal BuildSignal(ETwoHeartsHostileAttackSignalType SignalType, AActor* TargetActor, const FString& Detail, bool bHasContact) const;
 	void DrawDebugProbeState(const FColor& Color, const FString& Label) const;
@@ -124,6 +125,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> CurrentTargetActor = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> AttackTargetActor = nullptr;
 
 	FTimerHandle AttackPhaseTimerHandle;
 	FTimerHandle RepeatAttackTimerHandle;

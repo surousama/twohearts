@@ -14,6 +14,29 @@
 #include "UObject/ConstructorHelpers.h"
 #include "twohearts.h"
 
+namespace
+{
+	const TCHAR* LexToString(const ETwoHeartsHostileAttackSignalType SignalType)
+	{
+		switch (SignalType)
+		{
+		case ETwoHeartsHostileAttackSignalType::AttackStarted:
+			return TEXT("AttackStarted");
+		case ETwoHeartsHostileAttackSignalType::HitWindowOpened:
+			return TEXT("HitWindowOpened");
+		case ETwoHeartsHostileAttackSignalType::HitWindowClosed:
+			return TEXT("HitWindowClosed");
+		case ETwoHeartsHostileAttackSignalType::AttackContact:
+			return TEXT("AttackContact");
+		case ETwoHeartsHostileAttackSignalType::AttackFinished:
+			return TEXT("AttackFinished");
+		case ETwoHeartsHostileAttackSignalType::None:
+		default:
+			return TEXT("None");
+		}
+	}
+}
+
 ATwoHeartsHostileAttackProbeCharacter::ATwoHeartsHostileAttackProbeCharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -76,6 +99,21 @@ void ATwoHeartsHostileAttackProbeCharacter::BeginPlay()
 		TriggerSphereComponent->OnComponentBeginOverlap.AddDynamic(this, &ATwoHeartsHostileAttackProbeCharacter::HandleTriggerSphereBeginOverlap);
 		TriggerSphereComponent->OnComponentEndOverlap.AddDynamic(this, &ATwoHeartsHostileAttackProbeCharacter::HandleTriggerSphereEndOverlap);
 	}
+
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[HostileAttackProbe] actor=%s event=BeginPlay trigger_radius=%.1f attack_reach=%.1f attack_radius=%.1f startup=%.2f hit_window=%.2f recovery=%.2f repeat_cooldown=%.2f auto_trigger=%s loop=%s"),
+		*GetNameSafe(this),
+		TriggerRadius,
+		AttackReach,
+		AttackRadius,
+		StartupSeconds,
+		HitWindowSeconds,
+		RecoverySeconds,
+		RepeatCooldownSeconds,
+		bAutoTriggerWhenTargetEntersRange ? TEXT("true") : TEXT("false"),
+		bLoopAttackWhileTargetStaysInRange ? TEXT("true") : TEXT("false"));
 }
 
 void ATwoHeartsHostileAttackProbeCharacter::OnConstruction(const FTransform& Transform)
@@ -88,17 +126,18 @@ bool ATwoHeartsHostileAttackProbeCharacter::TriggerProbeAttack()
 {
 	if (bAttackActive)
 	{
-		UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[HostileAttackProbe] %s ignored trigger because an attack is already active."), *GetNameSafe(this));
+		UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[HostileAttackProbe] actor=%s event=TriggerIgnored reason=attack_already_active attack=%s"), *GetNameSafe(this), *CurrentAttackInstanceName);
 		return false;
 	}
 
 	if (!AttackAnimation)
 	{
-		UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[HostileAttackProbe] %s cannot start because AttackAnimation is not configured."), *GetNameSafe(this));
+		UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[HostileAttackProbe] actor=%s event=TriggerFailed reason=missing_attack_animation"), *GetNameSafe(this));
 		return false;
 	}
 
 	GetWorldTimerManager().ClearTimer(RepeatAttackTimerHandle);
+	UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[HostileAttackProbe] actor=%s event=TriggerAccepted target=%s"), *GetNameSafe(this), *GetNameSafe(CurrentTargetActor));
 	StartAttackStartup();
 	return true;
 }
@@ -111,6 +150,7 @@ void ATwoHeartsHostileAttackProbeCharacter::ResetProbeToIdle()
 	bAttackActive = false;
 	bHitWindowActive = false;
 	CurrentAttackInstanceName = TEXT("None");
+	AttackTargetActor = nullptr;
 	ContactedTargetsThisAttack.Reset();
 
 	if (CombatActionContextComponent && CombatActionContextComponent->HasActiveAction())
@@ -119,6 +159,8 @@ void ATwoHeartsHostileAttackProbeCharacter::ResetProbeToIdle()
 	}
 
 	RestoreIdleAnimation();
+
+	UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[HostileAttackProbe] actor=%s event=ResetToIdle"), *GetNameSafe(this));
 }
 
 void ATwoHeartsHostileAttackProbeCharacter::HandleTriggerSphereBeginOverlap(
@@ -136,10 +178,19 @@ void ATwoHeartsHostileAttackProbeCharacter::HandleTriggerSphereBeginOverlap(
 
 	if (!OtherActor->FindComponentByClass<UTwoHeartsHostileAttackReceiverComponent>())
 	{
+		UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[HostileAttackProbe] actor=%s event=TriggerEnterIgnored other=%s reason=missing_receiver_component"), *GetNameSafe(this), *GetNameSafe(OtherActor));
 		return;
 	}
 
 	CurrentTargetActor = OtherActor;
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[HostileAttackProbe] actor=%s event=TriggerEnter target=%s distance=%.1f auto_trigger=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(CurrentTargetActor),
+		FVector::Distance(GetActorLocation(), CurrentTargetActor->GetActorLocation()),
+		bAutoTriggerWhenTargetEntersRange ? TEXT("true") : TEXT("false"));
 
 	if (bAutoTriggerWhenTargetEntersRange)
 	{
@@ -155,6 +206,7 @@ void ATwoHeartsHostileAttackProbeCharacter::HandleTriggerSphereEndOverlap(
 {
 	if (OtherActor && OtherActor == CurrentTargetActor)
 	{
+		UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[HostileAttackProbe] actor=%s event=TriggerExit target=%s"), *GetNameSafe(this), *GetNameSafe(CurrentTargetActor));
 		CurrentTargetActor = nullptr;
 	}
 }
@@ -177,6 +229,7 @@ void ATwoHeartsHostileAttackProbeCharacter::StartAttackStartup()
 {
 	bAttackActive = true;
 	bHitWindowActive = false;
+	AttackTargetActor = CurrentTargetActor;
 	ContactedTargetsThisAttack.Reset();
 	CurrentAttackInstanceName = FString::Printf(TEXT("HostileProbe_%d"), ++AttackInstanceCounter);
 
@@ -193,6 +246,16 @@ void ATwoHeartsHostileAttackProbeCharacter::StartAttackStartup()
 
 	GetMesh()->PlayAnimation(AttackAnimation, false);
 	NotifyCurrentTarget(ETwoHeartsHostileAttackSignalType::AttackStarted, TEXT("Hostile attack startup began."), false);
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[HostileAttackProbe] actor=%s event=AttackStarted attack=%s target=%s startup=%.2f hit_window=%.2f recovery=%.2f"),
+		*GetNameSafe(this),
+		*CurrentAttackInstanceName,
+		*GetNameSafe(AttackTargetActor),
+		StartupSeconds,
+		HitWindowSeconds,
+		RecoverySeconds);
 	DrawDebugProbeState(FColor::Yellow, TEXT("Startup"));
 
 	if (bEnableScreenDebugOutput && GEngine)
@@ -220,7 +283,16 @@ void ATwoHeartsHostileAttackProbeCharacter::OpenHitWindow()
 		CombatActionContextComponent->TransitionToPhase(ETwoHeartsCombatPhase::Active, TEXT("HostileAttackProbeHitWindowOpened"));
 	}
 
-	NotifyCurrentTarget(ETwoHeartsHostileAttackSignalType::HitWindowOpened, TEXT("Hostile attack hit window is now active."), false);
+	NotifyTargetActor(AttackTargetActor, ETwoHeartsHostileAttackSignalType::HitWindowOpened, TEXT("Hostile attack hit window is now active."), false);
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[HostileAttackProbe] actor=%s event=HitWindowOpened attack=%s target=%s attack_radius=%.1f attack_reach=%.1f"),
+		*GetNameSafe(this),
+		*CurrentAttackInstanceName,
+		*GetNameSafe(AttackTargetActor),
+		AttackRadius,
+		AttackReach);
 	NotifyHitTargets();
 	DrawDebugProbeState(FColor::Red, TEXT("HitWindow"));
 
@@ -240,7 +312,8 @@ void ATwoHeartsHostileAttackProbeCharacter::CloseHitWindow()
 		CombatActionContextComponent->TransitionToPhase(ETwoHeartsCombatPhase::Recovery, TEXT("HostileAttackProbeHitWindowClosed"));
 	}
 
-	NotifyCurrentTarget(ETwoHeartsHostileAttackSignalType::HitWindowClosed, TEXT("Hostile attack hit window closed."), false);
+	NotifyTargetActor(AttackTargetActor, ETwoHeartsHostileAttackSignalType::HitWindowClosed, TEXT("Hostile attack hit window closed."), false);
+	UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[HostileAttackProbe] actor=%s event=HitWindowClosed attack=%s target=%s"), *GetNameSafe(this), *CurrentAttackInstanceName, *GetNameSafe(AttackTargetActor));
 	DrawDebugProbeState(FColor::Blue, TEXT("Recovery"));
 
 	GetWorldTimerManager().SetTimer(AttackPhaseTimerHandle, this, &ATwoHeartsHostileAttackProbeCharacter::FinishAttack, RecoverySeconds, false);
@@ -262,13 +335,15 @@ void ATwoHeartsHostileAttackProbeCharacter::FinishAttack()
 		CombatActionContextComponent->FinishAction(ETwoHeartsCombatActionEndReason::Completed, TEXT("HostileAttackProbeFinished"));
 	}
 
-	NotifyCurrentTarget(ETwoHeartsHostileAttackSignalType::AttackFinished, TEXT("Hostile attack finished and probe returned to idle."), false);
+	NotifyTargetActor(AttackTargetActor, ETwoHeartsHostileAttackSignalType::AttackFinished, TEXT("Hostile attack finished and probe returned to idle."), false);
+	UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[HostileAttackProbe] actor=%s event=AttackFinished attack=%s target=%s contacted_targets=%d"), *GetNameSafe(this), *CurrentAttackInstanceName, *GetNameSafe(AttackTargetActor), ContactedTargetsThisAttack.Num());
 	DrawDebugProbeState(FColor::Green, TEXT("Finished"));
 	RestoreIdleAnimation();
 	ContactedTargetsThisAttack.Reset();
 
 	if (bLoopAttackWhileTargetStaysInRange && CurrentTargetActor && IsActorInsideTriggerSphere(CurrentTargetActor))
 	{
+		UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[HostileAttackProbe] actor=%s event=LoopQueued attack=%s next_in=%.2f target=%s"), *GetNameSafe(this), *CurrentAttackInstanceName, RepeatCooldownSeconds, *GetNameSafe(CurrentTargetActor));
 		GetWorldTimerManager().SetTimer(
 			RepeatAttackTimerHandle,
 			this,
@@ -276,10 +351,13 @@ void ATwoHeartsHostileAttackProbeCharacter::FinishAttack()
 			RepeatCooldownSeconds,
 			false);
 	}
+
+	AttackTargetActor = nullptr;
 }
 
 void ATwoHeartsHostileAttackProbeCharacter::HandleRepeatAttackTimerElapsed()
 {
+	UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[HostileAttackProbe] actor=%s event=LoopTriggerElapsed target=%s"), *GetNameSafe(this), *GetNameSafe(CurrentTargetActor));
 	TriggerProbeAttack();
 }
 
@@ -293,14 +371,33 @@ void ATwoHeartsHostileAttackProbeCharacter::RestoreIdleAnimation() const
 
 void ATwoHeartsHostileAttackProbeCharacter::NotifyCurrentTarget(ETwoHeartsHostileAttackSignalType SignalType, const FString& Detail, bool bHasContact) const
 {
-	if (!CurrentTargetActor)
+	NotifyTargetActor(CurrentTargetActor, SignalType, Detail, bHasContact);
+}
+
+void ATwoHeartsHostileAttackProbeCharacter::NotifyTargetActor(
+	AActor* TargetActor,
+	ETwoHeartsHostileAttackSignalType SignalType,
+	const FString& Detail,
+	bool bHasContact) const
+{
+	if (!TargetActor)
 	{
+		UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[HostileAttackProbe] actor=%s event=SignalSkipped type=%s reason=no_target_actor"), *GetNameSafe(this), LexToString(SignalType));
 		return;
 	}
 
-	if (UTwoHeartsHostileAttackReceiverComponent* Receiver = CurrentTargetActor->FindComponentByClass<UTwoHeartsHostileAttackReceiverComponent>())
+	if (UTwoHeartsHostileAttackReceiverComponent* Receiver = TargetActor->FindComponentByClass<UTwoHeartsHostileAttackReceiverComponent>())
 	{
-		Receiver->ReceiveHostileAttackSignal(BuildSignal(SignalType, CurrentTargetActor, Detail, bHasContact));
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Display,
+			TEXT("[HostileAttackProbe] actor=%s event=SignalSent type=%s attack=%s target=%s contact=%s"),
+			*GetNameSafe(this),
+			LexToString(SignalType),
+			*CurrentAttackInstanceName,
+			*GetNameSafe(TargetActor),
+			bHasContact ? TEXT("true") : TEXT("false"));
+		Receiver->ReceiveHostileAttackSignal(BuildSignal(SignalType, TargetActor, Detail, bHasContact));
 	}
 }
 
@@ -313,6 +410,9 @@ void ATwoHeartsHostileAttackProbeCharacter::NotifyHitTargets()
 
 	TArray<AActor*> OverlappingActors;
 	HitSphereComponent->GetOverlappingActors(OverlappingActors, AActor::StaticClass());
+	UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[HostileAttackProbe] actor=%s event=ContactScan attack=%s overlap_count=%d"), *GetNameSafe(this), *CurrentAttackInstanceName, OverlappingActors.Num());
+
+	bool bContactSent = false;
 	for (AActor* OverlappingActor : OverlappingActors)
 	{
 		if (!OverlappingActor || OverlappingActor == this)
@@ -338,6 +438,21 @@ void ATwoHeartsHostileAttackProbeCharacter::NotifyHitTargets()
 				TEXT("Probe attack overlap/contact occurred during hit window."),
 				true));
 		ContactedTargetsThisAttack.Add(OverlappingActor);
+		bContactSent = true;
+
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Display,
+			TEXT("[HostileAttackProbe] actor=%s event=ContactSent attack=%s target=%s contacted_count=%d"),
+			*GetNameSafe(this),
+			*CurrentAttackInstanceName,
+			*GetNameSafe(OverlappingActor),
+			ContactedTargetsThisAttack.Num());
+	}
+
+	if (!bContactSent)
+	{
+		UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[HostileAttackProbe] actor=%s event=ContactMiss attack=%s reason=no_valid_overlap_target"), *GetNameSafe(this), *CurrentAttackInstanceName);
 	}
 }
 
