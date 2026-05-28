@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
+- **Total Sessions**: 15
 - **Last Active**: 2026-05-28
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~487 | Active |
+| `journal-1.md` | ~522 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | 日期 | 标题 | 提交 | 分支 |
 |---|------|-------|---------|--------|
+| 15 | 2026-05-28 | 预输入二期泛化收尾 | `d2df2e7`, `572f589`, `a2d9fe1` | `master` |
 | 14 | 2026-05-28 | 完成格挡结果结算与后续能力接口收尾 | `49d749e`, `f698eae`, `e8035b7` | `master` |
 | 13 | 2026-05-28 | 攻击元数据基础验收收尾与后续任务拆分 | `8b88d45`, `dabd3fa`, `3b34a5b`, `3b03a71` | `master` |
 | 12 | 2026-05-28 | 完成格挡规则基础升级 | `7f3bb69` | `master` |

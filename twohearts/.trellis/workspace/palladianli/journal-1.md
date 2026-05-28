@@ -485,3 +485,38 @@ Implemented character-side weapon visual switching, configured weapon assets and
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: 预输入二期泛化收尾
+
+**Date**: 2026-05-28
+**Task**: 预输入二期泛化收尾
+**Branch**: `master`
+
+### Summary
+
+完成预输入二期泛化、统一调试口径，并修复 hostile attack probe 的 unity 编译冲突。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d2df2e7` | (see git log) |
+| `572f589` | (see git log) |
+| `a2d9fe1` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
