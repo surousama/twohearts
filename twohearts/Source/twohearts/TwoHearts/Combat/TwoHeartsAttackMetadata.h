@@ -54,6 +54,15 @@ struct FTwoHeartsAttackMetadata
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Attack Metadata")
 	bool bCanBeGuarded = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Attack Metadata|Guard Rule", meta=(ClampMin="0.0", UIMin="0.0"))
+	float GuardMaxDistance = 220.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Attack Metadata|Guard Rule", meta=(ClampMin="0.0", UIMin="0.0"))
+	float GuardMaxHeightDifference = 120.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Attack Metadata|Guard Rule", meta=(ClampMin="0.0", ClampMax="180.0", UIMin="0.0", UIMax="180.0"))
+	float GuardFacingHalfAngleDegrees = 100.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Attack Metadata")
 	bool bCanBeDodged = true;
 

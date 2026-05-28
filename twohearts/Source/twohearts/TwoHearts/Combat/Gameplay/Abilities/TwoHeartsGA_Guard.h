@@ -10,7 +10,7 @@ class UTwoHeartsGA_Dodge;
 class UTwoHeartsCombatActionContextComponent;
 class UTwoHeartsHostileAttackReceiverComponent;
 struct FTwoHeartsGuardConfig;
-struct FTwoHeartsPlayerHitResult;
+struct FTwoHeartsHostileAttackSignal;
 enum class ETwoHeartsCombatActionType : uint8;
 
 UCLASS()
@@ -53,6 +53,7 @@ private:
 	void BindHostileAttackReceiver(UTwoHeartsHostileAttackReceiverComponent* ReceiverComponent);
 	void UnbindHostileAttackReceiver();
 	void UpdateGuardDebugState() const;
+	void DrawGuardDebugGeometry() const;
 	void RecordGuardEvent(const TCHAR* EventName, const FString& Detail, bool bWarning = false) const;
 	const FTwoHeartsGuardConfig* GetGuardConfig() const;
 
@@ -66,7 +67,10 @@ private:
 	void HandleGuardRecoveryFinished();
 
 	UFUNCTION()
-	void HandlePlayerHitResultUpdated(const FTwoHeartsPlayerHitResult& HitResult);
+	void HandleHostileAttackSignalReceived(const FTwoHeartsHostileAttackSignal& Signal);
+
+	bool TryEvaluateGuardAgainstAttackSignal(const FTwoHeartsHostileAttackSignal& Signal);
+	FString BuildGuardFailureDetailFromSignal(const FTwoHeartsHostileAttackSignal& Signal) const;
 
 	bool bGuardStarted = false;
 	bool bGuardFinished = false;
@@ -76,6 +80,7 @@ private:
 	bool bInterruptedByHitReaction = false;
 	ETwoHeartsCombatPhase CurrentGuardPhase = ETwoHeartsCombatPhase::None;
 	TWeakObjectPtr<UTwoHeartsHostileAttackReceiverComponent> BoundHostileAttackReceiver;
+	FString LastEvaluatedAttackInstanceName;
 	FTimerHandle GuardStartupTimerHandle;
 	FTimerHandle GuardWindowTimerHandle;
 	FTimerHandle GuardRecoveryTimerHandle;

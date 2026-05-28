@@ -291,6 +291,7 @@ private:
 	void BeginPlay() override;
 	void UpdatePlayerHitResultFromSignal(const FTwoHeartsHostileAttackSignal& Signal);
 	void FinalizeCurrentPendingAttack(const FTwoHeartsHostileAttackSignal& Signal, ETwoHeartsPlayerHitResultType FinalResultType, bool bHitConfirmed, bool bCanBeRewrittenByGuard, const FString& Detail);
+	bool TryConsumePendingGuardRewriteForAttack(const FString& AttackInstanceName, ETwoHeartsPlayerHitResultType& OutResultType, FString& OutDetail);
 	void PushPlayerHitResult(const FTwoHeartsPlayerHitResult& HitResult);
 	void UpdatePlayerDamageResultFromHitResult(const FTwoHeartsPlayerHitResult& HitResult);
 	void PushPlayerDamageResult(const FTwoHeartsPlayerDamageResult& DamageResult);
@@ -373,6 +374,18 @@ private:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Player Hit Result", meta=(AllowPrivateAccess="true"))
 	FTwoHeartsAttackMetadata PendingAttackMetadata;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Player Hit Result", meta=(AllowPrivateAccess="true"))
+	bool bHasPendingGuardRewriteRequest = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Player Hit Result", meta=(AllowPrivateAccess="true"))
+	FString PendingGuardRewriteAttackInstanceName = TEXT("None");
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Player Hit Result", meta=(AllowPrivateAccess="true"))
+	ETwoHeartsPlayerHitResultType PendingGuardRewriteResultType = ETwoHeartsPlayerHitResultType::None;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Player Hit Result", meta=(AllowPrivateAccess="true"))
+	FString PendingGuardRewriteDetail;
 
 	FTimerHandle HitReactionRecoveryTimerHandle;
 };

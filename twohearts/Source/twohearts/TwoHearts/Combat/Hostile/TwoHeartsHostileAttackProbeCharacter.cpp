@@ -79,11 +79,14 @@ namespace
 			? TEXT("None")
 			: AttackMetadata.TimingWindowName.ToString();
 		return FString::Printf(
-			TEXT("reaction=%s damage=%.2f tags=%s guard=%s dodge=%s timing=%s/%s"),
+			TEXT("reaction=%s damage=%.2f tags=%s guard=%s dist=%.1f height=%.1f angle=%.1f dodge=%s timing=%s/%s"),
 			LexHitReactionTypeToString(AttackMetadata.HitReactionType),
 			AttackMetadata.BaseDamage,
 			*DamageMechanicTags,
 			AttackMetadata.bCanBeGuarded ? TEXT("true") : TEXT("false"),
+			AttackMetadata.GuardMaxDistance,
+			AttackMetadata.GuardMaxHeightDifference,
+			AttackMetadata.GuardFacingHalfAngleDegrees,
 			AttackMetadata.bCanBeDodged ? TEXT("true") : TEXT("false"),
 			LexAttackTimingPhaseToString(AttackMetadata.TimingPhase),
 			*TimingWindowName);
@@ -290,7 +293,10 @@ void ATwoHeartsHostileAttackProbeCharacter::InitializeCurrentAttackMetadata()
 	CurrentAttackMetadata.BaseDamage = 10.0f;
 	CurrentAttackMetadata.DamageMechanicTags.AddTag(FTwoHeartsGameplayTags::Attack_Mechanic_Physical());
 	CurrentAttackMetadata.DamageMechanicTags.AddTag(FTwoHeartsGameplayTags::Attack_Mechanic_HostileProbe());
-	CurrentAttackMetadata.bCanBeGuarded = true;
+	CurrentAttackMetadata.bCanBeGuarded = bAttackCanBeGuarded;
+	CurrentAttackMetadata.GuardMaxDistance = GuardMaxDistance;
+	CurrentAttackMetadata.GuardMaxHeightDifference = GuardMaxHeightDifference;
+	CurrentAttackMetadata.GuardFacingHalfAngleDegrees = GuardFacingHalfAngleDegrees;
 	CurrentAttackMetadata.bCanBeDodged = true;
 	CurrentAttackMetadata.TimingPhase = ETwoHeartsAttackTimingPhase::Startup;
 	CurrentAttackMetadata.TimingWindowName = TEXT("Startup");

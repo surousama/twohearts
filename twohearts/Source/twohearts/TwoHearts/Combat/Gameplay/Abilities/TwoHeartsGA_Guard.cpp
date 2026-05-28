@@ -1,6 +1,7 @@
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_Guard.h"
 
 #include "AbilitySystemComponent.h"
+#include "DrawDebugHelpers.h"
 #include "TimerManager.h"
 #include "TwoHearts/Combat/Hostile/TwoHeartsHostileAttackReceiverComponent.h"
 #include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
@@ -32,6 +33,7 @@ void UTwoHeartsGA_Guard::ActivateAbility(
 	bInterruptedByHitReaction = false;
 	CurrentGuardPhase = ETwoHeartsCombatPhase::None;
 	BoundHostileAttackReceiver.Reset();
+	LastEvaluatedAttackInstanceName.Reset();
 	ClearGuardTimers();
 
 	if (!CanStartGuardExecution())
@@ -439,17 +441,18 @@ void UTwoHeartsGA_Guard::BindHostileAttackReceiver(UTwoHeartsHostileAttackReceiv
 
 	UnbindHostileAttackReceiver();
 	BoundHostileAttackReceiver = ReceiverComponent;
-	ReceiverComponent->OnPlayerHitResultUpdated.AddDynamic(this, &UTwoHeartsGA_Guard::HandlePlayerHitResultUpdated);
+	ReceiverComponent->OnHostileAttackSignalReceived.AddDynamic(this, &UTwoHeartsGA_Guard::HandleHostileAttackSignalReceived);
 }
 
 void UTwoHeartsGA_Guard::UnbindHostileAttackReceiver()
 {
 	if (UTwoHeartsHostileAttackReceiverComponent* ReceiverComponent = BoundHostileAttackReceiver.Get())
 	{
-		ReceiverComponent->OnPlayerHitResultUpdated.RemoveDynamic(this, &UTwoHeartsGA_Guard::HandlePlayerHitResultUpdated);
+		ReceiverComponent->OnHostileAttackSignalReceived.RemoveDynamic(this, &UTwoHeartsGA_Guard::HandleHostileAttackSignalReceived);
 	}
 
 	BoundHostileAttackReceiver.Reset();
+	LastEvaluatedAttackInstanceName.Reset();
 }
 
 void UTwoHeartsGA_Guard::UpdateGuardDebugState() const
@@ -462,6 +465,50 @@ void UTwoHeartsGA_Guard::UpdateGuardDebugState() const
 			: TEXT("Unknown");
 		Character->SetGuardDebugRuntimeState(bGuardStarted && !bGuardFinished, bGuardWindowActive, PhaseName, bHoldReserved);
 	}
+
+	DrawGuardDebugGeometry();
+}
+
+void UTwoHeartsGA_Guard::DrawGuardDebugGeometry() const
+{
+	const AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter());
+	if (!Character || !bGuardStarted || bGuardFinished)
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	const FTwoHeartsAttackMetadata* AttackMetadata = nullptr;
+	if (const UTwoHeartsHostileAttackReceiverComponent* ReceiverComponent = BoundHostileAttackReceiver.Get())
+	{
+		if (ReceiverComponent->HasReceivedHostileAttackSignal())
+		{
+			AttackMetadata = &ReceiverComponent->GetLastSignal().AttackMetadata;
+		}
+	}
+
+	const float GuardDistance = AttackMetadata ? AttackMetadata->GuardMaxDistance : 220.0f;
+	const float GuardHalfAngleDegrees = AttackMetadata ? AttackMetadata->GuardFacingHalfAngleDegrees : 100.0f;
+	const float GuardHeightTolerance = AttackMetadata ? AttackMetadata->GuardMaxHeightDifference : 120.0f;
+	const FVector Origin = Character->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
+	const FVector Forward2D = Character->GetActorForwardVector().GetSafeNormal2D();
+	const FVector LeftDirection = FRotator(0.0f, -GuardHalfAngleDegrees, 0.0f).RotateVector(Forward2D);
+	const FVector RightDirection = FRotator(0.0f, GuardHalfAngleDegrees, 0.0f).RotateVector(Forward2D);
+	const FColor GuardColor = bGuardWindowActive ? FColor::Green : FColor::Yellow;
+	const float LifetimeSeconds = 0.20f;
+
+	DrawDebugDirectionalArrow(World, Origin, Origin + (Forward2D * GuardDistance), 28.0f, GuardColor, false, LifetimeSeconds, 0, 2.2f);
+	DrawDebugLine(World, Origin, Origin + (LeftDirection * GuardDistance), GuardColor, false, LifetimeSeconds, 0, 1.6f);
+	DrawDebugLine(World, Origin, Origin + (RightDirection * GuardDistance), GuardColor, false, LifetimeSeconds, 0, 1.6f);
+	DrawDebugCircle(World, Origin, GuardDistance, 32, GuardColor, false, LifetimeSeconds, 0, 1.0f, FVector::UpVector, LeftDirection.GetSafeNormal());
+	DrawDebugCircle(World, Origin + FVector(0.0f, 0.0f, GuardHeightTolerance), 24.0f, 16, FColor::Cyan, false, LifetimeSeconds, 0, 1.0f, FVector::ForwardVector, FVector::RightVector);
+	DrawDebugCircle(World, Origin - FVector(0.0f, 0.0f, GuardHeightTolerance), 24.0f, 16, FColor::Cyan, false, LifetimeSeconds, 0, 1.0f, FVector::ForwardVector, FVector::RightVector);
+	DrawDebugLine(World, Origin + FVector(0.0f, 0.0f, GuardHeightTolerance), Origin - FVector(0.0f, 0.0f, GuardHeightTolerance), FColor::Cyan, false, LifetimeSeconds, 0, 1.2f);
 }
 
 void UTwoHeartsGA_Guard::RecordGuardEvent(const TCHAR* EventName, const FString& Detail, bool bWarning) const
@@ -584,36 +631,197 @@ void UTwoHeartsGA_Guard::HandleGuardRecoveryFinished()
 	FinishGuard(false);
 }
 
-void UTwoHeartsGA_Guard::HandlePlayerHitResultUpdated(const FTwoHeartsPlayerHitResult& HitResult)
+void UTwoHeartsGA_Guard::HandleHostileAttackSignalReceived(const FTwoHeartsHostileAttackSignal& Signal)
 {
-	if (!bGuardStarted || bGuardFinished || !bGuardWindowActive)
+	if (!bGuardStarted || bGuardFinished)
 	{
 		return;
 	}
 
-	if (HitResult.ResultType != ETwoHeartsPlayerHitResultType::HitConfirmed || !HitResult.bCanBeRewrittenByGuard)
+	if (Signal.SignalType != ETwoHeartsHostileAttackSignalType::AttackContact || !Signal.bHasContact)
 	{
 		return;
 	}
 
+	if (Signal.AttackInstanceName.IsEmpty() || Signal.AttackInstanceName == TEXT("None"))
+	{
+		RecordGuardEvent(TEXT("GuardRuleInvalid"), TEXT("Guard received an attack contact signal without a valid attack instance name."), true);
+		return;
+	}
+
+	if (LastEvaluatedAttackInstanceName == Signal.AttackInstanceName)
+	{
+		return;
+	}
+
+	LastEvaluatedAttackInstanceName = Signal.AttackInstanceName;
+	TryEvaluateGuardAgainstAttackSignal(Signal);
+}
+
+bool UTwoHeartsGA_Guard::TryEvaluateGuardAgainstAttackSignal(const FTwoHeartsHostileAttackSignal& Signal)
+{
 	UTwoHeartsHostileAttackReceiverComponent* ReceiverComponent = BoundHostileAttackReceiver.Get();
-	if (!ReceiverComponent)
+	AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter());
+	if (!ReceiverComponent || !Character)
 	{
-		return;
+		RecordGuardEvent(TEXT("GuardRuleInvalid"), TEXT("Guard rule evaluation failed because the receiver or defender character was invalid."), true);
+		return false;
+	}
+
+	if (!Signal.AttackMetadata.bCanBeGuarded)
+	{
+		RecordGuardEvent(
+			TEXT("GuardAttackUnguardable"),
+			FString::Printf(TEXT("Attack %s is marked as unguardable and therefore bypassed Guard."), *Signal.AttackInstanceName));
+		return false;
+	}
+
+	if (!bGuardWindowActive)
+	{
+		RecordGuardEvent(
+			CurrentGuardPhase == ETwoHeartsCombatPhase::Startup ? TEXT("GuardFailedTooEarly") : TEXT("GuardFailedTooLate"),
+			BuildGuardFailureDetailFromSignal(Signal));
+		return false;
+	}
+
+	const FVector DefenderLocation = Character->GetActorLocation();
+	const FVector SourceLocation = Signal.AttackMetadata.SourceLocation.IsNearlyZero()
+		? Signal.SourceLocation
+		: Signal.AttackMetadata.SourceLocation;
+	const float Distance2D = FVector::Dist2D(DefenderLocation, SourceLocation);
+	const float HeightDifference = FMath::Abs(SourceLocation.Z - DefenderLocation.Z);
+	float FacingDegrees = 0.0f;
+	const FVector ToSource2D = (SourceLocation - DefenderLocation).GetSafeNormal2D();
+	if (!ToSource2D.IsNearlyZero())
+	{
+		const float FacingDot = FVector::DotProduct(Character->GetActorForwardVector().GetSafeNormal2D(), ToSource2D);
+		FacingDegrees = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FacingDot, -1.0f, 1.0f)));
+	}
+
+	RecordGuardEvent(
+		TEXT("GuardRuleEvaluate"),
+		FString::Printf(
+			TEXT("attack=%s guardable=%s guard_window=%s phase=%s timing=%s/%s dist=%.1f/%.1f height=%.1f/%.1f angle=%.1f/%.1f"),
+			*Signal.AttackInstanceName,
+			Signal.AttackMetadata.bCanBeGuarded ? TEXT("true") : TEXT("false"),
+			bGuardWindowActive ? TEXT("true") : TEXT("false"),
+			*StaticEnum<ETwoHeartsCombatPhase>()->GetNameStringByValue(static_cast<int64>(CurrentGuardPhase)),
+			*StaticEnum<ETwoHeartsAttackTimingPhase>()->GetNameStringByValue(static_cast<int64>(Signal.AttackMetadata.TimingPhase)),
+			Signal.AttackMetadata.TimingWindowName.IsNone() ? TEXT("None") : *Signal.AttackMetadata.TimingWindowName.ToString(),
+			Distance2D,
+			Signal.AttackMetadata.GuardMaxDistance,
+			HeightDifference,
+			Signal.AttackMetadata.GuardMaxHeightDifference,
+			FacingDegrees,
+			Signal.AttackMetadata.GuardFacingHalfAngleDegrees));
+
+	if (UWorld* World = GetWorld())
+	{
+		const FVector DebugStart = DefenderLocation + FVector(0.0f, 0.0f, 60.0f);
+		const FVector DebugEnd = SourceLocation + FVector(0.0f, 0.0f, 60.0f);
+		DrawDebugLine(World, DebugStart, DebugEnd, bGuardWindowActive ? FColor::Green : FColor::Red, false, 1.2f, 0, 2.4f);
+		DrawDebugSphere(World, DebugEnd, 18.0f, 12, Signal.AttackMetadata.bCanBeGuarded ? FColor::Orange : FColor::Red, false, 1.2f, 0, 1.8f);
+	}
+
+	if (Distance2D > Signal.AttackMetadata.GuardMaxDistance)
+	{
+		RecordGuardEvent(TEXT("GuardFailedDistance"), BuildGuardFailureDetailFromSignal(Signal));
+		return false;
+	}
+
+	if (HeightDifference > Signal.AttackMetadata.GuardMaxHeightDifference)
+	{
+		RecordGuardEvent(TEXT("GuardFailedHeight"), BuildGuardFailureDetailFromSignal(Signal));
+		return false;
+	}
+
+	if (!ToSource2D.IsNearlyZero())
+	{
+		const float FacingDot = FVector::DotProduct(Character->GetActorForwardVector().GetSafeNormal2D(), ToSource2D);
+		const float MinFacingDot = FMath::Cos(FMath::DegreesToRadians(Signal.AttackMetadata.GuardFacingHalfAngleDegrees));
+		if (FacingDot < MinFacingDot)
+		{
+			RecordGuardEvent(TEXT("GuardFailedAngle"), BuildGuardFailureDetailFromSignal(Signal));
+			return false;
+		}
 	}
 
 	if (!ReceiverComponent->RewriteLastPlayerHitResultForGuard(
 		ETwoHeartsPlayerHitResultType::GuardRewritten,
-		TEXT("Basic guard rewrote the hostile attack contact during the active guard window.")))
+		FString::Printf(
+			TEXT("Guard satisfied guardable/timing/position rules and rewrote hostile attack %s into GuardRewritten."),
+			*Signal.AttackInstanceName)))
 	{
 		RecordGuardEvent(
 			TEXT("GuardRewriteFailed"),
-			FString::Printf(TEXT("Guard attempted to rewrite attack %s but the receiver rejected it."), *HitResult.AttackInstanceName),
+			FString::Printf(TEXT("Guard satisfied its rules for attack %s, but the receiver rejected the rewrite."), *Signal.AttackInstanceName),
 			true);
-		return;
+		return false;
 	}
 
 	RecordGuardEvent(
-		TEXT("GuardRewriteSuccess"),
-		FString::Printf(TEXT("Guard rewrote hostile attack %s into GuardRewritten."), *HitResult.AttackInstanceName));
+		TEXT("GuardRuleSuccess"),
+		FString::Printf(
+			TEXT("Attack %s satisfied guardable/timing/position rules and entered the formal guard branch."),
+			*Signal.AttackInstanceName));
+	return true;
+}
+
+FString UTwoHeartsGA_Guard::BuildGuardFailureDetailFromSignal(const FTwoHeartsHostileAttackSignal& Signal) const
+{
+	const AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetAbilityCharacter());
+	const FVector DefenderLocation = Character ? Character->GetActorLocation() : FVector::ZeroVector;
+	const FVector SourceLocation = Signal.AttackMetadata.SourceLocation.IsNearlyZero()
+		? Signal.SourceLocation
+		: Signal.AttackMetadata.SourceLocation;
+	const float Distance2D = FVector::Dist2D(DefenderLocation, SourceLocation);
+	const float HeightDifference = FMath::Abs(SourceLocation.Z - DefenderLocation.Z);
+
+	float FacingDegrees = 0.0f;
+	if (Character)
+	{
+		const FVector ToSource2D = (SourceLocation - DefenderLocation).GetSafeNormal2D();
+		if (!ToSource2D.IsNearlyZero())
+		{
+			const float FacingDot = FVector::DotProduct(Character->GetActorForwardVector().GetSafeNormal2D(), ToSource2D);
+			FacingDegrees = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FacingDot, -1.0f, 1.0f)));
+		}
+	}
+
+	if (!Signal.AttackMetadata.bCanBeGuarded)
+	{
+		return FString::Printf(TEXT("Attack %s is configured as unguardable."), *Signal.AttackInstanceName);
+	}
+
+	if (!bGuardWindowActive)
+	{
+		return FString::Printf(
+			TEXT("Attack %s arrived while Guard was outside its active window. phase=%s"),
+			*Signal.AttackInstanceName,
+			*StaticEnum<ETwoHeartsCombatPhase>()->GetNameStringByValue(static_cast<int64>(CurrentGuardPhase)));
+	}
+
+	if (Distance2D > Signal.AttackMetadata.GuardMaxDistance)
+	{
+		return FString::Printf(
+			TEXT("Attack %s was outside Guard distance. actual=%.1f allowed=%.1f"),
+			*Signal.AttackInstanceName,
+			Distance2D,
+			Signal.AttackMetadata.GuardMaxDistance);
+	}
+
+	if (HeightDifference > Signal.AttackMetadata.GuardMaxHeightDifference)
+	{
+		return FString::Printf(
+			TEXT("Attack %s was outside Guard height tolerance. actual=%.1f allowed=%.1f"),
+			*Signal.AttackInstanceName,
+			HeightDifference,
+			Signal.AttackMetadata.GuardMaxHeightDifference);
+	}
+
+	return FString::Printf(
+		TEXT("Attack %s came from outside the Guard facing sector. actual=%.1f allowed=%.1f"),
+		*Signal.AttackInstanceName,
+		FacingDegrees,
+		Signal.AttackMetadata.GuardFacingHalfAngleDegrees);
 }

@@ -370,10 +370,21 @@ void ATwoheartsDebugHUD::DrawHUD()
 
 			DrawDebugLine(
 				FString::Printf(
-					TEXT("reaction=%s   base_damage=%.2f   guard=%s   dodge=%s"),
+					TEXT("reaction=%s   base_damage=%.2f   guard=%s   dist=%.0f   angle=%.0f"),
 					LexHitReactionTypeToString(LastSignal.AttackMetadata.HitReactionType),
 					LastSignal.AttackMetadata.BaseDamage,
 					LastSignal.AttackMetadata.bCanBeGuarded ? TEXT("YES") : TEXT("NO"),
+					LastSignal.AttackMetadata.GuardMaxDistance,
+					LastSignal.AttackMetadata.GuardFacingHalfAngleDegrees),
+				PanelX + 12.0f,
+				CurrentY,
+				TextColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(
+					TEXT("guard_height=%.0f   dodge=%s"),
+					LastSignal.AttackMetadata.GuardMaxHeightDifference,
 					LastSignal.AttackMetadata.bCanBeDodged ? TEXT("YES") : TEXT("NO")),
 				PanelX + 12.0f,
 				CurrentY,
@@ -467,10 +478,21 @@ void ATwoheartsDebugHUD::DrawHUD()
 
 			DrawDebugLine(
 				FString::Printf(
-					TEXT("reaction=%s   base_damage=%.2f   guard=%s   dodge=%s"),
+					TEXT("reaction=%s   base_damage=%.2f   guard=%s   dist=%.0f   angle=%.0f"),
 					LexHitReactionTypeToString(LastHitResult.AttackMetadata.HitReactionType),
 					LastHitResult.AttackMetadata.BaseDamage,
 					LastHitResult.AttackMetadata.bCanBeGuarded ? TEXT("YES") : TEXT("NO"),
+					LastHitResult.AttackMetadata.GuardMaxDistance,
+					LastHitResult.AttackMetadata.GuardFacingHalfAngleDegrees),
+				PanelX + 12.0f,
+				CurrentY,
+				TextColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(
+					TEXT("guard_height=%.0f   dodge=%s"),
+					LastHitResult.AttackMetadata.GuardMaxHeightDifference,
 					LastHitResult.AttackMetadata.bCanBeDodged ? TEXT("YES") : TEXT("NO")),
 				PanelX + 12.0f,
 				CurrentY,

@@ -129,11 +129,14 @@ namespace
 			? TEXT("None")
 			: AttackMetadata.TimingWindowName.ToString();
 		return FString::Printf(
-			TEXT("reaction=%s damage=%.2f tags=%s guard=%s dodge=%s timing=%s/%s"),
+			TEXT("reaction=%s damage=%.2f tags=%s guard=%s dist=%.1f height=%.1f angle=%.1f dodge=%s timing=%s/%s"),
 			LexHitReactionTypeToString(AttackMetadata.HitReactionType),
 			AttackMetadata.BaseDamage,
 			*DamageMechanicTags,
 			AttackMetadata.bCanBeGuarded ? TEXT("true") : TEXT("false"),
+			AttackMetadata.GuardMaxDistance,
+			AttackMetadata.GuardMaxHeightDifference,
+			AttackMetadata.GuardFacingHalfAngleDegrees,
 			AttackMetadata.bCanBeDodged ? TEXT("true") : TEXT("false"),
 			LexAttackTimingPhaseToString(AttackMetadata.TimingPhase),
 			*TimingWindowName);
@@ -224,8 +227,9 @@ void UTwoHeartsHostileAttackReceiverComponent::ReceiveHostileAttackSignal(const 
 		*GetNameSafe(Signal.TargetActor),
 		*BuildPendingAttackDebugString(bHasPendingAttack, PendingAttackInstanceName, PendingAttackSourceActor, PendingAttackStartSeconds));
 
-	UpdatePlayerHitResultFromSignal(Signal);
+	// Guard rules must see the raw hostile contact before hit confirmation/damage/hit reaction consumes the active guard state.
 	OnHostileAttackSignalReceived.Broadcast(Signal);
+	UpdatePlayerHitResultFromSignal(Signal);
 }
 
 void UTwoHeartsHostileAttackReceiverComponent::ClearSignalHistory()
@@ -244,6 +248,10 @@ void UTwoHeartsHostileAttackReceiverComponent::ClearSignalHistory()
 	PendingAttackSourceActor = nullptr;
 	PendingAttackStartSeconds = 0.0f;
 	PendingAttackMetadata = FTwoHeartsAttackMetadata();
+	bHasPendingGuardRewriteRequest = false;
+	PendingGuardRewriteAttackInstanceName = TEXT("None");
+	PendingGuardRewriteResultType = ETwoHeartsPlayerHitResultType::None;
+	PendingGuardRewriteDetail.Reset();
 	CurrentHealth = MaxHealth;
 	CurrentHitReactionState = FTwoHeartsPlayerHitReactionState();
 
@@ -262,48 +270,83 @@ bool UTwoHeartsHostileAttackReceiverComponent::RewriteLastPlayerHitResultForGuar
 	ETwoHeartsPlayerHitResultType NewResultType,
 	const FString& Detail)
 {
-	if (!bHasPlayerHitResult || !LastPlayerHitResult.bCanBeRewrittenByGuard)
+	if (bHasPlayerHitResult && LastPlayerHitResult.bCanBeRewrittenByGuard)
+	{
+		LastPlayerHitResult.ResultType = NewResultType;
+		LastPlayerHitResult.bHitConfirmed = NewResultType == ETwoHeartsPlayerHitResultType::HitConfirmed;
+		LastPlayerHitResult.bCanBeRewrittenByGuard = false;
+		LastPlayerHitResult.Detail = Detail.IsEmpty() ? TEXT("Guard rewrote the pending hit result.") : Detail;
+		LastPlayerHitResult.SourceSignalType = ETwoHeartsHostileAttackSignalType::AttackContact;
+		LastPlayerHitResult.ResultTimestampSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : LastPlayerHitResult.ResultTimestampSeconds;
+
+		if (!PlayerHitResultHistory.IsEmpty())
+		{
+			PlayerHitResultHistory.Last() = LastPlayerHitResult;
+		}
+
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Display,
+			TEXT("[PlayerHitResult] receiver=%s event=GuardRewrite attack=%s result=%s hit=%s rewritable=%s detail=\"%s\" metadata=\"%s\""),
+			*GetNameSafe(GetOwner()),
+			*LastPlayerHitResult.AttackInstanceName,
+			LexPlayerHitResultTypeToString(LastPlayerHitResult.ResultType),
+			LastPlayerHitResult.bHitConfirmed ? TEXT("true") : TEXT("false"),
+			LastPlayerHitResult.bCanBeRewrittenByGuard ? TEXT("true") : TEXT("false"),
+			*LastPlayerHitResult.Detail,
+			*BuildAttackMetadataDebugString(LastPlayerHitResult.AttackMetadata));
+
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Verbose,
+			TEXT("[PlayerHitEval] receiver=%s stage=GuardRewrite attack=%s result=%s time=%.2f"),
+			*GetNameSafe(GetOwner()),
+			*LastPlayerHitResult.AttackInstanceName,
+			LexPlayerHitResultTypeToString(LastPlayerHitResult.ResultType),
+			LastPlayerHitResult.ResultTimestampSeconds);
+
+		UpdatePlayerDamageResultFromHitResult(LastPlayerHitResult);
+		OnPlayerHitResultUpdated.Broadcast(LastPlayerHitResult);
+		return true;
+	}
+
+	if (!bHasPendingAttack || PendingAttackInstanceName.IsEmpty() || PendingAttackInstanceName == TEXT("None"))
 	{
 		return false;
 	}
 
-	LastPlayerHitResult.ResultType = NewResultType;
-	LastPlayerHitResult.bHitConfirmed = NewResultType == ETwoHeartsPlayerHitResultType::HitConfirmed;
-	LastPlayerHitResult.bCanBeRewrittenByGuard = false;
-	LastPlayerHitResult.Detail = Detail.IsEmpty() ? TEXT("Guard rewrote the pending hit result.") : Detail;
-	LastPlayerHitResult.SourceSignalType = ETwoHeartsHostileAttackSignalType::AttackContact;
-	LastPlayerHitResult.ResultTimestampSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : LastPlayerHitResult.ResultTimestampSeconds;
-
-	if (!PlayerHitResultHistory.IsEmpty())
-	{
-		PlayerHitResultHistory.Last() = LastPlayerHitResult;
-	}
+	bHasPendingGuardRewriteRequest = true;
+	PendingGuardRewriteAttackInstanceName = PendingAttackInstanceName;
+	PendingGuardRewriteResultType = NewResultType;
+	PendingGuardRewriteDetail = Detail.IsEmpty() ? TEXT("Guard rewrote the pending hostile attack before hit confirmation committed.") : Detail;
 
 	UE_LOG(
 		LogtwoheartsCombatTest,
 		Display,
-		TEXT("[PlayerHitResult] receiver=%s event=GuardRewrite attack=%s result=%s hit=%s rewritable=%s detail=\"%s\" metadata=\"%s\""),
+		TEXT("[PlayerHitEval] receiver=%s stage=GuardRewriteQueued attack=%s result=%s detail=\"%s\""),
 		*GetNameSafe(GetOwner()),
-		*LastPlayerHitResult.AttackInstanceName,
-		LexPlayerHitResultTypeToString(LastPlayerHitResult.ResultType),
-		LastPlayerHitResult.bHitConfirmed ? TEXT("true") : TEXT("false"),
-		LastPlayerHitResult.bCanBeRewrittenByGuard ? TEXT("true") : TEXT("false"),
-		*LastPlayerHitResult.Detail,
-		*BuildAttackMetadataDebugString(LastPlayerHitResult.AttackMetadata));
+		*PendingGuardRewriteAttackInstanceName,
+		LexPlayerHitResultTypeToString(PendingGuardRewriteResultType),
+		*PendingGuardRewriteDetail);
+	return true;
+}
 
+bool UTwoHeartsHostileAttackReceiverComponent::TryConsumePendingGuardRewriteForAttack(
+	const FString& AttackInstanceName,
+	ETwoHeartsPlayerHitResultType& OutResultType,
+	FString& OutDetail)
+{
+	if (!bHasPendingGuardRewriteRequest || PendingGuardRewriteAttackInstanceName != AttackInstanceName)
+	{
+		return false;
+	}
 
-	UE_LOG(
-		LogtwoheartsCombatTest,
-		Verbose,
-		TEXT("[PlayerHitEval] receiver=%s stage=GuardRewrite attack=%s result=%s time=%.2f"),
-
-		*GetNameSafe(GetOwner()),
-		*LastPlayerHitResult.AttackInstanceName,
-		LexPlayerHitResultTypeToString(LastPlayerHitResult.ResultType),
-		LastPlayerHitResult.ResultTimestampSeconds);
-
-	UpdatePlayerDamageResultFromHitResult(LastPlayerHitResult);
-	OnPlayerHitResultUpdated.Broadcast(LastPlayerHitResult);
+	OutResultType = PendingGuardRewriteResultType;
+	OutDetail = PendingGuardRewriteDetail;
+	bHasPendingGuardRewriteRequest = false;
+	PendingGuardRewriteAttackInstanceName = TEXT("None");
+	PendingGuardRewriteResultType = ETwoHeartsPlayerHitResultType::None;
+	PendingGuardRewriteDetail.Reset();
 	return true;
 }
 
@@ -542,6 +585,16 @@ void UTwoHeartsHostileAttackReceiverComponent::FinalizeCurrentPendingAttack(
 	Result.ContactTimestampSeconds = Signal.SignalType == ETwoHeartsHostileAttackSignalType::AttackContact ? Signal.TimestampSeconds : 0.0f;
 	Result.SourceSignalType = Signal.SignalType;
 	Result.Detail = Detail.IsEmpty() ? Signal.Detail : Detail;
+
+	ETwoHeartsPlayerHitResultType GuardOverrideResultType = ETwoHeartsPlayerHitResultType::None;
+	FString GuardOverrideDetail;
+	if (TryConsumePendingGuardRewriteForAttack(Result.AttackInstanceName, GuardOverrideResultType, GuardOverrideDetail))
+	{
+		Result.ResultType = GuardOverrideResultType;
+		Result.bHitConfirmed = GuardOverrideResultType == ETwoHeartsPlayerHitResultType::HitConfirmed;
+		Result.bCanBeRewrittenByGuard = false;
+		Result.Detail = GuardOverrideDetail.IsEmpty() ? Result.Detail : GuardOverrideDetail;
+	}
 
 
 	UE_LOG(
