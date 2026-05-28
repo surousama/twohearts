@@ -374,3 +374,43 @@ Implemented character-side weapon visual switching, configured weapon assets and
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: 完成格挡规则基础升级
+
+**Date**: 2026-05-28
+**Task**: 完成格挡规则基础升级
+**Branch**: `master`
+
+### Summary
+
+完成攻击段格挡规则升级、Guard 判定日志与 DrawDebug 可视化，打通 GuardRewritten 到 GuardBlocked 的正式链路，并通过多轮构建与 PIE 白盒验证。
+
+### Main Changes
+
+- 将 Guard 从命中后最小窗口重写，升级为基于 `AttackContact` 的正式规则判定链路。
+- 在攻击元数据中补齐 `bCanBeGuarded`、最大距离、最大高度差、朝向半角等格挡规则承载，并接到 `HostileAttackProbe` 可调参数。
+- Guard 成功时正式落账为 `GuardRewriteQueued -> PlayerHitResult(GuardRewritten) -> PlayerDamageResult(GuardBlocked)`，确保不掉血且不进入新的受击链。
+- 补齐 `GuardFailedTooEarly`、`GuardFailedTooLate`、`GuardFailedDistance`、`GuardFailedHeight`、`GuardFailedAngle`、`GuardAttackUnguardable`、`GuardRuleSuccess` 等调试日志。
+- 增加 Guard `DrawDebug` 扇区/方向/高度可视化，并在 HUD 上显示当前 guard、dist、angle、guard_height 参数。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7f3bb69` | feat: 完成格挡规则基础升级 |
+
+### Testing
+
+- [OK] 多次完成 `twoheartsEditor Win64 Development` 构建，结果为 `Succeeded`。
+- [OK] 多轮 PIE 白盒验证确认成功链路稳定出现：`GuardRuleEvaluate -> GuardRewriteQueued -> GuardRuleSuccess -> PlayerHitResult(GuardRewritten) -> PlayerDamageResult(GuardBlocked)`。
+- [OK] 日志确认成功格挡时 `final=0.00`，且 `health_before` 与 `health_after` 保持一致。
+- [OK] 日志确认失败分支仍可命中，至少覆盖 `GuardFailedTooLate` 与 `GuardFailedAngle`。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
