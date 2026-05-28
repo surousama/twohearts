@@ -450,3 +450,38 @@ Implemented character-side weapon visual switching, configured weapon assets and
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: 完成格挡结果结算与后续能力接口收尾
+
+**Date**: 2026-05-28
+**Task**: 完成格挡结果结算与后续能力接口收尾
+**Branch**: `master`
+
+### Summary
+
+完成 Guard Outcome 位移/伤害/资源冷却结果结算，删除文档外反击窗口语义，仅保留最小后续能力读取口，并归档 05-28-guard-outcome-settlement-and-counter-hook。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `49d749e` | (see git log) |
+| `f698eae` | (see git log) |
+| `e8035b7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
