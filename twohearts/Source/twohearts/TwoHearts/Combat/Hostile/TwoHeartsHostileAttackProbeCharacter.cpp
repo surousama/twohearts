@@ -36,7 +36,7 @@ namespace
 		}
 	}
 
-	const TCHAR* LexHitReactionTypeToString(const ETwoHeartsHitReactionType HitReactionType)
+	const TCHAR* LexProbeHitReactionTypeToString(const ETwoHeartsHitReactionType HitReactionType)
 	{
 		switch (HitReactionType)
 		{
@@ -52,7 +52,7 @@ namespace
 		}
 	}
 
-	const TCHAR* LexAttackTimingPhaseToString(const ETwoHeartsAttackTimingPhase TimingPhase)
+	const TCHAR* LexProbeAttackTimingPhaseToString(const ETwoHeartsAttackTimingPhase TimingPhase)
 	{
 		switch (TimingPhase)
 		{
@@ -70,7 +70,7 @@ namespace
 		}
 	}
 
-	FString BuildAttackMetadataDebugString(const FTwoHeartsAttackMetadata& AttackMetadata)
+	FString BuildProbeAttackMetadataDebugString(const FTwoHeartsAttackMetadata& AttackMetadata)
 	{
 		const FString DamageMechanicTags = AttackMetadata.DamageMechanicTags.IsEmpty()
 			? TEXT("None")
@@ -80,7 +80,7 @@ namespace
 			: AttackMetadata.TimingWindowName.ToString();
 		return FString::Printf(
 			TEXT("reaction=%s damage=%.2f tags=%s guard=%s dist=%.1f height=%.1f angle=%.1f settlement=%s/%s chip=%.2f dodge=%s timing=%s/%s"),
-			LexHitReactionTypeToString(AttackMetadata.HitReactionType),
+			LexProbeHitReactionTypeToString(AttackMetadata.HitReactionType),
 			AttackMetadata.BaseDamage,
 			*DamageMechanicTags,
 			AttackMetadata.bCanBeGuarded ? TEXT("true") : TEXT("false"),
@@ -91,7 +91,7 @@ namespace
 			*StaticEnum<ETwoHeartsGuardDamageResult>()->GetNameStringByValue(static_cast<int64>(AttackMetadata.GuardSuccessDamageResult)),
 			AttackMetadata.GuardPartialDamageMultiplier,
 			AttackMetadata.bCanBeDodged ? TEXT("true") : TEXT("false"),
-			LexAttackTimingPhaseToString(AttackMetadata.TimingPhase),
+			LexProbeAttackTimingPhaseToString(AttackMetadata.TimingPhase),
 			*TimingWindowName);
 	}
 }
@@ -363,7 +363,7 @@ void ATwoHeartsHostileAttackProbeCharacter::StartAttackStartup()
 		StartupSeconds,
 		HitWindowSeconds,
 		RecoverySeconds,
-		*BuildAttackMetadataDebugString(CurrentAttackMetadata));
+		*BuildProbeAttackMetadataDebugString(CurrentAttackMetadata));
 	DrawDebugProbeState(FColor::Yellow, TEXT("Startup"));
 
 	if (bEnableScreenDebugOutput && GEngine)
@@ -403,7 +403,7 @@ void ATwoHeartsHostileAttackProbeCharacter::OpenHitWindow()
 		*GetNameSafe(AttackTargetActor),
 		AttackRadius,
 		AttackReach,
-		*BuildAttackMetadataDebugString(CurrentAttackMetadata));
+		*BuildProbeAttackMetadataDebugString(CurrentAttackMetadata));
 	NotifyHitTargets();
 	DrawDebugProbeState(FColor::Red, TEXT("HitWindow"));
 
@@ -451,7 +451,7 @@ void ATwoHeartsHostileAttackProbeCharacter::FinishAttack()
 	}
 
 	NotifyTargetActor(AttackTargetActor, ETwoHeartsHostileAttackSignalType::AttackFinished, TEXT("Hostile attack finished and probe returned to idle."), false);
-	UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[HostileAttackProbe] actor=%s event=AttackFinished attack=%s target=%s contacted_targets=%d metadata=\"%s\""), *GetNameSafe(this), *CurrentAttackInstanceName, *GetNameSafe(AttackTargetActor), ContactedTargetsThisAttack.Num(), *BuildAttackMetadataDebugString(CurrentAttackMetadata));
+	UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[HostileAttackProbe] actor=%s event=AttackFinished attack=%s target=%s contacted_targets=%d metadata=\"%s\""), *GetNameSafe(this), *CurrentAttackInstanceName, *GetNameSafe(AttackTargetActor), ContactedTargetsThisAttack.Num(), *BuildProbeAttackMetadataDebugString(CurrentAttackMetadata));
 	DrawDebugProbeState(FColor::Green, TEXT("Finished"));
 	RestoreIdleAnimation();
 	ContactedTargetsThisAttack.Reset();
@@ -512,7 +512,7 @@ void ATwoHeartsHostileAttackProbeCharacter::NotifyTargetActor(
 			*CurrentAttackInstanceName,
 			*GetNameSafe(TargetActor),
 			bHasContact ? TEXT("true") : TEXT("false"),
-			*BuildAttackMetadataDebugString(BuildCurrentAttackMetadataSnapshot()));
+			*BuildProbeAttackMetadataDebugString(BuildCurrentAttackMetadataSnapshot()));
 		Receiver->ReceiveHostileAttackSignal(BuildSignal(SignalType, TargetActor, Detail, bHasContact));
 	}
 }
