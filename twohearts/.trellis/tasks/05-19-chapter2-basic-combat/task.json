@@ -3,7 +3,7 @@
   "name": "chapter2-basic-combat",
   "title": "第二章基础战斗模块推进",
   "description": "",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -32,7 +32,13 @@
     "05-25-minimal-hostile-attack-probe",
     "05-25-player-hit-damage-minimum-loop",
     "05-25-guard-feedback-and-whitebox-validation",
-    "05-25-basic-guard-implementation"
+    "05-25-basic-guard-implementation",
+    "05-28-attack-metadata-foundation",
+    "05-28-player-damage-result-formalization",
+    "05-28-player-hit-reaction-minimum-implementation",
+    "05-28-guard-rule-foundation-upgrade",
+    "05-28-guard-outcome-settlement-and-counter-hook",
+    "05-28-preinput-second-pass-generalization"
   ],
   "parent": null,
   "relatedFiles": [],
