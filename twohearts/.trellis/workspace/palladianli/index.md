@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
+- **Total Sessions**: 13
 - **Last Active**: 2026-05-28
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~409 | Active |
+| `journal-1.md` | ~452 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | 日期 | 标题 | 提交 | 分支 |
 |---|------|-------|---------|--------|
+| 13 | 2026-05-28 | 攻击元数据基础验收收尾与后续任务拆分 | `8b88d45`, `dabd3fa`, `3b34a5b`, `3b03a71` | `master` |
 | 12 | 2026-05-28 | 完成格挡规则基础升级 | `7f3bb69` | `master` |
 | 11 | 2026-05-27 | 玩家受击最小闭环实现与白盒验收 | `b0c2150`, `b9f1f20` | `master` |
 | 10 | 2026-05-27 | 最小敌对攻击探针收尾与策划配置 | `0ee0330`, `c00224f` | `master` |

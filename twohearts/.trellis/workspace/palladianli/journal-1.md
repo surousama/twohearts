@@ -414,3 +414,39 @@ Implemented character-side weapon visual switching, configured weapon assets and
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: 攻击元数据基础验收收尾与后续任务拆分
+
+**Date**: 2026-05-28
+**Task**: 攻击元数据基础验收收尾与后续任务拆分
+**Branch**: `master`
+
+### Summary
+
+完成攻击描述与命中元数据基础链路、重新生成 compile_commands、回写本 task 验收记录，并在归档后同步更新第二章基础战斗父 task 与后续 05-28 子任务拆分。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8b88d45` | (see git log) |
+| `dabd3fa` | (see git log) |
+| `3b34a5b` | (see git log) |
+| `3b03a71` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
