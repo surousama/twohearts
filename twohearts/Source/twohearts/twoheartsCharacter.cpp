@@ -1237,6 +1237,114 @@ void AtwoheartsCharacter::PushCombatInputDebugEvent(const FString& InputName, co
 	RecordCombatInputDebugEvent(InputName, ResultName, RouteName, Detail);
 }
 
+float AtwoheartsCharacter::GetPreInputWindowSecondsForAction(ETwoHeartsCombatActionType ActionType) const
+{
+	for (const FTwoHeartsPreInputWindowOverride& Override : PreInputConfig.ActionWindowOverrides)
+	{
+		if (Override.ActionType == ActionType)
+		{
+			return FMath::Max(0.0f, Override.WindowSeconds);
+		}
+	}
+
+	return FMath::Max(0.0f, PreInputConfig.DefaultWindowSeconds);
+}
+
+bool AtwoheartsCharacter::IsBufferedCombatInputExpired(
+	const FTwoHeartsBufferedCombatInput& BufferedInput,
+	float& OutWindowSeconds,
+	float& OutAgeSeconds) const
+{
+	OutWindowSeconds = GetPreInputWindowSecondsForAction(BufferedInput.IncomingActionType);
+	OutAgeSeconds = 0.0f;
+
+	if (!BufferedInput.bIsSet)
+	{
+		return false;
+	}
+
+	if (OutWindowSeconds <= 0.0f)
+	{
+		return false;
+	}
+
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	OutAgeSeconds = FMath::Max(0.0f, World->GetTimeSeconds() - BufferedInput.BufferedTimeSeconds);
+	return OutAgeSeconds > OutWindowSeconds;
+}
+
+bool AtwoheartsCharacter::TryTakeBufferedCombatInput(
+	const FString& ConsumerName,
+	FTwoHeartsBufferedCombatInput& OutBufferedInput,
+	FString* OutFailureDetail)
+{
+	if (!CombatActionContextComponent)
+	{
+		return false;
+	}
+
+	const FTwoHeartsBufferedCombatInput PendingBufferedInput = CombatActionContextComponent->GetBufferedInputCopy();
+	if (!PendingBufferedInput.bIsSet)
+	{
+		return false;
+	}
+
+	float WindowSeconds = 0.0f;
+	float AgeSeconds = 0.0f;
+	if (IsBufferedCombatInputExpired(PendingBufferedInput, WindowSeconds, AgeSeconds))
+	{
+		CombatActionContextComponent->ClearBufferedInput(FString::Printf(TEXT("ExpiredBeforeConsume.%s"), *ConsumerName));
+		const FString Detail = FString::Printf(
+			TEXT("Buffered input expired before %s could consume it. input=%s age=%.3f window=%.3f."),
+			*ConsumerName,
+			*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(PendingBufferedInput.IncomingActionType)),
+			AgeSeconds,
+			WindowSeconds);
+		if (OutFailureDetail)
+		{
+			*OutFailureDetail = Detail;
+		}
+		return false;
+	}
+
+	return CombatActionContextComponent->ConsumeBufferedInput(OutBufferedInput, ConsumerName);
+}
+
+bool AtwoheartsCharacter::RestoreBufferedCombatInput(
+	const FTwoHeartsBufferedCombatInput& BufferedInput,
+	const FString& Reason,
+	FString* OutFailureDetail)
+{
+	if (!CombatActionContextComponent || !BufferedInput.bIsSet)
+	{
+		return false;
+	}
+
+	float WindowSeconds = 0.0f;
+	float AgeSeconds = 0.0f;
+	if (IsBufferedCombatInputExpired(BufferedInput, WindowSeconds, AgeSeconds))
+	{
+		const FString Detail = FString::Printf(
+			TEXT("Buffered input was not restored because it already expired. input=%s age=%.3f window=%.3f reason=%s."),
+			*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(BufferedInput.IncomingActionType)),
+			AgeSeconds,
+			WindowSeconds,
+			*Reason);
+		if (OutFailureDetail)
+		{
+			*OutFailureDetail = Detail;
+		}
+		return false;
+	}
+
+	return CombatActionContextComponent->RestoreBufferedInput(BufferedInput, Reason);
+}
+
 bool AtwoheartsCharacter::TryConsumeReservedCombatInput(const FString& ConsumerName)
 {
 	if (!CombatActionContextComponent)
@@ -1245,17 +1353,28 @@ bool AtwoheartsCharacter::TryConsumeReservedCombatInput(const FString& ConsumerN
 	}
 
 	FTwoHeartsBufferedCombatInput BufferedInput;
-	if (!CombatActionContextComponent->ConsumeBufferedInput(BufferedInput, ConsumerName))
+	FString ConsumeFailureDetail;
+	if (!TryTakeBufferedCombatInput(ConsumerName, BufferedInput, &ConsumeFailureDetail))
 	{
+		if (!ConsumeFailureDetail.IsEmpty())
+		{
+			RecordCombatInputDebugEvent(
+				TEXT("BufferedInput"),
+				TEXT("BufferedInputExpired"),
+				TEXT("ReserveForFutureBufferConsumer"),
+				ConsumeFailureDetail);
+		}
 		return false;
 	}
 
 	ETwoHeartsAbilityInputID InputID = ETwoHeartsAbilityInputID::None;
 	if (!TryGetCombatInputIDForActionType(BufferedInput.IncomingActionType, InputID))
 	{
-		const bool bRestoredUnsupportedInput = CombatActionContextComponent->RestoreBufferedInput(
+		FString RestoreFailureDetail;
+		const bool bRestoredUnsupportedInput = RestoreBufferedCombatInput(
 			BufferedInput,
-			FString::Printf(TEXT("%s.UnsupportedActionType"), *ConsumerName));
+			FString::Printf(TEXT("%s.UnsupportedActionType"), *ConsumerName),
+			&RestoreFailureDetail);
 		RecordCombatInputDebugEvent(
 			TEXT("Unknown"),
 			TEXT("BufferedConsumeFailed"),
@@ -1265,6 +1384,10 @@ bool AtwoheartsCharacter::TryConsumeReservedCombatInput(const FString& ConsumerN
 				*ConsumerName,
 				*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(BufferedInput.IncomingActionType)),
 				bRestoredUnsupportedInput ? TEXT("true") : TEXT("false")));
+		if (!bRestoredUnsupportedInput && !RestoreFailureDetail.IsEmpty())
+		{
+			RecordCombatInputDebugEvent(TEXT("Unknown"), TEXT("BufferedRestoreSkipped"), TEXT("ActivateMatchingAbility"), RestoreFailureDetail);
+		}
 		return false;
 	}
 
@@ -1276,10 +1399,12 @@ bool AtwoheartsCharacter::TryConsumeReservedCombatInput(const FString& ConsumerN
 	ConsumedEvaluation.Reason = FString::Printf(TEXT("Buffered input was consumed by %s. OriginalReason=%s"), *ConsumerName, *BufferedInput.Reason);
 
 	const bool bConsumed = TryExecuteCombatInputNow(InputID, InputName, ConsumedEvaluation);
+	FString RestoreFailureDetail;
 	const bool bRestoredBufferedInput = !bConsumed
-		&& CombatActionContextComponent->RestoreBufferedInput(
+		&& RestoreBufferedCombatInput(
 			BufferedInput,
-			FString::Printf(TEXT("%s.ActivationFailed"), *ConsumerName));
+			FString::Printf(TEXT("%s.ActivationFailed"), *ConsumerName),
+			&RestoreFailureDetail);
 	RecordCombatInputDebugEvent(
 		InputName,
 		bConsumed ? TEXT("BufferedConsumed") : TEXT("BufferedConsumeFailed"),
@@ -1290,6 +1415,10 @@ bool AtwoheartsCharacter::TryConsumeReservedCombatInput(const FString& ConsumerN
 				TEXT("Buffered input consumption by %s failed to activate a follow-up action. Restored=%s."),
 				*ConsumerName,
 				bRestoredBufferedInput ? TEXT("true") : TEXT("false")));
+	if (!bConsumed && !bRestoredBufferedInput && !RestoreFailureDetail.IsEmpty())
+	{
+		RecordCombatInputDebugEvent(InputName, TEXT("BufferedRestoreSkipped"), GetCombatInputConsumptionRouteName(ConsumedEvaluation.ConsumptionRoute), RestoreFailureDetail);
+	}
 	return bConsumed;
 }
 

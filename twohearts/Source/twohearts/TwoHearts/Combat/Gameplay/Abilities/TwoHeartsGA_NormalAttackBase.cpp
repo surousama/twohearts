@@ -590,14 +590,14 @@ bool UTwoHeartsGA_NormalAttackBase::TryConsumeLateBufferedNextSegment()
 	}
 
 	FTwoHeartsBufferedCombatInput BufferedInput;
-	if (!ActionContextComponent->ConsumeBufferedInput(BufferedInput, TEXT("NormalAttackLateFollowUp")))
+	if (!Character->TryTakeBufferedCombatInput(TEXT("NormalAttackLateFollowUp"), BufferedInput))
 	{
 		return false;
 	}
 
 	if (BufferedInput.IncomingActionType != ETwoHeartsCombatActionType::NormalAttack)
 	{
-		ActionContextComponent->RestoreBufferedInput(BufferedInput, TEXT("NormalAttackLateFollowUp.WrongActionType"));
+		Character->RestoreBufferedCombatInput(BufferedInput, TEXT("NormalAttackLateFollowUp.WrongActionType"));
 		return false;
 	}
 
@@ -1129,7 +1129,9 @@ bool UTwoHeartsGA_NormalAttackBase::RestorePendingLateBufferedInput(const FStrin
 		return false;
 	}
 
-	const bool bRestored = ActionContextComponent->RestoreBufferedInput(BufferedInputToRestore, Reason);
+	const bool bRestored = Character
+		? Character->RestoreBufferedCombatInput(BufferedInputToRestore, Reason)
+		: ActionContextComponent->RestoreBufferedInput(BufferedInputToRestore, Reason);
 	if (Character)
 	{
 		Character->PushCombatInputDebugEvent(

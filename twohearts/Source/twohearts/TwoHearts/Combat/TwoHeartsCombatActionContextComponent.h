@@ -138,6 +138,15 @@ struct FTwoHeartsCombatActionContextSnapshot
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Buffer")
 	float BufferedInputTimeSeconds = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Buffer")
+	FString BufferedInputLastEventName = TEXT("None");
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Buffer")
+	FString BufferedInputLastEventDetail = TEXT("None");
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Input Buffer")
+	float BufferedInputLastEventTimeSeconds = 0.0f;
 };
 
 USTRUCT(BlueprintType)
@@ -228,6 +237,7 @@ public:
 private:
 	float GetWorldTimeSecondsSafe() const;
 	void RecordContextEvent(const TCHAR* EventName, const FString& Detail) const;
+	void RecordBufferedInputStateEvent(const TCHAR* EventName, const FString& Detail);
 	void SyncBufferedInputToSnapshot();
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Action Context", meta=(AllowPrivateAccess="true"))

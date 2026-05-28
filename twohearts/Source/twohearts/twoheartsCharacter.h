@@ -6,6 +6,7 @@
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
 #include "TwoHearts/Combat/TwoHeartsCombatPhase.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsAbilityGrant.h"
 #include "twoheartsCharacter.generated.h"
@@ -138,6 +139,30 @@ struct FTwoHeartsGuardConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Guard", meta=(ClampMin="0.0", UIMin="0.0"))
 	float GuardSuccessCooldownSeconds = 0.20f;
+};
+
+USTRUCT(BlueprintType)
+struct FTwoHeartsPreInputWindowOverride
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|PreInput")
+	ETwoHeartsCombatActionType ActionType = ETwoHeartsCombatActionType::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|PreInput", meta=(ClampMin="0.0", UIMin="0.0"))
+	float WindowSeconds = 0.0f;
+};
+
+USTRUCT(BlueprintType)
+struct FTwoHeartsPreInputConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|PreInput", meta=(ClampMin="0.0", UIMin="0.0"))
+	float DefaultWindowSeconds = 0.35f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|PreInput")
+	TArray<FTwoHeartsPreInputWindowOverride> ActionWindowOverrides;
 };
 
 
@@ -313,6 +338,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Guard", meta=(AllowPrivateAccess="true"))
 	FTwoHeartsGuardConfig GuardConfig;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|PreInput", meta=(AllowPrivateAccess="true"))
+	FTwoHeartsPreInputConfig PreInputConfig;
+
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Dodge|Debug", meta=(AllowPrivateAccess="true"))
 	bool bIsDodgeAbilityActive = false;
 
@@ -445,6 +473,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="Combat|Guard")
 	const FTwoHeartsGuardConfig& GetGuardConfig() const { return GuardConfig; }
 
+	UFUNCTION(BlueprintPure, Category="Combat|PreInput")
+	const FTwoHeartsPreInputConfig& GetPreInputConfig() const { return PreInputConfig; }
+
 	UFUNCTION(BlueprintPure, Category="Combat|Dodge")
 	FVector GetDesiredDodgeDirectionWorld() const;
 
@@ -532,6 +563,9 @@ public:
 	float GetLastGuardEventTimeSeconds() const { return LastGuardEventTimeSeconds; }
 	const TArray<FTwoHeartsCombatInputDebugEvent>& GetCombatInputDebugEvents() const { return CombatInputDebugEvents; }
 	void PushCombatInputDebugEvent(const FString& InputName, const FString& ResultName, const FString& RouteName, const FString& Detail);
+	float GetPreInputWindowSecondsForAction(ETwoHeartsCombatActionType ActionType) const;
+	bool TryTakeBufferedCombatInput(const FString& ConsumerName, FTwoHeartsBufferedCombatInput& OutBufferedInput, FString* OutFailureDetail = nullptr);
+	bool RestoreBufferedCombatInput(const FTwoHeartsBufferedCombatInput& BufferedInput, const FString& Reason, FString* OutFailureDetail = nullptr);
 	bool TryConsumeReservedCombatInput(const FString& ConsumerName);
 
 public:
@@ -550,6 +584,7 @@ protected:
 	void RecordAbilityInputFailure(ETwoHeartsAbilityInputID InputID, const TCHAR* EventName, const FString& Detail);
 	bool HandleBufferedCombatInput(ETwoHeartsAbilityInputID InputID, const FString& InputName, const FTwoHeartsCombatInputEvaluation& InputEvaluation);
 	bool TryExecuteCombatInputNow(ETwoHeartsAbilityInputID InputID, const FString& InputName, const FTwoHeartsCombatInputEvaluation& InputEvaluation);
+	bool IsBufferedCombatInputExpired(const FTwoHeartsBufferedCombatInput& BufferedInput, float& OutWindowSeconds, float& OutAgeSeconds) const;
 	void RecordCombatInputDebugEvent(const FString& InputName, const FString& ResultName, const FString& RouteName, const FString& Detail);
 	bool ShouldEmitNormalAttackDebugLog(const TCHAR* EventName, bool bVerboseOnly) const;
 	FString GetCombatDebugLogFilePath() const;

@@ -159,7 +159,7 @@ void ATwoheartsDebugHUD::DrawHUD()
 		VisibleInputEvents.Add(&InputEvents[EventIndex]);
 	}
 
-	const float PanelHeight = 676.0f + (VisibleEvents.Num() * LineHeight) + (VisibleInputEvents.Num() * LineHeight * 2.0f);
+	const float PanelHeight = 712.0f + (VisibleEvents.Num() * LineHeight) + (VisibleInputEvents.Num() * LineHeight * 2.0f);
 
 
 	FCanvasTileItem Background(FVector2D(PanelX, PanelY), FVector2D(PanelWidth, PanelHeight), FLinearColor(0.02f, 0.02f, 0.02f, 0.78f));
@@ -270,6 +270,20 @@ void ATwoheartsDebugHUD::DrawHUD()
 			PanelX + 12.0f,
 			CurrentY,
 			ActionContext.bHasBufferedInput ? TextColor : MutedColor);
+		CurrentY += LineHeight;
+
+		DrawDebugLine(
+			FString::Printf(TEXT("buffer_event=%s @ %.2f"), *ActionContext.BufferedInputLastEventName, ActionContext.BufferedInputLastEventTimeSeconds),
+			PanelX + 12.0f,
+			CurrentY,
+			ActionContext.BufferedInputLastEventName.Equals(TEXT("None"), ESearchCase::CaseSensitive) ? MutedColor : TextColor);
+		CurrentY += LineHeight;
+
+		DrawDebugLine(
+			FString::Printf(TEXT("buffer_detail=%s"), *ActionContext.BufferedInputLastEventDetail),
+			PanelX + 12.0f,
+			CurrentY,
+			ActionContext.BufferedInputLastEventDetail.Equals(TEXT("None"), ESearchCase::CaseSensitive) ? MutedColor : TextColor);
 		CurrentY += LineHeight * 1.5f;
 	}
 	else

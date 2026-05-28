@@ -376,6 +376,11 @@ bool UTwoHeartsGA_Dodge::StartDodgeExecution()
 	bHasReceivedInvulnerabilityBeginNotify = false;
 	bHasReceivedInvulnerabilityEndNotify = false;
 
+	if (UTwoHeartsCombatActionContextComponent* ActionContextComponent = GetCombatActionContextComponent())
+	{
+		ActionContextComponent->ClearBufferedInput(TEXT("ClearedByDodgeStart"));
+	}
+
 	ApplyDodgeCooldown();
 	SyncCombatActionContextOnPhaseEntered(ETwoHeartsCombatPhase::Startup, TEXT("DodgeActivated"));
 	UpdateDodgeDebugState();

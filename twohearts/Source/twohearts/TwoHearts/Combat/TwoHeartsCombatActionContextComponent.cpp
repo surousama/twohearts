@@ -216,31 +216,45 @@ FTwoHeartsCombatInputEvaluation UTwoHeartsCombatActionContextComponent::Evaluate
 			return FinalizeEvaluation(MoveTemp(Evaluation));
 		}
 
-		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::Reject;
-		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::None;
+		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::BufferInput;
+		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ReserveForFutureBufferConsumer;
 		Evaluation.bShouldForwardToActiveAbility = false;
-		Evaluation.Reason = TEXT("Current normal attack has already passed its combo handoff window.");
+		Evaluation.Reason = TEXT("Current normal attack already passed its combo handoff window, so the latest normal attack input was stored as unified pre-input.");
 		return FinalizeEvaluation(MoveTemp(Evaluation));
 
 	}
 
-	if (CurrentContext.ActionType == ETwoHeartsCombatActionType::Dodge)
-	{
-		const bool bCanBufferDodgeFollowUp =
-			CurrentContext.ActionPhase == ETwoHeartsCombatPhase::Recovery
-			|| CurrentContext.ActionPhase == ETwoHeartsCombatPhase::LogicEnded
-			|| CurrentContext.bHasLogicEnded;
+	const bool bIncomingIsSupportedPlayerAction =
+		IncomingActionType == ETwoHeartsCombatActionType::NormalAttack
+		|| IncomingActionType == ETwoHeartsCombatActionType::Dodge
+		|| IncomingActionType == ETwoHeartsCombatActionType::Guard;
+	const bool bCurrentActionSupportsUnifiedPreInput =
+		CurrentContext.ActionType == ETwoHeartsCombatActionType::NormalAttack
+		|| CurrentContext.ActionType == ETwoHeartsCombatActionType::Dodge
+		|| CurrentContext.ActionType == ETwoHeartsCombatActionType::Guard;
 
-		if (bCanBufferDodgeFollowUp)
+	if (bCurrentActionSupportsUnifiedPreInput
+		&& bIncomingIsSupportedPlayerAction)
+	{
+		if (CurrentContext.ActionType == ETwoHeartsCombatActionType::Guard
+			&& IncomingActionType == ETwoHeartsCombatActionType::Guard)
 		{
-			Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::BufferInput;
-			Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ReserveForFutureBufferConsumer;
-			Evaluation.Reason = TEXT("Current dodge accepted a buffered follow-up input for post-action consumption.");
+			Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::Reject;
+			Evaluation.Reason = TEXT("Current basic guard action is already active.");
 			return FinalizeEvaluation(MoveTemp(Evaluation));
 		}
 
-		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::Reject;
-		Evaluation.Reason = TEXT("Current dodge has not reached its buffered follow-up window yet.");
+		if (CanCurrentActionBeInterruptedBy(IncomingActionType))
+		{
+			Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::ExecuteNow;
+			Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ActivateMatchingAbility;
+			Evaluation.Reason = TEXT("Current combat action can be interrupted by the incoming action.");
+			return FinalizeEvaluation(MoveTemp(Evaluation));
+		}
+
+		Evaluation.Result = ETwoHeartsCombatInputEvaluationResult::BufferInput;
+		Evaluation.ConsumptionRoute = ETwoHeartsCombatInputConsumptionRoute::ReserveForFutureBufferConsumer;
+		Evaluation.Reason = TEXT("Current combat action is still busy, so the latest valid player action was stored as unified pre-input for post-action consumption.");
 		return FinalizeEvaluation(MoveTemp(Evaluation));
 	}
 
@@ -262,6 +276,8 @@ void UTwoHeartsCombatActionContextComponent::BufferInput(
 	ETwoHeartsCombatInputConsumptionRoute ConsumptionRoute,
 	const FString& Reason)
 {
+	const bool bReplacedExistingInput = BufferedInput.bIsSet;
+	const ETwoHeartsCombatActionType PreviousInputType = BufferedInput.IncomingActionType;
 	BufferedInput.bIsSet = true;
 	BufferedInput.IncomingActionType = IncomingActionType;
 	BufferedInput.ConsumptionRoute = ConsumptionRoute;
@@ -269,13 +285,15 @@ void UTwoHeartsCombatActionContextComponent::BufferInput(
 	BufferedInput.BufferedTimeSeconds = GetWorldTimeSecondsSafe();
 	SyncBufferedInputToSnapshot();
 
-	RecordContextEvent(
-		TEXT("BufferInput"),
+	RecordBufferedInputStateEvent(
+		bReplacedExistingInput ? TEXT("BufferedInputReplaced") : TEXT("BufferedInputStored"),
 		FString::Printf(
-			TEXT("input=%s route=%s reason=%s"),
+			TEXT("input=%s route=%s reason=%s replaced_previous=%s previous_input=%s"),
 			*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(BufferedInput.IncomingActionType)),
 			*StaticEnum<ETwoHeartsCombatInputConsumptionRoute>()->GetNameStringByValue(static_cast<int64>(BufferedInput.ConsumptionRoute)),
-			*BufferedInput.Reason));
+			*BufferedInput.Reason,
+			bReplacedExistingInput ? TEXT("true") : TEXT("false"),
+			*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(PreviousInputType))));
 }
 
 bool UTwoHeartsCombatActionContextComponent::ConsumeBufferedInput(
@@ -288,8 +306,8 @@ bool UTwoHeartsCombatActionContextComponent::ConsumeBufferedInput(
 	}
 
 	OutBufferedInput = BufferedInput;
-	RecordContextEvent(
-		TEXT("ConsumeBufferedInput"),
+	RecordBufferedInputStateEvent(
+		TEXT("BufferedInputConsumed"),
 		FString::Printf(
 			TEXT("consumer=%s input=%s route=%s reason=%s"),
 			*ConsumerName,
@@ -313,8 +331,8 @@ bool UTwoHeartsCombatActionContextComponent::RestoreBufferedInput(
 
 	if (BufferedInput.bIsSet)
 	{
-		RecordContextEvent(
-			TEXT("RestoreBufferedInputSkipped"),
+		RecordBufferedInputStateEvent(
+			TEXT("BufferedInputRestoreSkipped"),
 			FString::Printf(
 				TEXT("reason=%s blocked_by=%s incoming=%s"),
 				*Reason,
@@ -326,8 +344,8 @@ bool UTwoHeartsCombatActionContextComponent::RestoreBufferedInput(
 	BufferedInput = InputToRestore;
 	SyncBufferedInputToSnapshot();
 
-	RecordContextEvent(
-		TEXT("RestoreBufferedInput"),
+	RecordBufferedInputStateEvent(
+		TEXT("BufferedInputRestored"),
 		FString::Printf(
 			TEXT("reason=%s input=%s route=%s original_reason=%s"),
 			*Reason,
@@ -344,8 +362,8 @@ void UTwoHeartsCombatActionContextComponent::ClearBufferedInput(const FString& R
 		return;
 	}
 
-	RecordContextEvent(
-		TEXT("ClearBufferedInput"),
+	RecordBufferedInputStateEvent(
+		TEXT("BufferedInputCleared"),
 		FString::Printf(
 			TEXT("reason=%s input=%s"),
 			*Reason,
@@ -398,4 +416,12 @@ void UTwoHeartsCombatActionContextComponent::SyncBufferedInputToSnapshot()
 	CurrentContext.BufferedInputRoute = BufferedInput.bIsSet ? BufferedInput.ConsumptionRoute : ETwoHeartsCombatInputConsumptionRoute::None;
 	CurrentContext.BufferedInputReason = BufferedInput.bIsSet ? BufferedInput.Reason : TEXT("None");
 	CurrentContext.BufferedInputTimeSeconds = BufferedInput.bIsSet ? BufferedInput.BufferedTimeSeconds : 0.0f;
+}
+
+void UTwoHeartsCombatActionContextComponent::RecordBufferedInputStateEvent(const TCHAR* EventName, const FString& Detail)
+{
+	CurrentContext.BufferedInputLastEventName = EventName ? EventName : TEXT("None");
+	CurrentContext.BufferedInputLastEventDetail = Detail.IsEmpty() ? TEXT("None") : Detail;
+	CurrentContext.BufferedInputLastEventTimeSeconds = GetWorldTimeSecondsSafe();
+	RecordContextEvent(EventName, Detail);
 }

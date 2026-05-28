@@ -332,6 +332,11 @@ bool UTwoHeartsGA_Guard::StartGuardExecution()
 	bGuardWindowActive = false;
 	CachedAbilitySystemComponent = GetTwoHeartsAbilitySystemComponent();
 
+	if (UTwoHeartsCombatActionContextComponent* ActionContextComponent = GetCombatActionContextComponent())
+	{
+		ActionContextComponent->ClearBufferedInput(TEXT("ClearedByGuardStart"));
+	}
+
 	BindHostileAttackReceiver(ReceiverComponent);
 
 	SyncCombatActionContextOnPhaseEntered(ETwoHeartsCombatPhase::Startup, TEXT("GuardActivated"));
