@@ -2,10 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "TwoHearts/Combat/TwoHeartsAttackMetadata.h"
 #include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
 #include "TwoHearts/Combat/TwoHeartsCombatPhase.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGameplayAbility.h"
 #include "TwoHeartsGA_NormalAttackBase.generated.h"
+
 
 class AtwoheartsCharacter;
 class UAbilityTask_PlayMontageAndWait;
@@ -44,6 +46,9 @@ public:
 	bool TryInterruptByAction(ETwoHeartsCombatActionType InterruptingActionType, const FString& InterruptReason);
 	bool TryInterruptByDodge();
 	void NotifyCombatPhaseByName(FName NotifyName);
+	UFUNCTION(BlueprintPure, Category="Normal Attack|Attack Metadata")
+	FTwoHeartsAttackMetadata BuildCurrentAttackMetadata() const;
+
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Normal Attack")
@@ -67,7 +72,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase")
 	FName NextSegmentAdvanceNotifyName = TEXT("CombatPhase_AdvanceNextSegment");
 
+	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Attack Metadata")
+	FTwoHeartsAttackMetadata AttackMetadataTemplate;
+
 	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase", meta=(ClampMin="0.0", ClampMax="1.0"))
+
 	float ActivePhaseFallbackNormalizedTime = 0.20f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase", meta=(ClampMin="0.0", ClampMax="1.0"))

@@ -2,7 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "TwoHearts/Combat/TwoHeartsAttackMetadata.h"
 #include "TwoHeartsHostileAttackReceiverComponent.generated.h"
+
 
 class AActor;
 
@@ -62,6 +64,9 @@ struct FTwoHeartsHostileAttackSignal
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Hostile Attack")
 	FString Detail = TEXT("None");
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Hostile Attack")
+	FTwoHeartsAttackMetadata AttackMetadata;
 };
 
 USTRUCT(BlueprintType)
@@ -98,6 +103,9 @@ struct FTwoHeartsPlayerHitResult
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Player Hit Result")
 	FString Detail = TEXT("None");
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Player Hit Result")
+	FTwoHeartsAttackMetadata AttackMetadata;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTwoHeartsHostileAttackSignalDelegate, const FTwoHeartsHostileAttackSignal&, Signal);
@@ -184,4 +192,7 @@ private:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Player Hit Result", meta=(AllowPrivateAccess="true"))
 	float PendingAttackStartSeconds = 0.0f;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Player Hit Result", meta=(AllowPrivateAccess="true"))
+	FTwoHeartsAttackMetadata PendingAttackMetadata;
 };

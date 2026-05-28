@@ -43,7 +43,7 @@ void FinishDodgeCooldown(
 
 	UE_LOG(
 		LogtwoheartsCombatTest,
-		Display,
+		Verbose,
 		TEXT("[Dodge] event=DodgeCooldownReady detail=\"Dodge cooldown finished and Cooldown.Dodge was removed from the ASC.\""));
 }
 }
@@ -600,13 +600,14 @@ void UTwoHeartsGA_Dodge::RecordDodgeEvent(const TCHAR* EventName, const FString&
 
 	UE_LOG(
 		LogtwoheartsCombatTest,
-		Display,
+		Verbose,
 		TEXT("[Dodge] ability=%s owner=%s avatar=%s event=%s detail=\"%s\""),
 		*GetNameSafe(GetClass()),
 		*GetNameSafe(GetAbilityOwnerActor()),
 		*GetNameSafe(GetAbilityAvatarActor()),
 		EventName,
 		*Detail);
+
 }
 
 const FTwoHeartsDodgeConfig* UTwoHeartsGA_Dodge::GetDodgeConfig() const

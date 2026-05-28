@@ -44,14 +44,76 @@ namespace
 		}
 	}
 
+	const TCHAR* LexHitReactionTypeToString(const ETwoHeartsHitReactionType HitReactionType)
+	{
+		switch (HitReactionType)
+		{
+		case ETwoHeartsHitReactionType::Light:
+			return TEXT("Light");
+		case ETwoHeartsHitReactionType::Heavy:
+			return TEXT("Heavy");
+		case ETwoHeartsHitReactionType::GuardBreak:
+			return TEXT("GuardBreak");
+		case ETwoHeartsHitReactionType::None:
+		default:
+			return TEXT("None");
+		}
+	}
+
+	const TCHAR* LexAttackTimingPhaseToString(const ETwoHeartsAttackTimingPhase TimingPhase)
+	{
+		switch (TimingPhase)
+		{
+		case ETwoHeartsAttackTimingPhase::Startup:
+			return TEXT("Startup");
+		case ETwoHeartsAttackTimingPhase::HitWindow:
+			return TEXT("HitWindow");
+		case ETwoHeartsAttackTimingPhase::Recovery:
+			return TEXT("Recovery");
+		case ETwoHeartsAttackTimingPhase::Finished:
+			return TEXT("Finished");
+		case ETwoHeartsAttackTimingPhase::None:
+		default:
+			return TEXT("None");
+		}
+	}
+
+	FString BuildAttackMetadataDebugString(const FTwoHeartsAttackMetadata& AttackMetadata)
+	{
+		const FString DamageMechanicTags = AttackMetadata.DamageMechanicTags.IsEmpty()
+			? TEXT("None")
+			: AttackMetadata.DamageMechanicTags.ToStringSimple();
+		const FString TimingWindowName = AttackMetadata.TimingWindowName.IsNone()
+			? TEXT("None")
+			: AttackMetadata.TimingWindowName.ToString();
+		return FString::Printf(
+			TEXT("reaction=%s tags=%s guard=%s dodge=%s timing=%s/%s"),
+			LexHitReactionTypeToString(AttackMetadata.HitReactionType),
+			*DamageMechanicTags,
+			AttackMetadata.bCanBeGuarded ? TEXT("true") : TEXT("false"),
+			AttackMetadata.bCanBeDodged ? TEXT("true") : TEXT("false"),
+			LexAttackTimingPhaseToString(AttackMetadata.TimingPhase),
+			*TimingWindowName);
+	}
+
 	bool IsFinalPlayerHitResultType(const ETwoHeartsPlayerHitResultType ResultType)
 	{
+
 		return ResultType == ETwoHeartsPlayerHitResultType::HitConfirmed
 			|| ResultType == ETwoHeartsPlayerHitResultType::HitExpired
 			|| ResultType == ETwoHeartsPlayerHitResultType::GuardRewritten;
 	}
 
+	bool ShouldLogPlayerHitResultAtDisplay(const ETwoHeartsPlayerHitResultType ResultType)
+	{
+		return ResultType == ETwoHeartsPlayerHitResultType::HitConfirmed
+			|| ResultType == ETwoHeartsPlayerHitResultType::HitExpired
+			|| ResultType == ETwoHeartsPlayerHitResultType::SignalInvalid
+			|| ResultType == ETwoHeartsPlayerHitResultType::GuardRewritten;
+	}
+
 	FString BuildPendingAttackDebugString(
+
 		const bool bHasPendingAttack,
 		const FString& PendingAttackInstanceName,
 		const AActor* PendingAttackSourceActor,
@@ -85,8 +147,9 @@ void UTwoHeartsHostileAttackReceiverComponent::ReceiveHostileAttackSignal(const 
 
 	UE_LOG(
 		LogtwoheartsCombatTest,
-		Display,
-		TEXT("[HostileAttackSignal] receiver=%s type=%s attack=%s source=%s target=%s hit_window=%s contact=%s time=%.2f detail=\"%s\""),
+		Verbose,
+		TEXT("[HostileAttackSignal] receiver=%s type=%s attack=%s source=%s target=%s hit_window=%s contact=%s time=%.2f detail=\"%s\" metadata=\"%s\""),
+
 		*GetNameSafe(GetOwner()),
 		LexHostileAttackSignalTypeToString(Signal.SignalType),
 		*Signal.AttackInstanceName,
@@ -95,12 +158,15 @@ void UTwoHeartsHostileAttackReceiverComponent::ReceiveHostileAttackSignal(const 
 		Signal.bIsHitWindowActive ? TEXT("true") : TEXT("false"),
 		Signal.bHasContact ? TEXT("true") : TEXT("false"),
 		Signal.TimestampSeconds,
-		*Signal.Detail);
+		*Signal.Detail,
+		*BuildAttackMetadataDebugString(Signal.AttackMetadata));
+
 
 	UE_LOG(
 		LogtwoheartsCombatTest,
-		Display,
+		Verbose,
 		TEXT("[PlayerHitEval] receiver=%s stage=SignalAccepted signal=%s attack=%s source=%s target=%s %s"),
+
 		*GetNameSafe(GetOwner()),
 		LexHostileAttackSignalTypeToString(Signal.SignalType),
 		*Signal.AttackInstanceName,
@@ -124,9 +190,12 @@ void UTwoHeartsHostileAttackReceiverComponent::ClearSignalHistory()
 	PendingAttackInstanceName = TEXT("None");
 	PendingAttackSourceActor = nullptr;
 	PendingAttackStartSeconds = 0.0f;
+	PendingAttackMetadata = FTwoHeartsAttackMetadata();
 
-	UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[HostileAttackSignal] receiver=%s history_cleared=true"), *GetNameSafe(GetOwner()));
-	UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[PlayerHitEval] receiver=%s stage=StateCleared"), *GetNameSafe(GetOwner()));
+
+	UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[HostileAttackSignal] receiver=%s history_cleared=true"), *GetNameSafe(GetOwner()));
+	UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[PlayerHitEval] receiver=%s stage=StateCleared"), *GetNameSafe(GetOwner()));
+
 }
 
 bool UTwoHeartsHostileAttackReceiverComponent::RewriteLastPlayerHitResultForGuard(
@@ -153,18 +222,21 @@ bool UTwoHeartsHostileAttackReceiverComponent::RewriteLastPlayerHitResultForGuar
 	UE_LOG(
 		LogtwoheartsCombatTest,
 		Display,
-		TEXT("[PlayerHitResult] receiver=%s event=GuardRewrite attack=%s result=%s hit=%s rewritable=%s detail=\"%s\""),
+		TEXT("[PlayerHitResult] receiver=%s event=GuardRewrite attack=%s result=%s hit=%s rewritable=%s detail=\"%s\" metadata=\"%s\""),
 		*GetNameSafe(GetOwner()),
 		*LastPlayerHitResult.AttackInstanceName,
 		LexPlayerHitResultTypeToString(LastPlayerHitResult.ResultType),
 		LastPlayerHitResult.bHitConfirmed ? TEXT("true") : TEXT("false"),
 		LastPlayerHitResult.bCanBeRewrittenByGuard ? TEXT("true") : TEXT("false"),
-		*LastPlayerHitResult.Detail);
+		*LastPlayerHitResult.Detail,
+		*BuildAttackMetadataDebugString(LastPlayerHitResult.AttackMetadata));
+
 
 	UE_LOG(
 		LogtwoheartsCombatTest,
-		Display,
+		Verbose,
 		TEXT("[PlayerHitEval] receiver=%s stage=GuardRewrite attack=%s result=%s time=%.2f"),
+
 		*GetNameSafe(GetOwner()),
 		*LastPlayerHitResult.AttackInstanceName,
 		LexPlayerHitResultTypeToString(LastPlayerHitResult.ResultType),
@@ -187,8 +259,9 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 
 	UE_LOG(
 		LogtwoheartsCombatTest,
-		Display,
+		Verbose,
 		TEXT("[PlayerHitEval] receiver=%s stage=EvaluateSignal signal=%s attack=%s can_start=%s starts_new=%s %s"),
+
 		*GetNameSafe(GetOwner()),
 		LexHostileAttackSignalTypeToString(Signal.SignalType),
 		*Signal.AttackInstanceName,
@@ -209,6 +282,8 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 		FTwoHeartsHostileAttackSignal SyntheticExpiredSignal = Signal;
 		SyntheticExpiredSignal.AttackInstanceName = PendingAttackInstanceName;
 		SyntheticExpiredSignal.SourceActor = PendingAttackSourceActor;
+		SyntheticExpiredSignal.AttackMetadata = PendingAttackMetadata;
+
 		FinalizeCurrentPendingAttack(
 			SyntheticExpiredSignal,
 			ETwoHeartsPlayerHitResultType::HitExpired,
@@ -223,8 +298,10 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 		PendingAttackInstanceName = Signal.AttackInstanceName;
 		PendingAttackSourceActor = Signal.SourceActor;
 		PendingAttackStartSeconds = Signal.TimestampSeconds;
+		PendingAttackMetadata = Signal.AttackMetadata;
 
 		FTwoHeartsPlayerHitResult PendingResult;
+
 		PendingResult.ResultType = ETwoHeartsPlayerHitResultType::PendingIncomingHit;
 		PendingResult.AttackInstanceName = Signal.AttackInstanceName;
 		PendingResult.SourceActor = Signal.SourceActor;
@@ -237,11 +314,14 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 		PendingResult.Detail = Signal.Detail.IsEmpty()
 			? TEXT("Incoming hostile attack became pending on the player side.")
 			: Signal.Detail;
+		PendingResult.AttackMetadata = Signal.AttackMetadata;
+
 
 		UE_LOG(
 			LogtwoheartsCombatTest,
-			Display,
+			Verbose,
 			TEXT("[PlayerHitEval] receiver=%s stage=PendingOpened attack=%s source_signal=%s target=%s time=%.2f"),
+
 			*GetNameSafe(GetOwner()),
 			*PendingResult.AttackInstanceName,
 			LexHostileAttackSignalTypeToString(PendingResult.SourceSignalType),
@@ -270,8 +350,9 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 		{
 			UE_LOG(
 				LogtwoheartsCombatTest,
-				Display,
+				Verbose,
 				TEXT("[PlayerHitEval] receiver=%s stage=LateLifecycleSignalIgnored signal=%s attack=%s last_result=%s"),
+
 				*GetNameSafe(GetOwner()),
 				LexHostileAttackSignalTypeToString(Signal.SignalType),
 				*Signal.AttackInstanceName,
@@ -289,7 +370,9 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 		InvalidResult.ResultTimestampSeconds = Signal.TimestampSeconds;
 		InvalidResult.ContactTimestampSeconds = 0.0f;
 		InvalidResult.SourceSignalType = Signal.SignalType;
+		InvalidResult.AttackMetadata = Signal.AttackMetadata;
 		InvalidResult.Detail = FString::Printf(
+
 			TEXT("Received %s without a tracked hostile attack instance. %s"),
 			LexHostileAttackSignalTypeToString(Signal.SignalType),
 			Signal.Detail.IsEmpty() ? TEXT("No detail.") : *Signal.Detail);
@@ -311,6 +394,8 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 	{
 	case ETwoHeartsHostileAttackSignalType::HitWindowOpened:
 	{
+		PendingAttackMetadata = Signal.AttackMetadata;
+
 		FTwoHeartsPlayerHitResult PendingResult;
 		PendingResult.ResultType = ETwoHeartsPlayerHitResultType::PendingIncomingHit;
 		PendingResult.AttackInstanceName = PendingAttackInstanceName;
@@ -322,11 +407,14 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 		PendingResult.ContactTimestampSeconds = 0.0f;
 		PendingResult.SourceSignalType = Signal.SignalType;
 		PendingResult.Detail = TEXT("Hostile attack hit window is active and waiting for a player-side hit result.");
+		PendingResult.AttackMetadata = Signal.AttackMetadata;
+
 
 		UE_LOG(
 			LogtwoheartsCombatTest,
-			Display,
+			Verbose,
 			TEXT("[PlayerHitEval] receiver=%s stage=HitWindowActive attack=%s target=%s time=%.2f"),
+
 			*GetNameSafe(GetOwner()),
 			*PendingResult.AttackInstanceName,
 			*GetNameSafe(PendingResult.TargetActor),
@@ -371,22 +459,35 @@ void UTwoHeartsHostileAttackReceiverComponent::FinalizeCurrentPendingAttack(
 	bool bCanBeRewrittenByGuard,
 	const FString& Detail)
 {
+	FTwoHeartsAttackMetadata ResolvedAttackMetadata = Signal.AttackMetadata;
+	if (ResolvedAttackMetadata.AttackInstanceName.IsEmpty() || ResolvedAttackMetadata.AttackInstanceName == TEXT("None"))
+	{
+		ResolvedAttackMetadata.AttackInstanceName = PendingAttackInstanceName;
+	}
+	if (!ResolvedAttackMetadata.SourceActor)
+	{
+		ResolvedAttackMetadata.SourceActor = PendingAttackSourceActor ? PendingAttackSourceActor : Signal.SourceActor;
+	}
+
 	FTwoHeartsPlayerHitResult Result;
 	Result.ResultType = FinalResultType;
-	Result.AttackInstanceName = PendingAttackInstanceName;
-	Result.SourceActor = PendingAttackSourceActor ? PendingAttackSourceActor : Signal.SourceActor;
+	Result.AttackMetadata = ResolvedAttackMetadata;
+	Result.AttackInstanceName = Result.AttackMetadata.AttackInstanceName;
+	Result.SourceActor = Result.AttackMetadata.SourceActor;
 	Result.TargetActor = Signal.TargetActor;
 	Result.bHitConfirmed = bHitConfirmed;
-	Result.bCanBeRewrittenByGuard = bCanBeRewrittenByGuard;
+	Result.bCanBeRewrittenByGuard = bCanBeRewrittenByGuard && Result.AttackMetadata.bCanBeGuarded;
 	Result.ResultTimestampSeconds = Signal.TimestampSeconds;
 	Result.ContactTimestampSeconds = Signal.SignalType == ETwoHeartsHostileAttackSignalType::AttackContact ? Signal.TimestampSeconds : 0.0f;
 	Result.SourceSignalType = Signal.SignalType;
 	Result.Detail = Detail.IsEmpty() ? Signal.Detail : Detail;
 
+
 	UE_LOG(
 		LogtwoheartsCombatTest,
-		Display,
-		TEXT("[PlayerHitEval] receiver=%s stage=Finalize attack=%s final_result=%s source_signal=%s hit=%s rewritable=%s finalize_time=%.2f contact_time=%.2f pending_lifetime=%.2f"),
+		Verbose,
+		TEXT("[PlayerHitEval] receiver=%s stage=Finalize attack=%s final_result=%s source_signal=%s hit=%s rewritable=%s finalize_time=%.2f contact_time=%.2f pending_lifetime=%.2f metadata=\"%s\""),
+
 		*GetNameSafe(GetOwner()),
 		*Result.AttackInstanceName,
 		LexPlayerHitResultTypeToString(Result.ResultType),
@@ -395,7 +496,9 @@ void UTwoHeartsHostileAttackReceiverComponent::FinalizeCurrentPendingAttack(
 		Result.bCanBeRewrittenByGuard ? TEXT("true") : TEXT("false"),
 		Result.ResultTimestampSeconds,
 		Result.ContactTimestampSeconds,
-		PendingAttackStartSeconds > 0.0f ? Signal.TimestampSeconds - PendingAttackStartSeconds : 0.0f);
+		PendingAttackStartSeconds > 0.0f ? Signal.TimestampSeconds - PendingAttackStartSeconds : 0.0f,
+		*BuildAttackMetadataDebugString(Result.AttackMetadata));
+
 
 	PushPlayerHitResult(Result);
 
@@ -403,6 +506,8 @@ void UTwoHeartsHostileAttackReceiverComponent::FinalizeCurrentPendingAttack(
 	PendingAttackInstanceName = TEXT("None");
 	PendingAttackSourceActor = nullptr;
 	PendingAttackStartSeconds = 0.0f;
+	PendingAttackMetadata = FTwoHeartsAttackMetadata();
+
 }
 
 void UTwoHeartsHostileAttackReceiverComponent::PushPlayerHitResult(const FTwoHeartsPlayerHitResult& HitResult)
@@ -417,23 +522,46 @@ void UTwoHeartsHostileAttackReceiverComponent::PushPlayerHitResult(const FTwoHea
 		PlayerHitResultHistory.RemoveAt(0, ExcessResults);
 	}
 
-	UE_LOG(
-		LogtwoheartsCombatTest,
-		Display,
-		TEXT("[PlayerHitResult] receiver=%s attack=%s result=%s hit=%s rewritable=%s time=%.2f source_signal=%s detail=\"%s\""),
-		*GetNameSafe(GetOwner()),
-		*HitResult.AttackInstanceName,
-		LexPlayerHitResultTypeToString(HitResult.ResultType),
-		HitResult.bHitConfirmed ? TEXT("true") : TEXT("false"),
-		HitResult.bCanBeRewrittenByGuard ? TEXT("true") : TEXT("false"),
-		HitResult.ResultTimestampSeconds,
-		LexHostileAttackSignalTypeToString(HitResult.SourceSignalType),
-		*HitResult.Detail);
+	if (ShouldLogPlayerHitResultAtDisplay(HitResult.ResultType))
+	{
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Display,
+			TEXT("[PlayerHitResult] receiver=%s attack=%s result=%s hit=%s rewritable=%s time=%.2f source_signal=%s detail=\"%s\" metadata=\"%s\""),
+			*GetNameSafe(GetOwner()),
+			*HitResult.AttackInstanceName,
+			LexPlayerHitResultTypeToString(HitResult.ResultType),
+			HitResult.bHitConfirmed ? TEXT("true") : TEXT("false"),
+			HitResult.bCanBeRewrittenByGuard ? TEXT("true") : TEXT("false"),
+			HitResult.ResultTimestampSeconds,
+			LexHostileAttackSignalTypeToString(HitResult.SourceSignalType),
+			*HitResult.Detail,
+			*BuildAttackMetadataDebugString(HitResult.AttackMetadata));
+	}
+	else
+	{
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Verbose,
+			TEXT("[PlayerHitResult] receiver=%s attack=%s result=%s hit=%s rewritable=%s time=%.2f source_signal=%s detail=\"%s\" metadata=\"%s\""),
+			*GetNameSafe(GetOwner()),
+			*HitResult.AttackInstanceName,
+			LexPlayerHitResultTypeToString(HitResult.ResultType),
+			HitResult.bHitConfirmed ? TEXT("true") : TEXT("false"),
+			HitResult.bCanBeRewrittenByGuard ? TEXT("true") : TEXT("false"),
+			HitResult.ResultTimestampSeconds,
+			LexHostileAttackSignalTypeToString(HitResult.SourceSignalType),
+			*HitResult.Detail,
+			*BuildAttackMetadataDebugString(HitResult.AttackMetadata));
+	}
+
+
 
 	UE_LOG(
 		LogtwoheartsCombatTest,
-		Display,
+		Verbose,
 		TEXT("[PlayerHitEval] receiver=%s stage=ResultCommitted attack=%s result=%s history_count=%d"),
+
 		*GetNameSafe(GetOwner()),
 		*HitResult.AttackInstanceName,
 		LexPlayerHitResultTypeToString(HitResult.ResultType),

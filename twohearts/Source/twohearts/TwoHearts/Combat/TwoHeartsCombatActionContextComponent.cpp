@@ -383,11 +383,12 @@ void UTwoHeartsCombatActionContextComponent::RecordContextEvent(const TCHAR* Eve
 {
 	UE_LOG(
 		LogtwoheartsCombatTest,
-		Display,
+		Verbose,
 		TEXT("[CombatActionContext] actor=%s event=%s detail=\"%s\""),
 		*GetNameSafe(GetOwner()),
 		EventName,
 		*Detail);
+
 }
 
 void UTwoHeartsCombatActionContextComponent::SyncBufferedInputToSnapshot()

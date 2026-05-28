@@ -62,7 +62,16 @@ UTwoHeartsGA_NormalAttackBase::UTwoHeartsGA_NormalAttackBase()
 	ActivationOwnedTags.AddTag(TAG_TwoHearts_State_Action_NormalAttack);
 	ActivationBlockedTags.AddTag(TAG_TwoHearts_State_CannotAttack);
 	ActivationBlockedTags.AddTag(TAG_TwoHearts_State_CannotInput);
+
+	AttackMetadataTemplate.HitReactionType = ETwoHeartsHitReactionType::Light;
+	AttackMetadataTemplate.DamageMechanicTags.AddTag(TAG_TwoHearts_Attack_Mechanic_Physical);
+	AttackMetadataTemplate.DamageMechanicTags.AddTag(TAG_TwoHearts_Attack_Mechanic_NormalAttack);
+	AttackMetadataTemplate.bCanBeGuarded = true;
+	AttackMetadataTemplate.bCanBeDodged = true;
+	AttackMetadataTemplate.TimingPhase = ETwoHeartsAttackTimingPhase::HitWindow;
+	AttackMetadataTemplate.TimingWindowName = TEXT("PrimaryHitWindow");
 }
+
 
 void UTwoHeartsGA_NormalAttackBase::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
@@ -266,7 +275,31 @@ void UTwoHeartsGA_NormalAttackBase::NotifyCombatPhaseByName(FName NotifyName)
 	}
 }
 
+FTwoHeartsAttackMetadata UTwoHeartsGA_NormalAttackBase::BuildCurrentAttackMetadata() const
+{
+	FTwoHeartsAttackMetadata AttackMetadata = AttackMetadataTemplate;
+	AttackMetadata.AttackInstanceName = FString::Printf(TEXT("NormalAttack.Segment%d"), NormalAttackSegment);
+	AttackMetadata.SourceActor = GetAbilityAvatarActor();
+	if (const AtwoheartsCharacter* Character = GetTwoHeartsCharacter())
+	{
+		AttackMetadata.SourceLocation = Character->GetActorLocation();
+		AttackMetadata.AttackDirection = Character->GetActorForwardVector().GetSafeNormal2D();
+	}
+
+	if (AttackMetadata.TimingPhase == ETwoHeartsAttackTimingPhase::None)
+	{
+		AttackMetadata.TimingPhase = ETwoHeartsAttackTimingPhase::HitWindow;
+	}
+	if (AttackMetadata.TimingWindowName.IsNone())
+	{
+		AttackMetadata.TimingWindowName = TEXT("PrimaryHitWindow");
+	}
+
+	return AttackMetadata;
+}
+
 void UTwoHeartsGA_NormalAttackBase::HandleMontageCompleted()
+
 {
 	FinishSegment(false);
 }
@@ -782,7 +815,8 @@ void UTwoHeartsGA_NormalAttackBase::SyncCombatActionContextOnPhaseEntered(ETwoHe
 		Registration.InitialPhase = NewPhase;
 		Registration.AbilityTag = SegmentAbilityTag.IsValid() ? SegmentAbilityTag : TAG_TwoHearts_Ability_NormalAttack;
 		Registration.ActionStateTag = TAG_TwoHearts_State_Action_NormalAttack;
-		Registration.ActionInstanceName = FString::Printf(TEXT("NormalAttack.Segment%d"), NormalAttackSegment);
+		Registration.ActionInstanceName = BuildCurrentAttackMetadata().AttackInstanceName;
+
 
 		ActionContextComponent->BeginAction(Registration, Reason);
 		bHasRegisteredCombatActionContext = true;

@@ -2,8 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "TwoHearts/Combat/TwoHeartsAttackMetadata.h"
 #include "TwoHearts/Combat/Hostile/TwoHeartsHostileAttackReceiverComponent.h"
 #include "TwoHeartsHostileAttackProbeCharacter.generated.h"
+
 
 class UAnimationAsset;
 class UPrimitiveComponent;
@@ -59,6 +61,9 @@ private:
 	void NotifyCurrentTarget(ETwoHeartsHostileAttackSignalType SignalType, const FString& Detail, bool bHasContact) const;
 	void NotifyTargetActor(AActor* TargetActor, ETwoHeartsHostileAttackSignalType SignalType, const FString& Detail, bool bHasContact) const;
 	void NotifyHitTargets();
+	void InitializeCurrentAttackMetadata();
+	void UpdateCurrentAttackMetadataTiming(ETwoHeartsAttackTimingPhase TimingPhase, FName TimingWindowName);
+	FTwoHeartsAttackMetadata BuildCurrentAttackMetadataSnapshot() const;
 	FTwoHeartsHostileAttackSignal BuildSignal(ETwoHeartsHostileAttackSignalType SignalType, AActor* TargetActor, const FString& Detail, bool bHasContact) const;
 	void DrawDebugProbeState(const FColor& Color, const FString& Label) const;
 	bool IsActorInsideTriggerSphere(const AActor* Actor) const;
@@ -123,8 +128,12 @@ private:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Hostile Attack Probe|Debug", meta=(AllowPrivateAccess="true"))
 	FString CurrentAttackInstanceName = TEXT("None");
 
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Hostile Attack Probe|Debug", meta=(AllowPrivateAccess="true"))
+	FTwoHeartsAttackMetadata CurrentAttackMetadata;
+
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> CurrentTargetActor = nullptr;
+
 
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> AttackTargetActor = nullptr;

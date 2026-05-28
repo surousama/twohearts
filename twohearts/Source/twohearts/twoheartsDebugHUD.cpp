@@ -9,7 +9,45 @@
 #include "Engine/Engine.h"
 #include "GameFramework/Pawn.h"
 
+namespace
+{
+	const TCHAR* LexHitReactionTypeToString(const ETwoHeartsHitReactionType HitReactionType)
+	{
+		switch (HitReactionType)
+		{
+		case ETwoHeartsHitReactionType::Light:
+			return TEXT("Light");
+		case ETwoHeartsHitReactionType::Heavy:
+			return TEXT("Heavy");
+		case ETwoHeartsHitReactionType::GuardBreak:
+			return TEXT("GuardBreak");
+		case ETwoHeartsHitReactionType::None:
+		default:
+			return TEXT("None");
+		}
+	}
+
+	const TCHAR* LexAttackTimingPhaseToString(const ETwoHeartsAttackTimingPhase TimingPhase)
+	{
+		switch (TimingPhase)
+		{
+		case ETwoHeartsAttackTimingPhase::Startup:
+			return TEXT("Startup");
+		case ETwoHeartsAttackTimingPhase::HitWindow:
+			return TEXT("HitWindow");
+		case ETwoHeartsAttackTimingPhase::Recovery:
+			return TEXT("Recovery");
+		case ETwoHeartsAttackTimingPhase::Finished:
+			return TEXT("Finished");
+		case ETwoHeartsAttackTimingPhase::None:
+		default:
+			return TEXT("None");
+		}
+	}
+}
+
 void ATwoheartsDebugHUD::DrawHUD()
+
 {
 	Super::DrawHUD();
 
@@ -67,7 +105,8 @@ void ATwoheartsDebugHUD::DrawHUD()
 		VisibleInputEvents.Add(&InputEvents[EventIndex]);
 	}
 
-	const float PanelHeight = 520.0f + (VisibleEvents.Num() * LineHeight) + (VisibleInputEvents.Num() * LineHeight * 2.0f);
+	const float PanelHeight = 640.0f + (VisibleEvents.Num() * LineHeight) + (VisibleInputEvents.Num() * LineHeight * 2.0f);
+
 	FCanvasTileItem Background(FVector2D(PanelX, PanelY), FVector2D(PanelWidth, PanelHeight), FLinearColor(0.02f, 0.02f, 0.02f, 0.78f));
 	Background.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(Background);
@@ -292,6 +331,13 @@ void ATwoheartsDebugHUD::DrawHUD()
 				TextColor);
 			CurrentY += LineHeight;
 
+			const FString SignalDamageMechanicTags = LastSignal.AttackMetadata.DamageMechanicTags.IsEmpty()
+				? TEXT("None")
+				: LastSignal.AttackMetadata.DamageMechanicTags.ToStringSimple();
+			const FString SignalTimingWindowName = LastSignal.AttackMetadata.TimingWindowName.IsNone()
+				? TEXT("None")
+				: LastSignal.AttackMetadata.TimingWindowName.ToString();
+
 			DrawDebugLine(
 				FString::Printf(
 					TEXT("source=%s   dir=(%.2f, %.2f, %.2f)"),
@@ -305,11 +351,40 @@ void ATwoheartsDebugHUD::DrawHUD()
 			CurrentY += LineHeight;
 
 			DrawDebugLine(
+				FString::Printf(
+					TEXT("reaction=%s   guard=%s   dodge=%s"),
+					LexHitReactionTypeToString(LastSignal.AttackMetadata.HitReactionType),
+					LastSignal.AttackMetadata.bCanBeGuarded ? TEXT("YES") : TEXT("NO"),
+					LastSignal.AttackMetadata.bCanBeDodged ? TEXT("YES") : TEXT("NO")),
+				PanelX + 12.0f,
+				CurrentY,
+				TextColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(
+					TEXT("timing=%s / %s"),
+					LexAttackTimingPhaseToString(LastSignal.AttackMetadata.TimingPhase),
+					*SignalTimingWindowName),
+				PanelX + 12.0f,
+				CurrentY,
+				MutedColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(TEXT("tags=%s"), *SignalDamageMechanicTags),
+				PanelX + 12.0f,
+				CurrentY,
+				MutedColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
 				FString::Printf(TEXT("detail=%s"), *LastSignal.Detail),
 				PanelX + 12.0f,
 				CurrentY,
 				MutedColor);
 			CurrentY += LineHeight * 1.5f;
+
 		}
 
 		DrawDebugLine(TEXT("Player Hit Result"), PanelX + 12.0f, CurrentY, HeaderColor);
@@ -354,6 +429,13 @@ void ATwoheartsDebugHUD::DrawHUD()
 				TextColor);
 			CurrentY += LineHeight;
 
+			const FString HitResultDamageMechanicTags = LastHitResult.AttackMetadata.DamageMechanicTags.IsEmpty()
+				? TEXT("None")
+				: LastHitResult.AttackMetadata.DamageMechanicTags.ToStringSimple();
+			const FString HitResultTimingWindowName = LastHitResult.AttackMetadata.TimingWindowName.IsNone()
+				? TEXT("None")
+				: LastHitResult.AttackMetadata.TimingWindowName.ToString();
+
 			DrawDebugLine(
 				FString::Printf(
 					TEXT("source_signal=%s   contact_time=%.2f"),
@@ -365,11 +447,40 @@ void ATwoheartsDebugHUD::DrawHUD()
 			CurrentY += LineHeight;
 
 			DrawDebugLine(
+				FString::Printf(
+					TEXT("reaction=%s   guard=%s   dodge=%s"),
+					LexHitReactionTypeToString(LastHitResult.AttackMetadata.HitReactionType),
+					LastHitResult.AttackMetadata.bCanBeGuarded ? TEXT("YES") : TEXT("NO"),
+					LastHitResult.AttackMetadata.bCanBeDodged ? TEXT("YES") : TEXT("NO")),
+				PanelX + 12.0f,
+				CurrentY,
+				TextColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(
+					TEXT("timing=%s / %s"),
+					LexAttackTimingPhaseToString(LastHitResult.AttackMetadata.TimingPhase),
+					*HitResultTimingWindowName),
+				PanelX + 12.0f,
+				CurrentY,
+				MutedColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(TEXT("tags=%s"), *HitResultDamageMechanicTags),
+				PanelX + 12.0f,
+				CurrentY,
+				MutedColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
 				FString::Printf(TEXT("detail=%s"), *LastHitResult.Detail),
 				PanelX + 12.0f,
 				CurrentY,
 				MutedColor);
 			CurrentY += LineHeight * 1.5f;
+
 		}
 	}
 	else
