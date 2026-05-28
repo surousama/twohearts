@@ -12,12 +12,44 @@
 #include "twohearts.h"
 #include "twoheartsCharacter.h"
 
+namespace
+{
+	void FinishGuardSuccessCooldown(
+		TWeakObjectPtr<UAbilitySystemComponent> WeakAbilitySystemComponent,
+		TWeakObjectPtr<AtwoheartsCharacter> WeakCharacter)
+	{
+		UAbilitySystemComponent* AbilitySystemComponent = WeakAbilitySystemComponent.Get();
+		if (!AbilitySystemComponent)
+		{
+			UE_LOG(
+				LogtwoheartsCombatTest,
+				Warning,
+				TEXT("[Guard] event=GuardCooldownClearFailed detail=\"Ability system component was invalid when cooldown timer completed.\""));
+			return;
+		}
+
+		AbilitySystemComponent->RemoveLooseGameplayTag(TAG_TwoHearts_Cooldown_Guard);
+
+		if (AtwoheartsCharacter* Character = WeakCharacter.Get())
+		{
+			Character->PushGuardDebugEvent(TEXT("GuardCooldownReady"), TEXT("Guard success cooldown finished."));
+		}
+
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Verbose,
+			TEXT("[Guard] event=GuardCooldownReady detail=\"Guard success cooldown finished and Cooldown.Guard was removed from the ASC.\""));
+	}
+}
+
 UTwoHeartsGA_Guard::UTwoHeartsGA_Guard()
 {
 	AddDefaultAssetTag(TAG_TwoHearts_Ability_Guard);
 	ActivationOwnedTags.AddTag(TAG_TwoHearts_State_Action_Guard);
 	ActivationOwnedTags.AddTag(TAG_TwoHearts_State_CannotInput);
+	ActivationBlockedTags.AddTag(TAG_TwoHearts_Cooldown_Guard);
 }
+
 
 void UTwoHeartsGA_Guard::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
@@ -25,9 +57,11 @@ void UTwoHeartsGA_Guard::ActivateAbility(
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
+	CachedAbilitySystemComponent.Reset();
 	bGuardStarted = false;
 	bGuardFinished = false;
 	bGuardWindowActive = false;
+	bHasAppliedSuccessCooldownThisActivation = false;
 	bHasRegisteredCombatActionContext = false;
 	bHasMarkedCombatLogicEnded = false;
 	bInterruptedByHitReaction = false;
@@ -35,6 +69,7 @@ void UTwoHeartsGA_Guard::ActivateAbility(
 	BoundHostileAttackReceiver.Reset();
 	LastEvaluatedAttackInstanceName.Reset();
 	ClearGuardTimers();
+
 
 	if (!CanStartGuardExecution())
 	{
@@ -295,8 +330,10 @@ bool UTwoHeartsGA_Guard::StartGuardExecution()
 	bGuardStarted = true;
 	bGuardFinished = false;
 	bGuardWindowActive = false;
+	CachedAbilitySystemComponent = GetTwoHeartsAbilitySystemComponent();
 
 	BindHostileAttackReceiver(ReceiverComponent);
+
 	SyncCombatActionContextOnPhaseEntered(ETwoHeartsCombatPhase::Startup, TEXT("GuardActivated"));
 	UpdateGuardDebugState();
 	RecordGuardEvent(
@@ -432,7 +469,56 @@ void UTwoHeartsGA_Guard::ClearGuardTimers()
 	}
 }
 
+bool UTwoHeartsGA_Guard::ApplyGuardSuccessCooldown()
+{
+	if (bHasAppliedSuccessCooldownThisActivation)
+	{
+		return false;
+	}
+
+	UAbilitySystemComponent* AbilitySystemComponent = CachedAbilitySystemComponent.Get();
+	if (!AbilitySystemComponent)
+	{
+		AbilitySystemComponent = GetTwoHeartsAbilitySystemComponent();
+		CachedAbilitySystemComponent = AbilitySystemComponent;
+	}
+
+	const FTwoHeartsGuardConfig* GuardConfig = GetGuardConfig();
+	if (!AbilitySystemComponent || !GuardConfig)
+	{
+		return false;
+	}
+
+	const float CooldownSeconds = FMath::Max(0.0f, GuardConfig->GuardSuccessCooldownSeconds);
+	if (CooldownSeconds <= 0.0f)
+	{
+		return false;
+	}
+
+	AbilitySystemComponent->AddLooseGameplayTag(TAG_TwoHearts_Cooldown_Guard);
+	bCooldownActive = true;
+	bHasAppliedSuccessCooldownThisActivation = true;
+	RecordGuardEvent(TEXT("GuardCooldownBegin"), FString::Printf(TEXT("Guard success cooldown started for %.2f seconds."), CooldownSeconds));
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(GuardCooldownTimerHandle);
+
+		const TWeakObjectPtr<UAbilitySystemComponent> WeakAbilitySystemComponent(AbilitySystemComponent);
+		const TWeakObjectPtr<AtwoheartsCharacter> WeakCharacter(Cast<AtwoheartsCharacter>(GetAbilityCharacter()));
+		FTimerDelegate CooldownFinishedDelegate = FTimerDelegate::CreateLambda(
+			[WeakAbilitySystemComponent, WeakCharacter]()
+			{
+				FinishGuardSuccessCooldown(WeakAbilitySystemComponent, WeakCharacter);
+			});
+		World->GetTimerManager().SetTimer(GuardCooldownTimerHandle, CooldownFinishedDelegate, CooldownSeconds, false);
+	}
+
+	return true;
+}
+
 void UTwoHeartsGA_Guard::BindHostileAttackReceiver(UTwoHeartsHostileAttackReceiverComponent* ReceiverComponent)
+
 {
 	if (!ReceiverComponent || BoundHostileAttackReceiver.Get() == ReceiverComponent)
 	{
@@ -643,16 +729,17 @@ void UTwoHeartsGA_Guard::HandleHostileAttackSignalReceived(const FTwoHeartsHosti
 		return;
 	}
 
-	if (Signal.AttackInstanceName.IsEmpty() || Signal.AttackInstanceName == TEXT("None"))
+	if (Signal.AttackInstanceName.IsEmpty() || Signal.AttackInstanceName.Equals(TEXT("None"), ESearchCase::CaseSensitive))
 	{
 		RecordGuardEvent(TEXT("GuardRuleInvalid"), TEXT("Guard received an attack contact signal without a valid attack instance name."), true);
 		return;
 	}
 
-	if (LastEvaluatedAttackInstanceName == Signal.AttackInstanceName)
+	if (LastEvaluatedAttackInstanceName.Equals(Signal.AttackInstanceName, ESearchCase::CaseSensitive))
 	{
 		return;
 	}
+
 
 	LastEvaluatedAttackInstanceName = Signal.AttackInstanceName;
 	TryEvaluateGuardAgainstAttackSignal(Signal);
@@ -746,12 +833,37 @@ bool UTwoHeartsGA_Guard::TryEvaluateGuardAgainstAttackSignal(const FTwoHeartsHos
 		}
 	}
 
-	if (!ReceiverComponent->RewriteLastPlayerHitResultForGuard(
-		ETwoHeartsPlayerHitResultType::GuardRewritten,
-		FString::Printf(
-			TEXT("Guard satisfied guardable/timing/position rules and rewrote hostile attack %s into GuardRewritten."),
-			*Signal.AttackInstanceName)))
+	const bool bAppliedGuardCooldown = ApplyGuardSuccessCooldown();
+	const float GuardCooldownSeconds = Character->GetGuardConfig().GuardSuccessCooldownSeconds;
+	FTwoHeartsGuardSettlementRequest SettlementRequest;
+	SettlementRequest.RewrittenHitResultType = ETwoHeartsPlayerHitResultType::GuardRewritten;
+	SettlementRequest.AttackInstanceName = Signal.AttackInstanceName;
+	SettlementRequest.RewriteDetail = FString::Printf(
+
+		TEXT("Guard satisfied guardable/timing/position rules and rewrote hostile attack %s into GuardRewritten."),
+		*Signal.AttackInstanceName);
+	SettlementRequest.bConsumesGuardResource = false;
+	SettlementRequest.bRefundsGuardResource = false;
+	SettlementRequest.bAppliesGuardCooldown = bAppliedGuardCooldown;
+	SettlementRequest.GuardCooldownSeconds = bAppliedGuardCooldown ? FMath::Max(0.0f, GuardCooldownSeconds) : 0.0f;
+	SettlementRequest.GuardCooldownTag = TAG_TwoHearts_Cooldown_Guard;
+
+	if (!ReceiverComponent->RewriteLastPlayerHitResultForGuard(SettlementRequest))
 	{
+		if (bAppliedGuardCooldown)
+		{
+			if (UWorld* World = GetWorld())
+			{
+				World->GetTimerManager().ClearTimer(GuardCooldownTimerHandle);
+			}
+			if (UAbilitySystemComponent* AbilitySystemComponent = CachedAbilitySystemComponent.Get())
+			{
+				AbilitySystemComponent->RemoveLooseGameplayTag(TAG_TwoHearts_Cooldown_Guard);
+			}
+			bCooldownActive = false;
+			bHasAppliedSuccessCooldownThisActivation = false;
+		}
+
 		RecordGuardEvent(
 			TEXT("GuardRewriteFailed"),
 			FString::Printf(TEXT("Guard satisfied its rules for attack %s, but the receiver rejected the rewrite."), *Signal.AttackInstanceName),
@@ -759,13 +871,21 @@ bool UTwoHeartsGA_Guard::TryEvaluateGuardAgainstAttackSignal(const FTwoHeartsHos
 		return false;
 	}
 
+
+	const UEnum* DisplacementEnum = StaticEnum<ETwoHeartsGuardDisplacementResult>();
+	const UEnum* DamageEnum = StaticEnum<ETwoHeartsGuardDamageResult>();
 	RecordGuardEvent(
 		TEXT("GuardRuleSuccess"),
 		FString::Printf(
-			TEXT("Attack %s satisfied guardable/timing/position rules and entered the formal guard branch."),
-			*Signal.AttackInstanceName));
+			TEXT("attack=%s displacement=%s damage=%s cooldown=%s/%.2f resource=consume:false refund:false"),
+			*Signal.AttackInstanceName,
+			DisplacementEnum ? *DisplacementEnum->GetNameStringByValue(static_cast<int64>(Signal.AttackMetadata.GuardSuccessDisplacementResult)) : TEXT("Unknown"),
+			DamageEnum ? *DamageEnum->GetNameStringByValue(static_cast<int64>(Signal.AttackMetadata.GuardSuccessDamageResult)) : TEXT("Unknown"),
+			bAppliedGuardCooldown ? TEXT("true") : TEXT("false"),
+			SettlementRequest.GuardCooldownSeconds));
 	return true;
 }
+
 
 FString UTwoHeartsGA_Guard::BuildGuardFailureDetailFromSignal(const FTwoHeartsHostileAttackSignal& Signal) const
 {

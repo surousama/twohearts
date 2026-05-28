@@ -25,6 +25,24 @@ enum class ETwoHeartsAttackTimingPhase : uint8
 	Finished UMETA(DisplayName="Finished")
 };
 
+UENUM(BlueprintType)
+enum class ETwoHeartsGuardDisplacementResult : uint8
+{
+	None = 0 UMETA(DisplayName="None"),
+	DefenderPushedBack UMETA(DisplayName="DefenderPushedBack"),
+	AttackerPushedBack UMETA(DisplayName="AttackerPushedBack"),
+	NoDisplacement UMETA(DisplayName="NoDisplacement")
+};
+
+UENUM(BlueprintType)
+enum class ETwoHeartsGuardDamageResult : uint8
+{
+	None = 0 UMETA(DisplayName="None"),
+	FullyBlocked UMETA(DisplayName="FullyBlocked"),
+	PartialDamageTaken UMETA(DisplayName="PartialDamageTaken"),
+	PenetrationFailed UMETA(DisplayName="PenetrationFailed")
+};
+
 USTRUCT(BlueprintType)
 struct FTwoHeartsAttackMetadata
 {
@@ -62,6 +80,15 @@ struct FTwoHeartsAttackMetadata
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Attack Metadata|Guard Rule", meta=(ClampMin="0.0", ClampMax="180.0", UIMin="0.0", UIMax="180.0"))
 	float GuardFacingHalfAngleDegrees = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Attack Metadata|Guard Outcome")
+	ETwoHeartsGuardDisplacementResult GuardSuccessDisplacementResult = ETwoHeartsGuardDisplacementResult::AttackerPushedBack;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Attack Metadata|Guard Outcome")
+	ETwoHeartsGuardDamageResult GuardSuccessDamageResult = ETwoHeartsGuardDamageResult::FullyBlocked;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Attack Metadata|Guard Outcome", meta=(ClampMin="0.0", ClampMax="1.0", UIMin="0.0", UIMax="1.0"))
+	float GuardPartialDamageMultiplier = 0.35f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Attack Metadata")
 	bool bCanBeDodged = true;

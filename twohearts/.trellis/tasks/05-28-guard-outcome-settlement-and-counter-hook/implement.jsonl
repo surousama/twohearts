@@ -1,1 +1,6 @@
-{"_example": "请填写 {\"file\": \"<path>\", \"reason\": \"<why>\"}。 这里只放 spec 或 research 文件，不要放代码路径。 可运行 `python .trellis/scripts/get_context.py --mode packages` 查看可用 spec。 真正条目补齐后，可删除这一行。"}
+{"file":".trellis/spec/roles/senior-programmer.md","reason":"当前角色是资深程序，实施前需遵守实现职责、接口边界与记录要求。"}
+{"file":".trellis/spec/combat/index.md","reason":"格挡任务属于战斗系统，需要先服从战斗规范索引。"}
+{"file":".trellis/spec/combat/system-framework.md","reason":"Guard 结果结算与后续反击读取点必须服从战斗系统长期模块边界。"}
+{"file":".trellis/spec/combat/current-stage.md","reason":"确认本轮只做当前阶段允许的最小结算与接口预留，不越界扩成完整弹反或资源系统。"}
+{"file":".trellis/spec/implementation/ue5-gas-cpp-guidelines.md","reason":"Guard 正式承载仍应放在 UE5 + GAS + C++ 的 Ability 与组件链路中。"}
+{"file":".trellis/spec/implementation/blueprint-boundary.md","reason":"核心规则、结果语义、冷却语义与调试口径应由 C++ 承载。"}

@@ -113,6 +113,15 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hostile Attack Probe|Rule", meta=(ClampMin="0.0", ClampMax="180.0", UIMin="0.0", UIMax="180.0", AllowPrivateAccess="true"))
 	float GuardFacingHalfAngleDegrees = 100.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hostile Attack Probe|Guard Outcome", meta=(AllowPrivateAccess="true"))
+	ETwoHeartsGuardDisplacementResult GuardSuccessDisplacementResult = ETwoHeartsGuardDisplacementResult::AttackerPushedBack;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hostile Attack Probe|Guard Outcome", meta=(AllowPrivateAccess="true"))
+	ETwoHeartsGuardDamageResult GuardSuccessDamageResult = ETwoHeartsGuardDamageResult::FullyBlocked;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hostile Attack Probe|Guard Outcome", meta=(ClampMin="0.0", ClampMax="1.0", UIMin="0.0", UIMax="1.0", AllowPrivateAccess="true"))
+	float GuardPartialDamageMultiplier = 0.35f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hostile Attack Probe", meta=(ClampMin="0.0", UIMin="0.0", AllowPrivateAccess="true"))
 	float RepeatCooldownSeconds = 0.8f;
 

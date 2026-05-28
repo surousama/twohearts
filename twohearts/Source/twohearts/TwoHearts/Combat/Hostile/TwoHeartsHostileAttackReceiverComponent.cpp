@@ -68,6 +68,38 @@ namespace
 		}
 	}
 
+	const TCHAR* LexGuardDisplacementResultToString(const ETwoHeartsGuardDisplacementResult ResultType)
+	{
+		switch (ResultType)
+		{
+		case ETwoHeartsGuardDisplacementResult::DefenderPushedBack:
+			return TEXT("DefenderPushedBack");
+		case ETwoHeartsGuardDisplacementResult::AttackerPushedBack:
+			return TEXT("AttackerPushedBack");
+		case ETwoHeartsGuardDisplacementResult::NoDisplacement:
+			return TEXT("NoDisplacement");
+		case ETwoHeartsGuardDisplacementResult::None:
+		default:
+			return TEXT("None");
+		}
+	}
+
+	const TCHAR* LexGuardDamageResultToString(const ETwoHeartsGuardDamageResult ResultType)
+	{
+		switch (ResultType)
+		{
+		case ETwoHeartsGuardDamageResult::FullyBlocked:
+			return TEXT("FullyBlocked");
+		case ETwoHeartsGuardDamageResult::PartialDamageTaken:
+			return TEXT("PartialDamageTaken");
+		case ETwoHeartsGuardDamageResult::PenetrationFailed:
+			return TEXT("PenetrationFailed");
+		case ETwoHeartsGuardDamageResult::None:
+		default:
+			return TEXT("None");
+		}
+	}
+
 	const TCHAR* LexHitReactionDirectionTypeToString(const ETwoHeartsHitReactionDirectionType DirectionType)
 	{
 		switch (DirectionType)
@@ -129,7 +161,7 @@ namespace
 			? TEXT("None")
 			: AttackMetadata.TimingWindowName.ToString();
 		return FString::Printf(
-			TEXT("reaction=%s damage=%.2f tags=%s guard=%s dist=%.1f height=%.1f angle=%.1f dodge=%s timing=%s/%s"),
+			TEXT("reaction=%s damage=%.2f tags=%s guard=%s dist=%.1f height=%.1f angle=%.1f settlement=%s/%s chip=%.2f dodge=%s timing=%s/%s"),
 			LexHitReactionTypeToString(AttackMetadata.HitReactionType),
 			AttackMetadata.BaseDamage,
 			*DamageMechanicTags,
@@ -137,6 +169,9 @@ namespace
 			AttackMetadata.GuardMaxDistance,
 			AttackMetadata.GuardMaxHeightDifference,
 			AttackMetadata.GuardFacingHalfAngleDegrees,
+			LexGuardDisplacementResultToString(AttackMetadata.GuardSuccessDisplacementResult),
+			LexGuardDamageResultToString(AttackMetadata.GuardSuccessDamageResult),
+			AttackMetadata.GuardPartialDamageMultiplier,
 			AttackMetadata.bCanBeDodged ? TEXT("true") : TEXT("false"),
 			LexAttackTimingPhaseToString(AttackMetadata.TimingPhase),
 			*TimingWindowName);
@@ -199,6 +234,7 @@ void UTwoHeartsHostileAttackReceiverComponent::ReceiveHostileAttackSignal(const 
 	}
 
 	UE_LOG(
+
 		LogtwoheartsCombatTest,
 		Verbose,
 		TEXT("[HostileAttackSignal] receiver=%s type=%s attack=%s source=%s target=%s hit_window=%s contact=%s time=%.2f detail=\"%s\" metadata=\"%s\""),
@@ -243,6 +279,9 @@ void UTwoHeartsHostileAttackReceiverComponent::ClearSignalHistory()
 	bHasPlayerDamageResult = false;
 	LastPlayerDamageResult = FTwoHeartsPlayerDamageResult();
 	PlayerDamageResultHistory.Reset();
+	bHasGuardOutcome = false;
+	LastGuardOutcome = FTwoHeartsGuardOutcome();
+	GuardOutcomeHistory.Reset();
 	bHasPendingAttack = false;
 	PendingAttackInstanceName = TEXT("None");
 	PendingAttackSourceActor = nullptr;
@@ -250,8 +289,7 @@ void UTwoHeartsHostileAttackReceiverComponent::ClearSignalHistory()
 	PendingAttackMetadata = FTwoHeartsAttackMetadata();
 	bHasPendingGuardRewriteRequest = false;
 	PendingGuardRewriteAttackInstanceName = TEXT("None");
-	PendingGuardRewriteResultType = ETwoHeartsPlayerHitResultType::None;
-	PendingGuardRewriteDetail.Reset();
+	PendingGuardSettlementRequest = FTwoHeartsGuardSettlementRequest();
 	CurrentHealth = MaxHealth;
 	CurrentHitReactionState = FTwoHeartsPlayerHitReactionState();
 
@@ -260,95 +298,158 @@ void UTwoHeartsHostileAttackReceiverComponent::ClearSignalHistory()
 		World->GetTimerManager().ClearTimer(HitReactionRecoveryTimerHandle);
 	}
 
-
 	UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[HostileAttackSignal] receiver=%s history_cleared=true"), *GetNameSafe(GetOwner()));
 	UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[PlayerHitEval] receiver=%s stage=StateCleared"), *GetNameSafe(GetOwner()));
-
 }
 
 bool UTwoHeartsHostileAttackReceiverComponent::RewriteLastPlayerHitResultForGuard(
 	ETwoHeartsPlayerHitResultType NewResultType,
 	const FString& Detail)
 {
+	FTwoHeartsGuardSettlementRequest SettlementRequest;
+	SettlementRequest.RewrittenHitResultType = NewResultType;
+	SettlementRequest.AttackInstanceName = bHasPendingAttack ? PendingAttackInstanceName : TEXT("None");
+	SettlementRequest.RewriteDetail = Detail;
+	return RewriteLastPlayerHitResultForGuard(SettlementRequest);
+}
+
+bool UTwoHeartsHostileAttackReceiverComponent::RewriteLastPlayerHitResultForGuard(const FTwoHeartsGuardSettlementRequest& SettlementRequest)
+{
+	const bool bHasRequestedAttackInstance = !SettlementRequest.AttackInstanceName.IsEmpty()
+		&& !SettlementRequest.AttackInstanceName.Equals(TEXT("None"), ESearchCase::CaseSensitive);
+	if (!bHasRequestedAttackInstance)
+	{
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Warning,
+			TEXT("[PlayerHitEval] receiver=%s stage=GuardRewriteRejected reason=MissingAttackInstance result=%s"),
+			*GetNameSafe(GetOwner()),
+			LexPlayerHitResultTypeToString(SettlementRequest.RewrittenHitResultType));
+		return false;
+	}
+
 	if (bHasPlayerHitResult && LastPlayerHitResult.bCanBeRewrittenByGuard)
 	{
-		LastPlayerHitResult.ResultType = NewResultType;
-		LastPlayerHitResult.bHitConfirmed = NewResultType == ETwoHeartsPlayerHitResultType::HitConfirmed;
-		LastPlayerHitResult.bCanBeRewrittenByGuard = false;
-		LastPlayerHitResult.Detail = Detail.IsEmpty() ? TEXT("Guard rewrote the pending hit result.") : Detail;
-		LastPlayerHitResult.SourceSignalType = ETwoHeartsHostileAttackSignalType::AttackContact;
-		LastPlayerHitResult.ResultTimestampSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : LastPlayerHitResult.ResultTimestampSeconds;
-
-		if (!PlayerHitResultHistory.IsEmpty())
+		if (LastPlayerHitResult.AttackInstanceName.Equals(SettlementRequest.AttackInstanceName, ESearchCase::CaseSensitive))
 		{
-			PlayerHitResultHistory.Last() = LastPlayerHitResult;
+			LastPlayerHitResult.ResultType = SettlementRequest.RewrittenHitResultType;
+			LastPlayerHitResult.bHitConfirmed = SettlementRequest.RewrittenHitResultType == ETwoHeartsPlayerHitResultType::HitConfirmed;
+			LastPlayerHitResult.bCanBeRewrittenByGuard = false;
+			LastPlayerHitResult.Detail = SettlementRequest.RewriteDetail.IsEmpty() ? TEXT("Guard rewrote the pending hit result.") : SettlementRequest.RewriteDetail;
+			LastPlayerHitResult.SourceSignalType = ETwoHeartsHostileAttackSignalType::AttackContact;
+			LastPlayerHitResult.ResultTimestampSeconds = GetWorldTimeSecondsSafe();
+
+			if (!PlayerHitResultHistory.IsEmpty())
+			{
+				PlayerHitResultHistory.Last() = LastPlayerHitResult;
+			}
+
+			UE_LOG(
+				LogtwoheartsCombatTest,
+				Display,
+				TEXT("[PlayerHitResult] receiver=%s event=GuardRewrite attack=%s result=%s hit=%s rewritable=%s detail=\"%s\" metadata=\"%s\""),
+				*GetNameSafe(GetOwner()),
+				*LastPlayerHitResult.AttackInstanceName,
+				LexPlayerHitResultTypeToString(LastPlayerHitResult.ResultType),
+				LastPlayerHitResult.bHitConfirmed ? TEXT("true") : TEXT("false"),
+				LastPlayerHitResult.bCanBeRewrittenByGuard ? TEXT("true") : TEXT("false"),
+				*LastPlayerHitResult.Detail,
+				*BuildAttackMetadataDebugString(LastPlayerHitResult.AttackMetadata));
+
+			UE_LOG(
+				LogtwoheartsCombatTest,
+				Verbose,
+				TEXT("[PlayerHitEval] receiver=%s stage=GuardRewrite attack=%s result=%s time=%.2f"),
+				*GetNameSafe(GetOwner()),
+				*LastPlayerHitResult.AttackInstanceName,
+				LexPlayerHitResultTypeToString(LastPlayerHitResult.ResultType),
+				LastPlayerHitResult.ResultTimestampSeconds);
+
+			UpdatePlayerDamageResultFromHitResult(LastPlayerHitResult);
+			CommitGuardOutcome(SettlementRequest, LastPlayerHitResult);
+			OnPlayerHitResultUpdated.Broadcast(LastPlayerHitResult);
+			return true;
 		}
 
 		UE_LOG(
 			LogtwoheartsCombatTest,
-			Display,
-			TEXT("[PlayerHitResult] receiver=%s event=GuardRewrite attack=%s result=%s hit=%s rewritable=%s detail=\"%s\" metadata=\"%s\""),
+			Warning,
+			TEXT("[PlayerHitEval] receiver=%s stage=GuardRewriteRejected reason=AttackInstanceMismatch requested_attack=%s last_attack=%s"),
 			*GetNameSafe(GetOwner()),
-			*LastPlayerHitResult.AttackInstanceName,
-			LexPlayerHitResultTypeToString(LastPlayerHitResult.ResultType),
-			LastPlayerHitResult.bHitConfirmed ? TEXT("true") : TEXT("false"),
-			LastPlayerHitResult.bCanBeRewrittenByGuard ? TEXT("true") : TEXT("false"),
-			*LastPlayerHitResult.Detail,
-			*BuildAttackMetadataDebugString(LastPlayerHitResult.AttackMetadata));
-
-		UE_LOG(
-			LogtwoheartsCombatTest,
-			Verbose,
-			TEXT("[PlayerHitEval] receiver=%s stage=GuardRewrite attack=%s result=%s time=%.2f"),
-			*GetNameSafe(GetOwner()),
-			*LastPlayerHitResult.AttackInstanceName,
-			LexPlayerHitResultTypeToString(LastPlayerHitResult.ResultType),
-			LastPlayerHitResult.ResultTimestampSeconds);
-
-		UpdatePlayerDamageResultFromHitResult(LastPlayerHitResult);
-		OnPlayerHitResultUpdated.Broadcast(LastPlayerHitResult);
-		return true;
+			*SettlementRequest.AttackInstanceName,
+			*LastPlayerHitResult.AttackInstanceName);
 	}
 
-	if (!bHasPendingAttack || PendingAttackInstanceName.IsEmpty() || PendingAttackInstanceName == TEXT("None"))
+	if (!bHasPendingAttack
+		|| PendingAttackInstanceName.IsEmpty()
+		|| PendingAttackInstanceName.Equals(TEXT("None"), ESearchCase::CaseSensitive)
+		|| !PendingAttackInstanceName.Equals(SettlementRequest.AttackInstanceName, ESearchCase::CaseSensitive))
 	{
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Warning,
+			TEXT("[PlayerHitEval] receiver=%s stage=GuardRewriteRejected reason=PendingAttackMismatch requested_attack=%s pending_attack=%s pending=%s"),
+			*GetNameSafe(GetOwner()),
+			*SettlementRequest.AttackInstanceName,
+			bHasPendingAttack ? *PendingAttackInstanceName : TEXT("None"),
+			bHasPendingAttack ? TEXT("true") : TEXT("false"));
 		return false;
 	}
 
 	bHasPendingGuardRewriteRequest = true;
-	PendingGuardRewriteAttackInstanceName = PendingAttackInstanceName;
-	PendingGuardRewriteResultType = NewResultType;
-	PendingGuardRewriteDetail = Detail.IsEmpty() ? TEXT("Guard rewrote the pending hostile attack before hit confirmation committed.") : Detail;
+	PendingGuardRewriteAttackInstanceName = SettlementRequest.AttackInstanceName;
+	PendingGuardSettlementRequest = SettlementRequest;
+	if (PendingGuardSettlementRequest.RewriteDetail.IsEmpty())
+	{
+		PendingGuardSettlementRequest.RewriteDetail = TEXT("Guard rewrote the pending hostile attack before hit confirmation committed.");
+	}
 
 	UE_LOG(
 		LogtwoheartsCombatTest,
 		Display,
-		TEXT("[PlayerHitEval] receiver=%s stage=GuardRewriteQueued attack=%s result=%s detail=\"%s\""),
+		TEXT("[PlayerHitEval] receiver=%s stage=GuardRewriteQueued attack=%s result=%s detail=\"%s\" cooldown=%s/%.2f resource_consume=%s resource_refund=%s"),
 		*GetNameSafe(GetOwner()),
 		*PendingGuardRewriteAttackInstanceName,
-		LexPlayerHitResultTypeToString(PendingGuardRewriteResultType),
-		*PendingGuardRewriteDetail);
+		LexPlayerHitResultTypeToString(PendingGuardSettlementRequest.RewrittenHitResultType),
+		*PendingGuardSettlementRequest.RewriteDetail,
+		PendingGuardSettlementRequest.bAppliesGuardCooldown ? TEXT("true") : TEXT("false"),
+		PendingGuardSettlementRequest.GuardCooldownSeconds,
+		PendingGuardSettlementRequest.bConsumesGuardResource ? TEXT("true") : TEXT("false"),
+		PendingGuardSettlementRequest.bRefundsGuardResource ? TEXT("true") : TEXT("false"));
 	return true;
 }
 
+
 bool UTwoHeartsHostileAttackReceiverComponent::TryConsumePendingGuardRewriteForAttack(
 	const FString& AttackInstanceName,
-	ETwoHeartsPlayerHitResultType& OutResultType,
-	FString& OutDetail)
+	FTwoHeartsGuardSettlementRequest& OutSettlementRequest)
 {
-	if (!bHasPendingGuardRewriteRequest || PendingGuardRewriteAttackInstanceName != AttackInstanceName)
+	if (!bHasPendingGuardRewriteRequest || !PendingGuardRewriteAttackInstanceName.Equals(AttackInstanceName, ESearchCase::CaseSensitive))
 	{
 		return false;
 	}
 
-	OutResultType = PendingGuardRewriteResultType;
-	OutDetail = PendingGuardRewriteDetail;
+	OutSettlementRequest = PendingGuardSettlementRequest;
+
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[PlayerHitEval] receiver=%s stage=GuardRewriteConsume attack=%s result=%s cooldown=%s/%.2f resource_consume=%s resource_refund=%s"),
+		*GetNameSafe(GetOwner()),
+		*AttackInstanceName,
+		LexPlayerHitResultTypeToString(OutSettlementRequest.RewrittenHitResultType),
+		OutSettlementRequest.bAppliesGuardCooldown ? TEXT("true") : TEXT("false"),
+		OutSettlementRequest.GuardCooldownSeconds,
+		OutSettlementRequest.bConsumesGuardResource ? TEXT("true") : TEXT("false"),
+		OutSettlementRequest.bRefundsGuardResource ? TEXT("true") : TEXT("false"));
+
 	bHasPendingGuardRewriteRequest = false;
 	PendingGuardRewriteAttackInstanceName = TEXT("None");
-	PendingGuardRewriteResultType = ETwoHeartsPlayerHitResultType::None;
-	PendingGuardRewriteDetail.Reset();
+	PendingGuardSettlementRequest = FTwoHeartsGuardSettlementRequest();
 	return true;
 }
+
+
 
 void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(const FTwoHeartsHostileAttackSignal& Signal)
 {
@@ -358,8 +459,8 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 	const bool bStartsNewAttackInstance =
 		bCanStartTrackedAttackFromSignal
 		&& !Signal.AttackInstanceName.IsEmpty()
-		&& Signal.AttackInstanceName != TEXT("None")
-		&& (!bHasPendingAttack || PendingAttackInstanceName != Signal.AttackInstanceName);
+		&& !Signal.AttackInstanceName.Equals(TEXT("None"))
+		&& (!bHasPendingAttack || !PendingAttackInstanceName.Equals(Signal.AttackInstanceName, ESearchCase::CaseSensitive));
 
 	UE_LOG(
 		LogtwoheartsCombatTest,
@@ -373,7 +474,7 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 		bStartsNewAttackInstance ? TEXT("true") : TEXT("false"),
 		*BuildPendingAttackDebugString(bHasPendingAttack, PendingAttackInstanceName, PendingAttackSourceActor, PendingAttackStartSeconds));
 
-	if (bStartsNewAttackInstance && bHasPendingAttack && PendingAttackInstanceName != Signal.AttackInstanceName)
+	if (bStartsNewAttackInstance && bHasPendingAttack && !PendingAttackInstanceName.Equals(Signal.AttackInstanceName, ESearchCase::CaseSensitive))
 	{
 		UE_LOG(
 			LogtwoheartsCombatTest,
@@ -447,7 +548,7 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerHitResultFromSignal(c
 			|| Signal.SignalType == ETwoHeartsHostileAttackSignalType::AttackFinished;
 		const bool bMatchesLastResolvedAttack =
 			bHasPlayerHitResult
-			&& LastPlayerHitResult.AttackInstanceName == Signal.AttackInstanceName
+			&& LastPlayerHitResult.AttackInstanceName.Equals(Signal.AttackInstanceName, ESearchCase::CaseSensitive)
 			&& IsFinalPlayerHitResultType(LastPlayerHitResult.ResultType);
 
 		if (bIsLateLifecycleSignal && bMatchesLastResolvedAttack)
@@ -564,7 +665,7 @@ void UTwoHeartsHostileAttackReceiverComponent::FinalizeCurrentPendingAttack(
 	const FString& Detail)
 {
 	FTwoHeartsAttackMetadata ResolvedAttackMetadata = Signal.AttackMetadata;
-	if (ResolvedAttackMetadata.AttackInstanceName.IsEmpty() || ResolvedAttackMetadata.AttackInstanceName == TEXT("None"))
+	if (ResolvedAttackMetadata.AttackInstanceName.IsEmpty() || ResolvedAttackMetadata.AttackInstanceName.Equals(TEXT("None")))
 	{
 		ResolvedAttackMetadata.AttackInstanceName = PendingAttackInstanceName;
 	}
@@ -586,15 +687,17 @@ void UTwoHeartsHostileAttackReceiverComponent::FinalizeCurrentPendingAttack(
 	Result.SourceSignalType = Signal.SignalType;
 	Result.Detail = Detail.IsEmpty() ? Signal.Detail : Detail;
 
-	ETwoHeartsPlayerHitResultType GuardOverrideResultType = ETwoHeartsPlayerHitResultType::None;
-	FString GuardOverrideDetail;
-	if (TryConsumePendingGuardRewriteForAttack(Result.AttackInstanceName, GuardOverrideResultType, GuardOverrideDetail))
+	bool bHasGuardSettlementRequest = false;
+	FTwoHeartsGuardSettlementRequest GuardSettlementRequest;
+	if (TryConsumePendingGuardRewriteForAttack(Result.AttackInstanceName, GuardSettlementRequest))
 	{
-		Result.ResultType = GuardOverrideResultType;
-		Result.bHitConfirmed = GuardOverrideResultType == ETwoHeartsPlayerHitResultType::HitConfirmed;
+		bHasGuardSettlementRequest = true;
+		Result.ResultType = GuardSettlementRequest.RewrittenHitResultType;
+		Result.bHitConfirmed = GuardSettlementRequest.RewrittenHitResultType == ETwoHeartsPlayerHitResultType::HitConfirmed;
 		Result.bCanBeRewrittenByGuard = false;
-		Result.Detail = GuardOverrideDetail.IsEmpty() ? Result.Detail : GuardOverrideDetail;
+		Result.Detail = GuardSettlementRequest.RewriteDetail.IsEmpty() ? Result.Detail : GuardSettlementRequest.RewriteDetail;
 	}
+
 
 
 	UE_LOG(
@@ -615,12 +718,17 @@ void UTwoHeartsHostileAttackReceiverComponent::FinalizeCurrentPendingAttack(
 
 
 	PushPlayerHitResult(Result);
+	if (bHasGuardSettlementRequest)
+	{
+		CommitGuardOutcome(GuardSettlementRequest, LastPlayerHitResult);
+	}
 
 	bHasPendingAttack = false;
 	PendingAttackInstanceName = TEXT("None");
 	PendingAttackSourceActor = nullptr;
 	PendingAttackStartSeconds = 0.0f;
 	PendingAttackMetadata = FTwoHeartsAttackMetadata();
+
 
 }
 
@@ -706,29 +814,73 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerDamageResultFromHitRe
 
 	if (HitResult.ResultType == ETwoHeartsPlayerHitResultType::GuardRewritten)
 	{
-		DamageResult.ResultType = ETwoHeartsPlayerDamageResultType::GuardBlocked;
-		DamageResult.FinalDamage = 0.0f;
-		DamageResult.bWasGuardRewritten = true;
+		const ETwoHeartsGuardDamageResult GuardDamageResult = HitResult.AttackMetadata.GuardSuccessDamageResult;
+		const float PartialDamageMultiplier = FMath::Clamp(HitResult.AttackMetadata.GuardPartialDamageMultiplier, 0.0f, 1.0f);
+		const bool bHadPreviousAppliedDamage = bHasPlayerDamageResult
+			&& LastPlayerDamageResult.AttackInstanceName.Equals(HitResult.AttackInstanceName, ESearchCase::CaseSensitive)
+			&& LastPlayerDamageResult.ResultType == ETwoHeartsPlayerDamageResultType::DamageApplied;
 
-		if (bHasPlayerDamageResult
-			&& LastPlayerDamageResult.AttackInstanceName == HitResult.AttackInstanceName
-			&& LastPlayerDamageResult.ResultType == ETwoHeartsPlayerDamageResultType::DamageApplied)
+		DamageResult.bWasGuardRewritten = true;
+		if (bHadPreviousAppliedDamage)
 		{
 			CurrentHealth = FMath::Clamp(CurrentHealth + LastPlayerDamageResult.FinalDamage, 0.0f, MaxHealth);
 			DamageResult.HealthBeforeDamage = LastPlayerDamageResult.HealthBeforeDamage;
-			DamageResult.HealthAfterDamage = CurrentHealth;
-			DamageResult.Detail = TEXT("Guard rewrote a previously applied damage result and restored the deducted health.");
 		}
 		else
 		{
 			DamageResult.HealthBeforeDamage = CurrentHealth;
-			DamageResult.HealthAfterDamage = CurrentHealth;
-			DamageResult.Detail = TEXT("Guard rewrote the hostile hit before any lasting damage was applied.");
 		}
+
+		switch (GuardDamageResult)
+		{
+		case ETwoHeartsGuardDamageResult::PartialDamageTaken:
+			DamageResult.ResultType = ETwoHeartsPlayerDamageResultType::DamageApplied;
+			DamageResult.FinalDamage = DamageResult.BaseDamage * PartialDamageMultiplier;
+			DamageResult.Detail = bHadPreviousAppliedDamage
+				? TEXT("Guard rewrote a previously applied full damage result into configured partial chip damage.")
+				: TEXT("Guard succeeded, but the attack still dealt configured partial chip damage.");
+			break;
+
+		case ETwoHeartsGuardDamageResult::PenetrationFailed:
+			DamageResult.ResultType = ETwoHeartsPlayerDamageResultType::GuardBlocked;
+			DamageResult.FinalDamage = 0.0f;
+			DamageResult.Detail = TEXT("Guard succeeded and the attack's penetration attempt failed, so no lasting damage was applied.");
+			break;
+
+		case ETwoHeartsGuardDamageResult::FullyBlocked:
+		case ETwoHeartsGuardDamageResult::None:
+		default:
+			DamageResult.ResultType = ETwoHeartsPlayerDamageResultType::GuardBlocked;
+			DamageResult.FinalDamage = 0.0f;
+			DamageResult.Detail = bHadPreviousAppliedDamage
+				? TEXT("Guard rewrote a previously applied damage result and restored the deducted health.")
+				: TEXT("Guard rewrote the hostile hit before any lasting damage was applied.");
+			break;
+		}
+
+		if (DamageResult.FinalDamage > 0.0f)
+		{
+			CurrentHealth = FMath::Clamp(CurrentHealth - DamageResult.FinalDamage, 0.0f, MaxHealth);
+		}
+		DamageResult.HealthAfterDamage = CurrentHealth;
+
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Display,
+			TEXT("[PlayerDamageRewrite] receiver=%s attack=%s path=%s guard_damage=%s base=%.2f final=%.2f health_before=%.2f health_after=%.2f"),
+			*GetNameSafe(GetOwner()),
+			*DamageResult.AttackInstanceName,
+			bHadPreviousAppliedDamage ? TEXT("RollbackAfterDamage") : TEXT("PreDamageRewrite"),
+			LexGuardDamageResultToString(GuardDamageResult),
+			DamageResult.BaseDamage,
+			DamageResult.FinalDamage,
+			DamageResult.HealthBeforeDamage,
+			DamageResult.HealthAfterDamage);
 
 		PushPlayerDamageResult(DamageResult);
 		return;
 	}
+
 
 	if (HitResult.ResultType != ETwoHeartsPlayerHitResultType::HitConfirmed)
 	{
@@ -762,9 +914,10 @@ void UTwoHeartsHostileAttackReceiverComponent::PushPlayerDamageResult(const FTwo
 	bHasPlayerDamageResult = true;
 	LastPlayerDamageResult = DamageResult;
 
-	if (!PlayerDamageResultHistory.IsEmpty()
-		&& PlayerDamageResultHistory.Last().AttackInstanceName == DamageResult.AttackInstanceName
-		&& DamageResult.ResultType == ETwoHeartsPlayerDamageResultType::GuardBlocked)
+	const bool bShouldReplacePreviousResult = !PlayerDamageResultHistory.IsEmpty()
+		&& PlayerDamageResultHistory.Last().AttackInstanceName.Equals(DamageResult.AttackInstanceName, ESearchCase::CaseSensitive)
+		&& (DamageResult.ResultType == ETwoHeartsPlayerDamageResultType::GuardBlocked || DamageResult.bWasGuardRewritten);
+	if (bShouldReplacePreviousResult)
 	{
 		PlayerDamageResultHistory.Last() = DamageResult;
 	}
@@ -799,6 +952,120 @@ void UTwoHeartsHostileAttackReceiverComponent::PushPlayerDamageResult(const FTwo
 	OnPlayerDamageResultUpdated.Broadcast(DamageResult);
 }
 
+
+
+
+
+
+
+bool UTwoHeartsHostileAttackReceiverComponent::DoesLastGuardEnableFollowUpAbility() const
+{
+	return bHasGuardOutcome && LastGuardOutcome.bWasGuardSuccessful;
+}
+
+void UTwoHeartsHostileAttackReceiverComponent::RefreshGuardOutcomeDetail(FTwoHeartsGuardOutcome& GuardOutcome) const
+{
+	GuardOutcome.Detail = FString::Printf(
+		TEXT("displacement=%s damage=%s resolved_hit=%s resolved_damage=%s cooldown=%s/%.2f resource=consume:%s refund:%s"),
+		LexGuardDisplacementResultToString(GuardOutcome.DisplacementResult),
+		LexGuardDamageResultToString(GuardOutcome.DamageResult),
+		LexPlayerHitResultTypeToString(GuardOutcome.ResolvedHitResultType),
+		LexPlayerDamageResultTypeToString(GuardOutcome.ResolvedPlayerDamageResultType),
+		GuardOutcome.bAppliedGuardCooldown ? TEXT("true") : TEXT("false"),
+		GuardOutcome.GuardCooldownSeconds,
+		GuardOutcome.bConsumedGuardResource ? TEXT("true") : TEXT("false"),
+		GuardOutcome.bRefundedGuardResource ? TEXT("true") : TEXT("false"));
+}
+
+void UTwoHeartsHostileAttackReceiverComponent::CommitGuardOutcome(
+	const FTwoHeartsGuardSettlementRequest& SettlementRequest,
+	const FTwoHeartsPlayerHitResult& HitResult)
+{
+
+	FTwoHeartsGuardOutcome GuardOutcome;
+	GuardOutcome.bWasGuardSuccessful = true;
+	GuardOutcome.AttackInstanceName = HitResult.AttackInstanceName;
+	GuardOutcome.SourceActor = HitResult.SourceActor;
+	GuardOutcome.TargetActor = HitResult.TargetActor;
+	GuardOutcome.DisplacementResult = HitResult.AttackMetadata.GuardSuccessDisplacementResult;
+	GuardOutcome.DamageResult = HitResult.AttackMetadata.GuardSuccessDamageResult;
+	GuardOutcome.ResolvedHitResultType = HitResult.ResultType;
+	GuardOutcome.BaseDamage = FMath::Max(0.0f, HitResult.AttackMetadata.BaseDamage);
+
+	GuardOutcome.AttackMetadata = HitResult.AttackMetadata;
+	GuardOutcome.bConsumedGuardResource = SettlementRequest.bConsumesGuardResource;
+	GuardOutcome.bRefundedGuardResource = SettlementRequest.bRefundsGuardResource;
+	GuardOutcome.bAppliedGuardCooldown = SettlementRequest.bAppliesGuardCooldown && SettlementRequest.GuardCooldownSeconds > 0.0f;
+	GuardOutcome.GuardCooldownSeconds = SettlementRequest.GuardCooldownSeconds;
+	GuardOutcome.GuardCooldownTag = SettlementRequest.GuardCooldownTag;
+
+	if (bHasPlayerDamageResult && LastPlayerDamageResult.AttackInstanceName.Equals(HitResult.AttackInstanceName, ESearchCase::CaseSensitive))
+	{
+		GuardOutcome.ResolvedPlayerDamageResultType = LastPlayerDamageResult.ResultType;
+		GuardOutcome.BaseDamage = LastPlayerDamageResult.BaseDamage;
+		GuardOutcome.FinalDamage = LastPlayerDamageResult.FinalDamage;
+		GuardOutcome.ResultTimestampSeconds = LastPlayerDamageResult.ResultTimestampSeconds;
+	}
+	else
+	{
+		GuardOutcome.ResultTimestampSeconds = HitResult.ResultTimestampSeconds;
+	}
+
+	RefreshGuardOutcomeDetail(GuardOutcome);
+
+	PushGuardOutcome(GuardOutcome);
+}
+
+
+void UTwoHeartsHostileAttackReceiverComponent::PushGuardOutcome(const FTwoHeartsGuardOutcome& GuardOutcome)
+{
+	bHasGuardOutcome = true;
+	LastGuardOutcome = GuardOutcome;
+
+	const bool bShouldReplacePreviousOutcome = !GuardOutcomeHistory.IsEmpty()
+		&& GuardOutcomeHistory.Last().AttackInstanceName.Equals(GuardOutcome.AttackInstanceName, ESearchCase::CaseSensitive);
+	if (bShouldReplacePreviousOutcome)
+	{
+		GuardOutcomeHistory.Last() = GuardOutcome;
+	}
+	else
+	{
+		GuardOutcomeHistory.Add(GuardOutcome);
+	}
+
+	const int32 ExcessResults = GuardOutcomeHistory.Num() - FMath::Max(1, MaxGuardOutcomeHistory);
+	if (ExcessResults > 0)
+	{
+		GuardOutcomeHistory.RemoveAt(0, ExcessResults);
+	}
+
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[GuardOutcome] receiver=%s attack=%s displacement=%s damage=%s resolved_hit=%s resolved_damage=%s final=%.2f cooldown=%s/%.2f resource=consume:%s refund:%s detail=\"%s\""),
+		*GetNameSafe(GetOwner()),
+		*GuardOutcome.AttackInstanceName,
+		LexGuardDisplacementResultToString(GuardOutcome.DisplacementResult),
+		LexGuardDamageResultToString(GuardOutcome.DamageResult),
+		LexPlayerHitResultTypeToString(GuardOutcome.ResolvedHitResultType),
+		LexPlayerDamageResultTypeToString(GuardOutcome.ResolvedPlayerDamageResultType),
+		GuardOutcome.FinalDamage,
+		GuardOutcome.bAppliedGuardCooldown ? TEXT("true") : TEXT("false"),
+		GuardOutcome.GuardCooldownSeconds,
+		GuardOutcome.bConsumedGuardResource ? TEXT("true") : TEXT("false"),
+		GuardOutcome.bRefundedGuardResource ? TEXT("true") : TEXT("false"),
+		*GuardOutcome.Detail);
+
+
+	OnGuardOutcomeUpdated.Broadcast(GuardOutcome);
+}
+
+
+
+
+
+
+
 void UTwoHeartsHostileAttackReceiverComponent::UpdateHitReactionStateFromDamageResult(const FTwoHeartsPlayerDamageResult& DamageResult)
 {
 	UE_LOG(
@@ -814,7 +1081,7 @@ void UTwoHeartsHostileAttackReceiverComponent::UpdateHitReactionStateFromDamageR
 	if (DamageResult.ResultType == ETwoHeartsPlayerDamageResultType::GuardBlocked)
 	{
 		if (CurrentHitReactionState.bIsActive
-			&& CurrentHitReactionState.SourceAttackInstanceName == DamageResult.AttackInstanceName)
+			&& CurrentHitReactionState.SourceAttackInstanceName.Equals(DamageResult.AttackInstanceName, ESearchCase::CaseSensitive))
 		{
 			UE_LOG(
 				LogtwoheartsCombatTest,
@@ -872,6 +1139,7 @@ void UTwoHeartsHostileAttackReceiverComponent::EnterHitReaction(const FTwoHearts
 	}
 
 	const float StartTimeSeconds = GetWorldTimeSecondsSafe();
+
 	const float DurationSeconds = ResolveHitReactionDuration(DamageResult);
 	const FVector IncomingDirection = DamageResult.AttackMetadata.AttackDirection.GetSafeNormal2D();
 	const ETwoHeartsHitReactionDirectionType DirectionType = ResolveHitReactionDirectionType(IncomingDirection);
@@ -950,7 +1218,7 @@ void UTwoHeartsHostileAttackReceiverComponent::FinishHitReaction(const FString& 
 	CurrentHitReactionState.bIsActive = false;
 	CurrentHitReactionState.LastEndTimeSeconds = GetWorldTimeSecondsSafe();
 	CurrentHitReactionState.LastEndReason = EndReason.IsEmpty() ? TEXT("None") : EndReason;
-	CurrentHitReactionState.Detail = EndReason == TEXT("GuardBlocked")
+	CurrentHitReactionState.Detail = EndReason.Equals(TEXT("GuardBlocked"), ESearchCase::CaseSensitive)
 		? TEXT("Hit reaction was cleared because Guard rewrote the incoming hit.")
 		: TEXT("Hit reaction recovered automatically.");
 

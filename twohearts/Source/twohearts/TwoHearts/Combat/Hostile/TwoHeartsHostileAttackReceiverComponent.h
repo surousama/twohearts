@@ -173,6 +173,96 @@ struct FTwoHeartsPlayerDamageResult
 };
 
 USTRUCT(BlueprintType)
+struct FTwoHeartsGuardSettlementRequest
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	ETwoHeartsPlayerHitResultType RewrittenHitResultType = ETwoHeartsPlayerHitResultType::GuardRewritten;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	FString AttackInstanceName = TEXT("None");
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	FString RewriteDetail = TEXT("None");
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	bool bConsumesGuardResource = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	bool bRefundsGuardResource = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	bool bAppliesGuardCooldown = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	float GuardCooldownSeconds = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	FGameplayTag GuardCooldownTag;
+};
+
+USTRUCT(BlueprintType)
+struct FTwoHeartsGuardOutcome
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	bool bWasGuardSuccessful = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	FString AttackInstanceName = TEXT("None");
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	TObjectPtr<AActor> SourceActor = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	TObjectPtr<AActor> TargetActor = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	ETwoHeartsGuardDisplacementResult DisplacementResult = ETwoHeartsGuardDisplacementResult::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	ETwoHeartsGuardDamageResult DamageResult = ETwoHeartsGuardDamageResult::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	ETwoHeartsPlayerHitResultType ResolvedHitResultType = ETwoHeartsPlayerHitResultType::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	ETwoHeartsPlayerDamageResultType ResolvedPlayerDamageResultType = ETwoHeartsPlayerDamageResultType::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	float BaseDamage = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	float FinalDamage = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	bool bConsumedGuardResource = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	bool bRefundedGuardResource = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	bool bAppliedGuardCooldown = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	float GuardCooldownSeconds = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	FGameplayTag GuardCooldownTag;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	float ResultTimestampSeconds = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	FString Detail = TEXT("None");
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome")
+	FTwoHeartsAttackMetadata AttackMetadata;
+};
+
+USTRUCT(BlueprintType)
 struct FTwoHeartsPlayerHitReactionState
 {
 	GENERATED_BODY()
@@ -217,6 +307,7 @@ struct FTwoHeartsPlayerHitReactionState
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTwoHeartsHostileAttackSignalDelegate, const FTwoHeartsHostileAttackSignal&, Signal);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTwoHeartsPlayerHitResultDelegate, const FTwoHeartsPlayerHitResult&, HitResult);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTwoHeartsPlayerDamageResultDelegate, const FTwoHeartsPlayerDamageResult&, DamageResult);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTwoHeartsGuardOutcomeDelegate, const FTwoHeartsGuardOutcome&, GuardOutcome);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FTwoHeartsPlayerHitReactionStateDelegate, const FTwoHeartsPlayerHitReactionState&, HitReactionState);
 
 UCLASS(ClassGroup=(Combat), BlueprintType, Blueprintable, meta=(BlueprintSpawnableComponent))
@@ -257,6 +348,18 @@ public:
 	UFUNCTION(BlueprintPure, Category="Combat|Player Damage Result")
 	const TArray<FTwoHeartsPlayerDamageResult>& GetPlayerDamageResultHistory() const { return PlayerDamageResultHistory; }
 
+	UFUNCTION(BlueprintPure, Category="Combat|Guard Outcome")
+	bool HasGuardOutcome() const { return bHasGuardOutcome; }
+
+	UFUNCTION(BlueprintPure, Category="Combat|Guard Outcome")
+	const FTwoHeartsGuardOutcome& GetLastGuardOutcome() const { return LastGuardOutcome; }
+
+	UFUNCTION(BlueprintPure, Category="Combat|Guard Outcome")
+	const TArray<FTwoHeartsGuardOutcome>& GetGuardOutcomeHistory() const { return GuardOutcomeHistory; }
+
+	UFUNCTION(BlueprintPure, Category="Combat|Guard Outcome")
+	bool DoesLastGuardEnableFollowUpAbility() const;
+
 	UFUNCTION(BlueprintPure, Category="Combat|Player Damage Result")
 	float GetCurrentHealth() const { return CurrentHealth; }
 
@@ -275,6 +378,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Combat|Player Hit Result")
 	bool RewriteLastPlayerHitResultForGuard(ETwoHeartsPlayerHitResultType NewResultType, const FString& Detail);
 
+	bool RewriteLastPlayerHitResultForGuard(const FTwoHeartsGuardSettlementRequest& SettlementRequest);
+
 	UPROPERTY(BlueprintAssignable, Category="Combat|Hostile Attack")
 	FTwoHeartsHostileAttackSignalDelegate OnHostileAttackSignalReceived;
 
@@ -284,6 +389,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Combat|Player Damage Result")
 	FTwoHeartsPlayerDamageResultDelegate OnPlayerDamageResultUpdated;
 
+	UPROPERTY(BlueprintAssignable, Category="Combat|Guard Outcome")
+	FTwoHeartsGuardOutcomeDelegate OnGuardOutcomeUpdated;
+
 	UPROPERTY(BlueprintAssignable, Category="Combat|Hit Reaction")
 	FTwoHeartsPlayerHitReactionStateDelegate OnPlayerHitReactionStateUpdated;
 
@@ -291,10 +399,13 @@ private:
 	void BeginPlay() override;
 	void UpdatePlayerHitResultFromSignal(const FTwoHeartsHostileAttackSignal& Signal);
 	void FinalizeCurrentPendingAttack(const FTwoHeartsHostileAttackSignal& Signal, ETwoHeartsPlayerHitResultType FinalResultType, bool bHitConfirmed, bool bCanBeRewrittenByGuard, const FString& Detail);
-	bool TryConsumePendingGuardRewriteForAttack(const FString& AttackInstanceName, ETwoHeartsPlayerHitResultType& OutResultType, FString& OutDetail);
+	bool TryConsumePendingGuardRewriteForAttack(const FString& AttackInstanceName, FTwoHeartsGuardSettlementRequest& OutSettlementRequest);
 	void PushPlayerHitResult(const FTwoHeartsPlayerHitResult& HitResult);
 	void UpdatePlayerDamageResultFromHitResult(const FTwoHeartsPlayerHitResult& HitResult);
 	void PushPlayerDamageResult(const FTwoHeartsPlayerDamageResult& DamageResult);
+	void RefreshGuardOutcomeDetail(FTwoHeartsGuardOutcome& GuardOutcome) const;
+	void CommitGuardOutcome(const FTwoHeartsGuardSettlementRequest& SettlementRequest, const FTwoHeartsPlayerHitResult& HitResult);
+	void PushGuardOutcome(const FTwoHeartsGuardOutcome& GuardOutcome);
 	void UpdateHitReactionStateFromDamageResult(const FTwoHeartsPlayerDamageResult& DamageResult);
 	void EnterHitReaction(const FTwoHeartsPlayerDamageResult& DamageResult);
 	void FinishHitReaction(const FString& EndReason);
@@ -314,6 +425,9 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Player Damage Result|Debug", meta=(ClampMin="1", UIMin="1", ClampMax="20", UIMax="20", AllowPrivateAccess="true"))
 	int32 MaxPlayerDamageResultHistory = 8;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Guard Outcome|Debug", meta=(ClampMin="1", UIMin="1", ClampMax="20", UIMax="20", AllowPrivateAccess="true"))
+	int32 MaxGuardOutcomeHistory = 8;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Player Damage Result", meta=(ClampMin="1.0", UIMin="1.0", AllowPrivateAccess="true"))
 	float MaxHealth = 100.0f;
@@ -357,6 +471,15 @@ private:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Player Damage Result", meta=(AllowPrivateAccess="true"))
 	TArray<FTwoHeartsPlayerDamageResult> PlayerDamageResultHistory;
 
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Guard Outcome", meta=(AllowPrivateAccess="true"))
+	bool bHasGuardOutcome = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Guard Outcome", meta=(AllowPrivateAccess="true"))
+	FTwoHeartsGuardOutcome LastGuardOutcome;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Guard Outcome", meta=(AllowPrivateAccess="true"))
+	TArray<FTwoHeartsGuardOutcome> GuardOutcomeHistory;
+
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Hit Reaction", meta=(AllowPrivateAccess="true"))
 	FTwoHeartsPlayerHitReactionState CurrentHitReactionState;
 
@@ -382,10 +505,7 @@ private:
 	FString PendingGuardRewriteAttackInstanceName = TEXT("None");
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Player Hit Result", meta=(AllowPrivateAccess="true"))
-	ETwoHeartsPlayerHitResultType PendingGuardRewriteResultType = ETwoHeartsPlayerHitResultType::None;
-
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Combat|Player Hit Result", meta=(AllowPrivateAccess="true"))
-	FString PendingGuardRewriteDetail;
+	FTwoHeartsGuardSettlementRequest PendingGuardSettlementRequest;
 
 	FTimerHandle HitReactionRecoveryTimerHandle;
 };

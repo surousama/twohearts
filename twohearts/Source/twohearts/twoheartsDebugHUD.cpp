@@ -1,8 +1,11 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "twoheartsDebugHUD.h"
+#include "AbilitySystemComponent.h"
 #include "twoheartsCharacter.h"
 #include "TwoHearts/Combat/Hostile/TwoHeartsHostileAttackReceiverComponent.h"
+
+#include "TwoHearts/Combat/Gameplay/Tags/TwoHeartsGameplayTags.h"
 #include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
 #include "CanvasItem.h"
 #include "Engine/Canvas.h"
@@ -45,6 +48,38 @@ namespace
 		}
 	}
 
+	const TCHAR* LexGuardDisplacementResultToString(const ETwoHeartsGuardDisplacementResult ResultType)
+	{
+		switch (ResultType)
+		{
+		case ETwoHeartsGuardDisplacementResult::DefenderPushedBack:
+			return TEXT("DefenderPushedBack");
+		case ETwoHeartsGuardDisplacementResult::AttackerPushedBack:
+			return TEXT("AttackerPushedBack");
+		case ETwoHeartsGuardDisplacementResult::NoDisplacement:
+			return TEXT("NoDisplacement");
+		case ETwoHeartsGuardDisplacementResult::None:
+		default:
+			return TEXT("None");
+		}
+	}
+
+	const TCHAR* LexGuardDamageResultToString(const ETwoHeartsGuardDamageResult ResultType)
+	{
+		switch (ResultType)
+		{
+		case ETwoHeartsGuardDamageResult::FullyBlocked:
+			return TEXT("FullyBlocked");
+		case ETwoHeartsGuardDamageResult::PartialDamageTaken:
+			return TEXT("PartialDamageTaken");
+		case ETwoHeartsGuardDamageResult::PenetrationFailed:
+			return TEXT("PenetrationFailed");
+		case ETwoHeartsGuardDamageResult::None:
+		default:
+			return TEXT("None");
+		}
+	}
+
 	const TCHAR* LexHitReactionDirectionTypeToString(const ETwoHeartsHitReactionDirectionType DirectionType)
 	{
 		switch (DirectionType)
@@ -63,6 +98,7 @@ namespace
 		}
 	}
 }
+
 
 void ATwoheartsDebugHUD::DrawHUD()
 
@@ -123,7 +159,8 @@ void ATwoheartsDebugHUD::DrawHUD()
 		VisibleInputEvents.Add(&InputEvents[EventIndex]);
 	}
 
-	const float PanelHeight = 640.0f + (VisibleEvents.Num() * LineHeight) + (VisibleInputEvents.Num() * LineHeight * 2.0f);
+	const float PanelHeight = 676.0f + (VisibleEvents.Num() * LineHeight) + (VisibleInputEvents.Num() * LineHeight * 2.0f);
+
 
 	FCanvasTileItem Background(FVector2D(PanelX, PanelY), FVector2D(PanelWidth, PanelHeight), FLinearColor(0.02f, 0.02f, 0.02f, 0.78f));
 	Background.BlendMode = SE_BLEND_Translucent;
@@ -212,7 +249,8 @@ void ATwoheartsDebugHUD::DrawHUD()
 			FString::Printf(TEXT("reason=%s"), *ActionContext.LastReason),
 			PanelX + 12.0f,
 			CurrentY,
-			ActionContext.LastReason == TEXT("None") ? MutedColor : TextColor);
+			ActionContext.LastReason.Equals(TEXT("None"), ESearchCase::CaseSensitive) ? MutedColor : TextColor);
+
 		CurrentY += LineHeight * 1.5f;
 
 		const UEnum* RouteEnum = StaticEnum<ETwoHeartsCombatInputConsumptionRoute>();
@@ -299,16 +337,20 @@ void ATwoheartsDebugHUD::DrawHUD()
 	DrawDebugLine(TEXT("Guard"), PanelX + 12.0f, CurrentY, HeaderColor);
 	CurrentY += LineHeight;
 
+	const UAbilitySystemComponent* GuardAbilitySystemComponent = Character->GetAbilitySystemComponent();
+	const bool bIsGuardCooldownReady = !GuardAbilitySystemComponent || !GuardAbilitySystemComponent->HasMatchingGameplayTag(TAG_TwoHearts_Cooldown_Guard);
 	DrawDebugLine(
 		FString::Printf(
-			TEXT("guarding=%s   window=%s   phase=%s   hold_reserved=%s"),
+			TEXT("guarding=%s   window=%s   phase=%s   hold_reserved=%s   cooldown_ready=%s"),
 			Character->IsGuardingDebugState() ? TEXT("YES") : TEXT("NO"),
 			Character->IsGuardWindowActiveDebugState() ? TEXT("YES") : TEXT("NO"),
 			*Character->GetCurrentGuardPhaseDebugState(),
-			Character->IsGuardHoldInputReservedDebugState() ? TEXT("YES") : TEXT("NO")),
+			Character->IsGuardHoldInputReservedDebugState() ? TEXT("YES") : TEXT("NO"),
+			bIsGuardCooldownReady ? TEXT("YES") : TEXT("NO")),
 		PanelX + 12.0f,
 		CurrentY,
 		TextColor);
+
 	CurrentY += LineHeight;
 
 	DrawDebugLine(
@@ -579,10 +621,67 @@ void ATwoheartsDebugHUD::DrawHUD()
 					PanelX + 12.0f,
 					CurrentY,
 					MutedColor);
+				CurrentY += LineHeight;
+			}
+
+			DrawDebugLine(TEXT("Guard Outcome"), PanelX + 12.0f, CurrentY, HeaderColor);
+			CurrentY += LineHeight;
+
+			if (!HostileAttackReceiver->HasGuardOutcome())
+			{
+				DrawDebugLine(TEXT("no_guard_outcome_yet"), PanelX + 12.0f, CurrentY, MutedColor);
+				CurrentY += LineHeight * 1.5f;
+			}
+			else
+			{
+				const FTwoHeartsGuardOutcome& LastGuardOutcome = HostileAttackReceiver->GetLastGuardOutcome();
+				const UEnum* GuardOutcomeDamageResultEnum = StaticEnum<ETwoHeartsPlayerDamageResultType>();
+
+				DrawDebugLine(
+					FString::Printf(
+						TEXT("attack=%s   displacement=%s   damage=%s"),
+						*LastGuardOutcome.AttackInstanceName,
+						LexGuardDisplacementResultToString(LastGuardOutcome.DisplacementResult),
+						LexGuardDamageResultToString(LastGuardOutcome.DamageResult)),
+					PanelX + 12.0f,
+					CurrentY,
+					TextColor);
+				CurrentY += LineHeight;
+
+				DrawDebugLine(
+					FString::Printf(
+						TEXT("resolved_hit=%s   resolved_damage=%s   final=%.2f"),
+						ResultEnum ? *ResultEnum->GetNameStringByValue(static_cast<int64>(LastGuardOutcome.ResolvedHitResultType)) : TEXT("Unknown"),
+						GuardOutcomeDamageResultEnum ? *GuardOutcomeDamageResultEnum->GetNameStringByValue(static_cast<int64>(LastGuardOutcome.ResolvedPlayerDamageResultType)) : TEXT("Unknown"),
+						LastGuardOutcome.FinalDamage),
+					PanelX + 12.0f,
+					CurrentY,
+					TextColor);
+				CurrentY += LineHeight;
+
+				DrawDebugLine(
+					FString::Printf(
+						TEXT("resource_consume=%s   resource_refund=%s   cooldown=%s / %.2f"),
+						LastGuardOutcome.bConsumedGuardResource ? TEXT("YES") : TEXT("NO"),
+						LastGuardOutcome.bRefundedGuardResource ? TEXT("YES") : TEXT("NO"),
+						LastGuardOutcome.bAppliedGuardCooldown ? TEXT("YES") : TEXT("NO"),
+						LastGuardOutcome.GuardCooldownSeconds),
+					PanelX + 12.0f,
+					CurrentY,
+					TextColor);
+				CurrentY += LineHeight;
+
+				DrawDebugLine(
+					FString::Printf(TEXT("detail=%s"), *LastGuardOutcome.Detail),
+					PanelX + 12.0f,
+					CurrentY,
+					MutedColor);
+
 				CurrentY += LineHeight * 1.5f;
 			}
 
 			DrawDebugLine(TEXT("Hit Reaction"), PanelX + 12.0f, CurrentY, HeaderColor);
+
 			CurrentY += LineHeight;
 
 			const FTwoHeartsPlayerHitReactionState& HitReactionState = HostileAttackReceiver->GetCurrentHitReactionState();

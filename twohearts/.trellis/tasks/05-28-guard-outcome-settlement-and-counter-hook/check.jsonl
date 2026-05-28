@@ -1,1 +1,7 @@
-{"_example": "请填写 {\"file\": \"<path>\", \"reason\": \"<why>\"}。 这里只放 spec 或 research 文件，不要放代码路径。 可运行 `python .trellis/scripts/get_context.py --mode packages` 查看可用 spec。 真正条目补齐后，可删除这一行。"}
+{"file":".trellis/spec/roles/senior-programmer.md","reason":"复核实现是否仍符合资深程序职责与模块边界。"}
+{"file":".trellis/spec/combat/index.md","reason":"检查改动是否仍服从战斗规范索引。"}
+{"file":".trellis/spec/combat/system-framework.md","reason":"检查 Guard 结算与反击接口是否复用了正式动作上下文，而非另造一套私有规则。"}
+{"file":".trellis/spec/combat/current-stage.md","reason":"检查本轮是否只做最小位移/伤害结算、资源冷却语义与反击接口预留。"}
+{"file":".trellis/spec/implementation/ue5-gas-cpp-guidelines.md","reason":"检查核心逻辑是否继续落在 Ability 与 C++ 组件正式承载。"}
+{"file":".trellis/spec/implementation/blueprint-boundary.md","reason":"检查规则真相源、冷却语义与调试输出是否仍以 C++ 为准。"}
+{"file":".trellis/spec/testing/whitebox-testing-guidelines.md","reason":"检查 HUD、日志与结构化结果是否具备最小可观察性。"}

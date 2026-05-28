@@ -16,6 +16,7 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_State_CannotDodge, "State.CannotDod
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_State_CannotInput, "State.CannotInput", "Prevents combat ability input from activating.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_State_Dodge_Invulnerable, "State.Dodge.Invulnerable", "The avatar is inside the dodge invulnerability window.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Cooldown_Dodge, "Cooldown.Dodge", "Dodge is on cooldown.");
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Cooldown_Guard, "Cooldown.Guard", "Guard success cooldown is active.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Attack_Mechanic_Physical, "Attack.Mechanic.Physical", "Physical damage/mechanic tag for shared attack metadata.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Attack_Mechanic_HostileProbe, "Attack.Mechanic.HostileProbe", "Marks hostile probe sample attacks.");
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_TwoHearts_Attack_Mechanic_NormalAttack, "Attack.Mechanic.NormalAttack", "Marks player normal attack segments.");
@@ -98,6 +99,11 @@ FGameplayTag FTwoHeartsGameplayTags::State_Dodge_Invulnerable()
 FGameplayTag FTwoHeartsGameplayTags::Cooldown_Dodge()
 {
 	return TAG_TwoHearts_Cooldown_Dodge;
+}
+
+FGameplayTag FTwoHeartsGameplayTags::Cooldown_Guard()
+{
+	return TAG_TwoHearts_Cooldown_Guard;
 }
 
 FGameplayTag FTwoHeartsGameplayTags::Attack_Mechanic_Physical()

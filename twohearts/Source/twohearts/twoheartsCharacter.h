@@ -135,7 +135,11 @@ struct FTwoHeartsGuardConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Guard", meta=(ClampMin="0.0", UIMin="0.0"))
 	float GuardRecoverySeconds = 0.10f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Guard", meta=(ClampMin="0.0", UIMin="0.0"))
+	float GuardSuccessCooldownSeconds = 0.20f;
 };
+
 
 USTRUCT(BlueprintType)
 struct FTwoHeartsCombatInputDebugEvent
