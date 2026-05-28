@@ -29,6 +29,7 @@ void UTwoHeartsGA_Guard::ActivateAbility(
 	bGuardWindowActive = false;
 	bHasRegisteredCombatActionContext = false;
 	bHasMarkedCombatLogicEnded = false;
+	bInterruptedByHitReaction = false;
 	CurrentGuardPhase = ETwoHeartsCombatPhase::None;
 	BoundHostileAttackReceiver.Reset();
 	ClearGuardTimers();
@@ -77,6 +78,20 @@ void UTwoHeartsGA_Guard::EndAbility(
 	UpdateGuardDebugState();
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
+bool UTwoHeartsGA_Guard::TryInterruptByAction(ETwoHeartsCombatActionType InterruptingActionType, const FString& InterruptReason)
+{
+	if (InterruptingActionType != ETwoHeartsCombatActionType::HitReaction)
+	{
+		return false;
+	}
+
+	bInterruptedByHitReaction = true;
+	MarkCombatActionLogicEnded(InterruptReason);
+	RecordGuardEvent(TEXT("GuardInterruptedByAction"), TEXT("Guard was interrupted by hit reaction."));
+	FinishGuard(true);
+	return true;
 }
 
 UTwoHeartsGA_NormalAttackBase* UTwoHeartsGA_Guard::FindActiveNormalAttackAbility() const
@@ -363,9 +378,11 @@ void UTwoHeartsGA_Guard::FinishCombatActionContext(bool bWasCancelled)
 		if (CurrentContext.ActionType == ETwoHeartsCombatActionType::Guard)
 		{
 			const ETwoHeartsCombatActionEndReason EndReason = bWasCancelled
-				? ETwoHeartsCombatActionEndReason::Cancelled
+				? (bInterruptedByHitReaction ? ETwoHeartsCombatActionEndReason::Interrupted : ETwoHeartsCombatActionEndReason::Cancelled)
 				: ETwoHeartsCombatActionEndReason::Completed;
-			const FString FinishReason = bWasCancelled ? TEXT("GuardCancelled") : TEXT("GuardEnded");
+			const FString FinishReason = bWasCancelled
+				? (bInterruptedByHitReaction ? TEXT("InterruptedByHitReaction") : TEXT("GuardCancelled"))
+				: TEXT("GuardEnded");
 			ActionContextComponent->FinishAction(EndReason, FinishReason);
 		}
 	}
@@ -380,6 +397,7 @@ void UTwoHeartsGA_Guard::FinishCombatActionContext(bool bWasCancelled)
 
 	bHasRegisteredCombatActionContext = false;
 	bHasMarkedCombatLogicEnded = false;
+	bInterruptedByHitReaction = false;
 	CurrentGuardPhase = ETwoHeartsCombatPhase::None;
 }
 

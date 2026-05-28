@@ -79,8 +79,9 @@ namespace
 			? TEXT("None")
 			: AttackMetadata.TimingWindowName.ToString();
 		return FString::Printf(
-			TEXT("reaction=%s tags=%s guard=%s dodge=%s timing=%s/%s"),
+			TEXT("reaction=%s damage=%.2f tags=%s guard=%s dodge=%s timing=%s/%s"),
 			LexHitReactionTypeToString(AttackMetadata.HitReactionType),
+			AttackMetadata.BaseDamage,
 			*DamageMechanicTags,
 			AttackMetadata.bCanBeGuarded ? TEXT("true") : TEXT("false"),
 			AttackMetadata.bCanBeDodged ? TEXT("true") : TEXT("false"),
@@ -286,6 +287,7 @@ void ATwoHeartsHostileAttackProbeCharacter::InitializeCurrentAttackMetadata()
 	CurrentAttackMetadata.SourceLocation = GetActorLocation();
 	CurrentAttackMetadata.AttackDirection = GetActorForwardVector().GetSafeNormal2D();
 	CurrentAttackMetadata.HitReactionType = ETwoHeartsHitReactionType::Light;
+	CurrentAttackMetadata.BaseDamage = 10.0f;
 	CurrentAttackMetadata.DamageMechanicTags.AddTag(FTwoHeartsGameplayTags::Attack_Mechanic_Physical());
 	CurrentAttackMetadata.DamageMechanicTags.AddTag(FTwoHeartsGameplayTags::Attack_Mechanic_HostileProbe());
 	CurrentAttackMetadata.bCanBeGuarded = true;

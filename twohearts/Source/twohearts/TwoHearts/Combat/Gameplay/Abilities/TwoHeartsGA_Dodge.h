@@ -100,6 +100,7 @@ private:
 	bool bHasReceivedInvulnerabilityBeginNotify = false;
 	bool bHasReceivedInvulnerabilityEndNotify = false;
 	bool bInterruptedByGuard = false;
+	bool bInterruptedByHitReaction = false;
 	bool bCachedOrientRotationToMovement = false;
 	bool bCachedUseControllerDesiredRotation = false;
 	bool bCachedUseControllerRotationYaw = false;

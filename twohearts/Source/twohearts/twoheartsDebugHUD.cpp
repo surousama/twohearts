@@ -44,6 +44,24 @@ namespace
 			return TEXT("None");
 		}
 	}
+
+	const TCHAR* LexHitReactionDirectionTypeToString(const ETwoHeartsHitReactionDirectionType DirectionType)
+	{
+		switch (DirectionType)
+		{
+		case ETwoHeartsHitReactionDirectionType::Front:
+			return TEXT("Front");
+		case ETwoHeartsHitReactionDirectionType::Back:
+			return TEXT("Back");
+		case ETwoHeartsHitReactionDirectionType::Left:
+			return TEXT("Left");
+		case ETwoHeartsHitReactionDirectionType::Right:
+			return TEXT("Right");
+		case ETwoHeartsHitReactionDirectionType::None:
+		default:
+			return TEXT("None");
+		}
+	}
 }
 
 void ATwoheartsDebugHUD::DrawHUD()
@@ -352,8 +370,9 @@ void ATwoheartsDebugHUD::DrawHUD()
 
 			DrawDebugLine(
 				FString::Printf(
-					TEXT("reaction=%s   guard=%s   dodge=%s"),
+					TEXT("reaction=%s   base_damage=%.2f   guard=%s   dodge=%s"),
 					LexHitReactionTypeToString(LastSignal.AttackMetadata.HitReactionType),
+					LastSignal.AttackMetadata.BaseDamage,
 					LastSignal.AttackMetadata.bCanBeGuarded ? TEXT("YES") : TEXT("NO"),
 					LastSignal.AttackMetadata.bCanBeDodged ? TEXT("YES") : TEXT("NO")),
 				PanelX + 12.0f,
@@ -448,8 +467,9 @@ void ATwoheartsDebugHUD::DrawHUD()
 
 			DrawDebugLine(
 				FString::Printf(
-					TEXT("reaction=%s   guard=%s   dodge=%s"),
+					TEXT("reaction=%s   base_damage=%.2f   guard=%s   dodge=%s"),
 					LexHitReactionTypeToString(LastHitResult.AttackMetadata.HitReactionType),
+					LastHitResult.AttackMetadata.BaseDamage,
 					LastHitResult.AttackMetadata.bCanBeGuarded ? TEXT("YES") : TEXT("NO"),
 					LastHitResult.AttackMetadata.bCanBeDodged ? TEXT("YES") : TEXT("NO")),
 				PanelX + 12.0f,
@@ -476,6 +496,114 @@ void ATwoheartsDebugHUD::DrawHUD()
 
 			DrawDebugLine(
 				FString::Printf(TEXT("detail=%s"), *LastHitResult.Detail),
+				PanelX + 12.0f,
+				CurrentY,
+				MutedColor);
+			CurrentY += LineHeight * 1.5f;
+
+			DrawDebugLine(TEXT("Player Damage Result"), PanelX + 12.0f, CurrentY, HeaderColor);
+			CurrentY += LineHeight;
+
+			if (!HostileAttackReceiver->HasPlayerDamageResult())
+			{
+				DrawDebugLine(TEXT("no_player_damage_result_yet"), PanelX + 12.0f, CurrentY, MutedColor);
+				CurrentY += LineHeight;
+			}
+			else
+			{
+				const FTwoHeartsPlayerDamageResult& LastDamageResult = HostileAttackReceiver->GetLastPlayerDamageResult();
+				const UEnum* DamageResultEnum = StaticEnum<ETwoHeartsPlayerDamageResultType>();
+				const FLinearColor DamageResultColor =
+					LastDamageResult.ResultType == ETwoHeartsPlayerDamageResultType::GuardBlocked
+						? FLinearColor(0.35f, 1.0f, 0.55f, 1.0f)
+						: FLinearColor(1.0f, 0.65f, 0.35f, 1.0f);
+
+				DrawDebugLine(
+					FString::Printf(
+						TEXT("result=%s   source_hit=%s   guard_rewritten=%s"),
+						DamageResultEnum ? *DamageResultEnum->GetNameStringByValue(static_cast<int64>(LastDamageResult.ResultType)) : TEXT("Unknown"),
+						ResultEnum ? *ResultEnum->GetNameStringByValue(static_cast<int64>(LastDamageResult.SourceHitResultType)) : TEXT("Unknown"),
+						LastDamageResult.bWasGuardRewritten ? TEXT("YES") : TEXT("NO")),
+					PanelX + 12.0f,
+					CurrentY,
+					DamageResultColor);
+				CurrentY += LineHeight;
+
+				DrawDebugLine(
+					FString::Printf(
+						TEXT("base=%.2f   final=%.2f   health=%.2f / %.2f"),
+						LastDamageResult.BaseDamage,
+						LastDamageResult.FinalDamage,
+						HostileAttackReceiver->GetCurrentHealth(),
+						HostileAttackReceiver->GetMaxHealth()),
+					PanelX + 12.0f,
+					CurrentY,
+					TextColor);
+				CurrentY += LineHeight;
+
+				DrawDebugLine(
+					FString::Printf(
+						TEXT("health_before=%.2f   health_after=%.2f   time=%.2f"),
+						LastDamageResult.HealthBeforeDamage,
+						LastDamageResult.HealthAfterDamage,
+						LastDamageResult.ResultTimestampSeconds),
+					PanelX + 12.0f,
+					CurrentY,
+					MutedColor);
+				CurrentY += LineHeight;
+
+				DrawDebugLine(
+					FString::Printf(TEXT("detail=%s"), *LastDamageResult.Detail),
+					PanelX + 12.0f,
+					CurrentY,
+					MutedColor);
+				CurrentY += LineHeight * 1.5f;
+			}
+
+			DrawDebugLine(TEXT("Hit Reaction"), PanelX + 12.0f, CurrentY, HeaderColor);
+			CurrentY += LineHeight;
+
+			const FTwoHeartsPlayerHitReactionState& HitReactionState = HostileAttackReceiver->GetCurrentHitReactionState();
+			const FLinearColor HitReactionColor = HitReactionState.bIsActive
+				? FLinearColor(1.0f, 0.55f, 0.35f, 1.0f)
+				: MutedColor;
+
+			DrawDebugLine(
+				FString::Printf(
+					TEXT("active=%s   attack=%s   type=%s   direction=%s"),
+					HitReactionState.bIsActive ? TEXT("YES") : TEXT("NO"),
+					*HitReactionState.SourceAttackInstanceName,
+					LexHitReactionTypeToString(HitReactionState.HitReactionType),
+					LexHitReactionDirectionTypeToString(HitReactionState.DirectionType)),
+				PanelX + 12.0f,
+				CurrentY,
+				HitReactionColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(
+					TEXT("start=%.2f   recover_at=%.2f   end_reason=%s"),
+					HitReactionState.StartTimeSeconds,
+					HitReactionState.ExpectedRecoveryTimeSeconds,
+					*HitReactionState.LastEndReason),
+				PanelX + 12.0f,
+				CurrentY,
+				HitReactionState.bIsActive ? TextColor : MutedColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(
+					TEXT("incoming_dir=(%.2f, %.2f, %.2f)"),
+					HitReactionState.IncomingDirection.X,
+					HitReactionState.IncomingDirection.Y,
+					HitReactionState.IncomingDirection.Z),
+				PanelX + 12.0f,
+				CurrentY,
+				MutedColor);
+			CurrentY += LineHeight;
+
+			DrawDebugLine(
+				FString::Printf(TEXT("detail=%s"), *HitReactionState.Detail),
 				PanelX + 12.0f,
 				CurrentY,
 				MutedColor);

@@ -13,6 +13,7 @@ enum class ETwoHeartsCombatActionType : uint8
 	NormalAttack UMETA(DisplayName="NormalAttack"),
 	Dodge UMETA(DisplayName="Dodge"),
 	Guard UMETA(DisplayName="Guard"),
+	HitReaction UMETA(DisplayName="HitReaction"),
 	HostileAttackProbe UMETA(DisplayName="HostileAttackProbe")
 };
 

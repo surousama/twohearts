@@ -34,6 +34,8 @@ public:
 		bool bReplicateEndAbility,
 		bool bWasCancelled) override;
 
+	bool TryInterruptByAction(ETwoHeartsCombatActionType InterruptingActionType, const FString& InterruptReason);
+
 private:
 	UTwoHeartsGA_NormalAttackBase* FindActiveNormalAttackAbility() const;
 	UTwoHeartsGA_Dodge* FindActiveDodgeAbility() const;
@@ -71,6 +73,7 @@ private:
 	bool bGuardWindowActive = false;
 	bool bHasRegisteredCombatActionContext = false;
 	bool bHasMarkedCombatLogicEnded = false;
+	bool bInterruptedByHitReaction = false;
 	ETwoHeartsCombatPhase CurrentGuardPhase = ETwoHeartsCombatPhase::None;
 	TWeakObjectPtr<UTwoHeartsHostileAttackReceiverComponent> BoundHostileAttackReceiver;
 	FTimerHandle GuardStartupTimerHandle;

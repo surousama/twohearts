@@ -1,6 +1,14 @@
 #include "TwoHearts/Combat/Hostile/TwoHeartsHostileAttackReceiverComponent.h"
 
+#include "AbilitySystemComponent.h"
+#include "AbilitySystemInterface.h"
+#include "TimerManager.h"
+#include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
+#include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_Dodge.h"
+#include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_Guard.h"
+#include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsGA_NormalAttackBase.h"
 #include "twohearts.h"
+#include "twoheartsCharacter.h"
 
 namespace
 {
@@ -39,6 +47,40 @@ namespace
 		case ETwoHeartsPlayerHitResultType::GuardRewritten:
 			return TEXT("GuardRewritten");
 		case ETwoHeartsPlayerHitResultType::None:
+		default:
+			return TEXT("None");
+		}
+	}
+
+	const TCHAR* LexPlayerDamageResultTypeToString(const ETwoHeartsPlayerDamageResultType ResultType)
+	{
+		switch (ResultType)
+		{
+		case ETwoHeartsPlayerDamageResultType::DamageApplied:
+			return TEXT("DamageApplied");
+		case ETwoHeartsPlayerDamageResultType::GuardBlocked:
+			return TEXT("GuardBlocked");
+		case ETwoHeartsPlayerDamageResultType::IgnoredNoHealth:
+			return TEXT("IgnoredNoHealth");
+		case ETwoHeartsPlayerDamageResultType::None:
+		default:
+			return TEXT("None");
+		}
+	}
+
+	const TCHAR* LexHitReactionDirectionTypeToString(const ETwoHeartsHitReactionDirectionType DirectionType)
+	{
+		switch (DirectionType)
+		{
+		case ETwoHeartsHitReactionDirectionType::Front:
+			return TEXT("Front");
+		case ETwoHeartsHitReactionDirectionType::Back:
+			return TEXT("Back");
+		case ETwoHeartsHitReactionDirectionType::Left:
+			return TEXT("Left");
+		case ETwoHeartsHitReactionDirectionType::Right:
+			return TEXT("Right");
+		case ETwoHeartsHitReactionDirectionType::None:
 		default:
 			return TEXT("None");
 		}
@@ -87,8 +129,9 @@ namespace
 			? TEXT("None")
 			: AttackMetadata.TimingWindowName.ToString();
 		return FString::Printf(
-			TEXT("reaction=%s tags=%s guard=%s dodge=%s timing=%s/%s"),
+			TEXT("reaction=%s damage=%.2f tags=%s guard=%s dodge=%s timing=%s/%s"),
 			LexHitReactionTypeToString(AttackMetadata.HitReactionType),
+			AttackMetadata.BaseDamage,
 			*DamageMechanicTags,
 			AttackMetadata.bCanBeGuarded ? TEXT("true") : TEXT("false"),
 			AttackMetadata.bCanBeDodged ? TEXT("true") : TEXT("false"),
@@ -131,6 +174,13 @@ namespace
 UTwoHeartsHostileAttackReceiverComponent::UTwoHeartsHostileAttackReceiverComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	CurrentHealth = MaxHealth;
+}
+
+void UTwoHeartsHostileAttackReceiverComponent::BeginPlay()
+{
+	Super::BeginPlay();
+	CurrentHealth = MaxHealth;
 }
 
 void UTwoHeartsHostileAttackReceiverComponent::ReceiveHostileAttackSignal(const FTwoHeartsHostileAttackSignal& Signal)
@@ -186,11 +236,21 @@ void UTwoHeartsHostileAttackReceiverComponent::ClearSignalHistory()
 	bHasPlayerHitResult = false;
 	LastPlayerHitResult = FTwoHeartsPlayerHitResult();
 	PlayerHitResultHistory.Reset();
+	bHasPlayerDamageResult = false;
+	LastPlayerDamageResult = FTwoHeartsPlayerDamageResult();
+	PlayerDamageResultHistory.Reset();
 	bHasPendingAttack = false;
 	PendingAttackInstanceName = TEXT("None");
 	PendingAttackSourceActor = nullptr;
 	PendingAttackStartSeconds = 0.0f;
 	PendingAttackMetadata = FTwoHeartsAttackMetadata();
+	CurrentHealth = MaxHealth;
+	CurrentHitReactionState = FTwoHeartsPlayerHitReactionState();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(HitReactionRecoveryTimerHandle);
+	}
 
 
 	UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[HostileAttackSignal] receiver=%s history_cleared=true"), *GetNameSafe(GetOwner()));
@@ -242,6 +302,7 @@ bool UTwoHeartsHostileAttackReceiverComponent::RewriteLastPlayerHitResultForGuar
 		LexPlayerHitResultTypeToString(LastPlayerHitResult.ResultType),
 		LastPlayerHitResult.ResultTimestampSeconds);
 
+	UpdatePlayerDamageResultFromHitResult(LastPlayerHitResult);
 	OnPlayerHitResultUpdated.Broadcast(LastPlayerHitResult);
 	return true;
 }
@@ -567,5 +628,490 @@ void UTwoHeartsHostileAttackReceiverComponent::PushPlayerHitResult(const FTwoHea
 		LexPlayerHitResultTypeToString(HitResult.ResultType),
 		PlayerHitResultHistory.Num());
 
+	UpdatePlayerDamageResultFromHitResult(HitResult);
 	OnPlayerHitResultUpdated.Broadcast(HitResult);
+}
+
+void UTwoHeartsHostileAttackReceiverComponent::UpdatePlayerDamageResultFromHitResult(const FTwoHeartsPlayerHitResult& HitResult)
+{
+	if (HitResult.ResultType == ETwoHeartsPlayerHitResultType::PendingIncomingHit
+		|| HitResult.ResultType == ETwoHeartsPlayerHitResultType::HitExpired
+		|| HitResult.ResultType == ETwoHeartsPlayerHitResultType::SignalInvalid
+		|| HitResult.ResultType == ETwoHeartsPlayerHitResultType::None)
+	{
+		return;
+	}
+
+	FTwoHeartsPlayerDamageResult DamageResult;
+	DamageResult.AttackInstanceName = HitResult.AttackInstanceName;
+	DamageResult.SourceActor = HitResult.SourceActor;
+	DamageResult.TargetActor = HitResult.TargetActor;
+	DamageResult.SourceHitResultType = HitResult.ResultType;
+	DamageResult.ResultTimestampSeconds = HitResult.ResultTimestampSeconds;
+	DamageResult.AttackMetadata = HitResult.AttackMetadata;
+	DamageResult.BaseDamage = FMath::Max(0.0f, HitResult.AttackMetadata.BaseDamage);
+
+	if (HitResult.ResultType == ETwoHeartsPlayerHitResultType::GuardRewritten)
+	{
+		DamageResult.ResultType = ETwoHeartsPlayerDamageResultType::GuardBlocked;
+		DamageResult.FinalDamage = 0.0f;
+		DamageResult.bWasGuardRewritten = true;
+
+		if (bHasPlayerDamageResult
+			&& LastPlayerDamageResult.AttackInstanceName == HitResult.AttackInstanceName
+			&& LastPlayerDamageResult.ResultType == ETwoHeartsPlayerDamageResultType::DamageApplied)
+		{
+			CurrentHealth = FMath::Clamp(CurrentHealth + LastPlayerDamageResult.FinalDamage, 0.0f, MaxHealth);
+			DamageResult.HealthBeforeDamage = LastPlayerDamageResult.HealthBeforeDamage;
+			DamageResult.HealthAfterDamage = CurrentHealth;
+			DamageResult.Detail = TEXT("Guard rewrote a previously applied damage result and restored the deducted health.");
+		}
+		else
+		{
+			DamageResult.HealthBeforeDamage = CurrentHealth;
+			DamageResult.HealthAfterDamage = CurrentHealth;
+			DamageResult.Detail = TEXT("Guard rewrote the hostile hit before any lasting damage was applied.");
+		}
+
+		PushPlayerDamageResult(DamageResult);
+		return;
+	}
+
+	if (HitResult.ResultType != ETwoHeartsPlayerHitResultType::HitConfirmed)
+	{
+		return;
+	}
+
+	if (CurrentHealth <= 0.0f)
+	{
+		DamageResult.ResultType = ETwoHeartsPlayerDamageResultType::IgnoredNoHealth;
+		DamageResult.FinalDamage = 0.0f;
+		DamageResult.bWasGuardRewritten = false;
+		DamageResult.HealthBeforeDamage = CurrentHealth;
+		DamageResult.HealthAfterDamage = CurrentHealth;
+		DamageResult.Detail = TEXT("Ignored confirmed hit because the minimum health pool had already reached zero.");
+		PushPlayerDamageResult(DamageResult);
+		return;
+	}
+
+	DamageResult.ResultType = ETwoHeartsPlayerDamageResultType::DamageApplied;
+	DamageResult.FinalDamage = DamageResult.BaseDamage;
+	DamageResult.bWasGuardRewritten = false;
+	DamageResult.HealthBeforeDamage = CurrentHealth;
+	CurrentHealth = FMath::Clamp(CurrentHealth - DamageResult.FinalDamage, 0.0f, MaxHealth);
+	DamageResult.HealthAfterDamage = CurrentHealth;
+	DamageResult.Detail = TEXT("Confirmed hostile hit produced a formal player damage result and reduced the minimum health pool.");
+	PushPlayerDamageResult(DamageResult);
+}
+
+void UTwoHeartsHostileAttackReceiverComponent::PushPlayerDamageResult(const FTwoHeartsPlayerDamageResult& DamageResult)
+{
+	bHasPlayerDamageResult = true;
+	LastPlayerDamageResult = DamageResult;
+
+	if (!PlayerDamageResultHistory.IsEmpty()
+		&& PlayerDamageResultHistory.Last().AttackInstanceName == DamageResult.AttackInstanceName
+		&& DamageResult.ResultType == ETwoHeartsPlayerDamageResultType::GuardBlocked)
+	{
+		PlayerDamageResultHistory.Last() = DamageResult;
+	}
+	else
+	{
+		PlayerDamageResultHistory.Add(DamageResult);
+	}
+
+	const int32 ExcessResults = PlayerDamageResultHistory.Num() - FMath::Max(1, MaxPlayerDamageResultHistory);
+	if (ExcessResults > 0)
+	{
+		PlayerDamageResultHistory.RemoveAt(0, ExcessResults);
+	}
+
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[PlayerDamageResult] receiver=%s attack=%s result=%s hit_result=%s base=%.2f final=%.2f guard_rewritten=%s time=%.2f health_before=%.2f health_after=%.2f detail=\"%s\""),
+		*GetNameSafe(GetOwner()),
+		*DamageResult.AttackInstanceName,
+		LexPlayerDamageResultTypeToString(DamageResult.ResultType),
+		LexPlayerHitResultTypeToString(DamageResult.SourceHitResultType),
+		DamageResult.BaseDamage,
+		DamageResult.FinalDamage,
+		DamageResult.bWasGuardRewritten ? TEXT("true") : TEXT("false"),
+		DamageResult.ResultTimestampSeconds,
+		DamageResult.HealthBeforeDamage,
+		DamageResult.HealthAfterDamage,
+		*DamageResult.Detail);
+
+	UpdateHitReactionStateFromDamageResult(DamageResult);
+	OnPlayerDamageResultUpdated.Broadcast(DamageResult);
+}
+
+void UTwoHeartsHostileAttackReceiverComponent::UpdateHitReactionStateFromDamageResult(const FTwoHeartsPlayerDamageResult& DamageResult)
+{
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Verbose,
+		TEXT("[HitReaction] receiver=%s stage=EvaluateDamageResult attack=%s damage_result=%s final_damage=%.2f active_before=%s"),
+		*GetNameSafe(GetOwner()),
+		*DamageResult.AttackInstanceName,
+		LexPlayerDamageResultTypeToString(DamageResult.ResultType),
+		DamageResult.FinalDamage,
+		CurrentHitReactionState.bIsActive ? TEXT("true") : TEXT("false"));
+
+	if (DamageResult.ResultType == ETwoHeartsPlayerDamageResultType::GuardBlocked)
+	{
+		if (CurrentHitReactionState.bIsActive
+			&& CurrentHitReactionState.SourceAttackInstanceName == DamageResult.AttackInstanceName)
+		{
+			UE_LOG(
+				LogtwoheartsCombatTest,
+				Display,
+				TEXT("[HitReaction] receiver=%s stage=GuardBlockedResolve attack=%s detail=\"Active hit reaction will be cleared because Guard blocked the same attack.\""),
+				*GetNameSafe(GetOwner()),
+				*DamageResult.AttackInstanceName);
+			FinishHitReaction(TEXT("GuardBlocked"));
+		}
+		return;
+	}
+
+	if (DamageResult.ResultType != ETwoHeartsPlayerDamageResultType::DamageApplied
+		|| DamageResult.FinalDamage <= 0.0f)
+	{
+		return;
+	}
+
+	EnterHitReaction(DamageResult);
+}
+
+void UTwoHeartsHostileAttackReceiverComponent::EnterHitReaction(const FTwoHeartsPlayerDamageResult& DamageResult)
+{
+	if (CurrentHitReactionState.bIsActive)
+	{
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Display,
+			TEXT("[HitReaction] receiver=%s stage=Supersede attack=%s previous_attack=%s"),
+			*GetNameSafe(GetOwner()),
+			*DamageResult.AttackInstanceName,
+			*CurrentHitReactionState.SourceAttackInstanceName);
+		FinishHitReaction(TEXT("SupersededByNewHit"));
+	}
+
+	if (!InterruptCurrentActionForHitReaction())
+	{
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Warning,
+			TEXT("[HitReaction] receiver=%s attack=%s detail=\"Failed to interrupt current action before entering hit reaction.\""),
+			*GetNameSafe(GetOwner()),
+			*DamageResult.AttackInstanceName);
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(HitReactionRecoveryTimerHandle);
+	}
+
+	UTwoHeartsCombatActionContextComponent* ActionContextComponent = nullptr;
+	if (const AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetOwner()))
+	{
+		ActionContextComponent = Character->GetCombatActionContextComponent();
+	}
+
+	const float StartTimeSeconds = GetWorldTimeSecondsSafe();
+	const float DurationSeconds = ResolveHitReactionDuration(DamageResult);
+	const FVector IncomingDirection = DamageResult.AttackMetadata.AttackDirection.GetSafeNormal2D();
+	const ETwoHeartsHitReactionDirectionType DirectionType = ResolveHitReactionDirectionType(IncomingDirection);
+
+	CurrentHitReactionState.bIsActive = true;
+	CurrentHitReactionState.HitReactionInstanceName = FString::Printf(TEXT("HitReaction.%s"), *DamageResult.AttackInstanceName);
+	CurrentHitReactionState.SourceActor = DamageResult.SourceActor;
+	CurrentHitReactionState.SourceAttackInstanceName = DamageResult.AttackInstanceName;
+	CurrentHitReactionState.HitReactionType = DamageResult.AttackMetadata.HitReactionType;
+	CurrentHitReactionState.DirectionType = DirectionType;
+	CurrentHitReactionState.IncomingDirection = IncomingDirection;
+	CurrentHitReactionState.StartTimeSeconds = StartTimeSeconds;
+	CurrentHitReactionState.ExpectedRecoveryTimeSeconds = StartTimeSeconds + DurationSeconds;
+	CurrentHitReactionState.LastEndReason = TEXT("None");
+	CurrentHitReactionState.Detail = TEXT("Formal hit reaction entered from a confirmed player damage result.");
+
+	if (ActionContextComponent)
+	{
+		ActionContextComponent->ClearBufferedInput(TEXT("ClearedByHitReaction"));
+
+		FTwoHeartsCombatActionRegistration Registration;
+		Registration.ActionType = ETwoHeartsCombatActionType::HitReaction;
+		Registration.InitialPhase = ETwoHeartsCombatPhase::Active;
+		Registration.ActionInstanceName = CurrentHitReactionState.HitReactionInstanceName;
+		ActionContextComponent->BeginAction(Registration, TEXT("DamageApplied"));
+	}
+
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[HitReaction] receiver=%s event=Enter attack=%s reaction=%s direction=%s duration=%.2f source=%s"),
+		*GetNameSafe(GetOwner()),
+		*CurrentHitReactionState.SourceAttackInstanceName,
+		LexHitReactionTypeToString(CurrentHitReactionState.HitReactionType),
+		LexHitReactionDirectionTypeToString(CurrentHitReactionState.DirectionType),
+		DurationSeconds,
+		*GetNameSafe(CurrentHitReactionState.SourceActor));
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			HitReactionRecoveryTimerHandle,
+			this,
+			&UTwoHeartsHostileAttackReceiverComponent::HandleHitReactionRecovery,
+			DurationSeconds,
+			false);
+	}
+
+	OnPlayerHitReactionStateUpdated.Broadcast(CurrentHitReactionState);
+}
+
+void UTwoHeartsHostileAttackReceiverComponent::FinishHitReaction(const FString& EndReason)
+{
+	if (!CurrentHitReactionState.bIsActive)
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(HitReactionRecoveryTimerHandle);
+	}
+
+	if (const AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetOwner()))
+	{
+		if (UTwoHeartsCombatActionContextComponent* ActionContextComponent = Character->GetCombatActionContextComponent())
+		{
+			const FTwoHeartsCombatActionContextSnapshot& CurrentContext = ActionContextComponent->GetCurrentContext();
+			if (CurrentContext.ActionType == ETwoHeartsCombatActionType::HitReaction)
+			{
+				ActionContextComponent->FinishAction(ETwoHeartsCombatActionEndReason::Completed, EndReason);
+			}
+		}
+	}
+
+	CurrentHitReactionState.bIsActive = false;
+	CurrentHitReactionState.LastEndTimeSeconds = GetWorldTimeSecondsSafe();
+	CurrentHitReactionState.LastEndReason = EndReason.IsEmpty() ? TEXT("None") : EndReason;
+	CurrentHitReactionState.Detail = EndReason == TEXT("GuardBlocked")
+		? TEXT("Hit reaction was cleared because Guard rewrote the incoming hit.")
+		: TEXT("Hit reaction recovered automatically.");
+
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[HitReaction] receiver=%s event=Exit attack=%s reason=%s end_time=%.2f"),
+		*GetNameSafe(GetOwner()),
+		*CurrentHitReactionState.SourceAttackInstanceName,
+		*CurrentHitReactionState.LastEndReason,
+		CurrentHitReactionState.LastEndTimeSeconds);
+
+	OnPlayerHitReactionStateUpdated.Broadcast(CurrentHitReactionState);
+}
+
+bool UTwoHeartsHostileAttackReceiverComponent::InterruptCurrentActionForHitReaction()
+{
+	const AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetOwner());
+	if (!Character)
+	{
+		UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[HitReaction] receiver=%s stage=InterruptAction owner_invalid=true"), *GetNameSafe(GetOwner()));
+		return false;
+	}
+
+	UTwoHeartsCombatActionContextComponent* ActionContextComponent = Character->GetCombatActionContextComponent();
+	if (!ActionContextComponent || !ActionContextComponent->HasActiveAction())
+	{
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Verbose,
+			TEXT("[HitReaction] receiver=%s stage=InterruptAction active_action=false detail=\"No active combat action needed interruption.\""),
+			*GetNameSafe(GetOwner()));
+		return true;
+	}
+
+	const FTwoHeartsCombatActionContextSnapshot& CurrentContext = ActionContextComponent->GetCurrentContext();
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[HitReaction] receiver=%s stage=InterruptAction active_type=%s phase=%s instance=%s"),
+		*GetNameSafe(GetOwner()),
+		*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(CurrentContext.ActionType)),
+		*StaticEnum<ETwoHeartsCombatPhase>()->GetNameStringByValue(static_cast<int64>(CurrentContext.ActionPhase)),
+		*CurrentContext.ActionInstanceName);
+
+	switch (CurrentContext.ActionType)
+	{
+	case ETwoHeartsCombatActionType::NormalAttack:
+	{
+		if (const IAbilitySystemInterface* AbilitySystemOwner = Cast<IAbilitySystemInterface>(Character))
+		{
+			if (UAbilitySystemComponent* AbilitySystemComponent = AbilitySystemOwner->GetAbilitySystemComponent())
+			{
+				for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
+				{
+					if (!AbilitySpec.IsActive())
+					{
+						continue;
+					}
+
+					if (UTwoHeartsGA_NormalAttackBase* ActiveNormalAttack = Cast<UTwoHeartsGA_NormalAttackBase>(AbilitySpec.GetPrimaryInstance()))
+					{
+						const bool bInterrupted = ActiveNormalAttack->TryInterruptByAction(ETwoHeartsCombatActionType::HitReaction, TEXT("InterruptedByHitReaction"));
+						UE_LOG(
+							LogtwoheartsCombatTest,
+							Display,
+							TEXT("[HitReaction] receiver=%s stage=InterruptNormalAttack success=%s attack_instance=%s"),
+							*GetNameSafe(GetOwner()),
+							bInterrupted ? TEXT("true") : TEXT("false"),
+							*CurrentContext.ActionInstanceName);
+						return bInterrupted;
+					}
+				}
+			}
+		}
+		UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[HitReaction] receiver=%s stage=InterruptNormalAttack success=false detail=\"No active normal attack ability instance was found.\""), *GetNameSafe(GetOwner()));
+		return false;
+	}
+
+	case ETwoHeartsCombatActionType::Dodge:
+	{
+		if (const IAbilitySystemInterface* AbilitySystemOwner = Cast<IAbilitySystemInterface>(Character))
+		{
+			if (UAbilitySystemComponent* AbilitySystemComponent = AbilitySystemOwner->GetAbilitySystemComponent())
+			{
+				for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
+				{
+					if (!AbilitySpec.IsActive())
+					{
+						continue;
+					}
+
+					if (UTwoHeartsGA_Dodge* ActiveDodge = Cast<UTwoHeartsGA_Dodge>(AbilitySpec.GetPrimaryInstance()))
+					{
+						const bool bInterrupted = ActiveDodge->TryInterruptByAction(ETwoHeartsCombatActionType::HitReaction, TEXT("InterruptedByHitReaction"));
+						UE_LOG(
+							LogtwoheartsCombatTest,
+							Display,
+							TEXT("[HitReaction] receiver=%s stage=InterruptDodge success=%s action_instance=%s"),
+							*GetNameSafe(GetOwner()),
+							bInterrupted ? TEXT("true") : TEXT("false"),
+							*CurrentContext.ActionInstanceName);
+						return bInterrupted;
+					}
+				}
+			}
+		}
+		UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[HitReaction] receiver=%s stage=InterruptDodge success=false detail=\"No active dodge ability instance was found.\""), *GetNameSafe(GetOwner()));
+		return false;
+	}
+
+	case ETwoHeartsCombatActionType::Guard:
+	{
+		if (const IAbilitySystemInterface* AbilitySystemOwner = Cast<IAbilitySystemInterface>(Character))
+		{
+			if (UAbilitySystemComponent* AbilitySystemComponent = AbilitySystemOwner->GetAbilitySystemComponent())
+			{
+				for (FGameplayAbilitySpec& AbilitySpec : AbilitySystemComponent->GetActivatableAbilities())
+				{
+					if (!AbilitySpec.IsActive())
+					{
+						continue;
+					}
+
+					if (UTwoHeartsGA_Guard* ActiveGuard = Cast<UTwoHeartsGA_Guard>(AbilitySpec.GetPrimaryInstance()))
+					{
+						const bool bInterrupted = ActiveGuard->TryInterruptByAction(ETwoHeartsCombatActionType::HitReaction, TEXT("InterruptedByHitReaction"));
+						UE_LOG(
+							LogtwoheartsCombatTest,
+							Display,
+							TEXT("[HitReaction] receiver=%s stage=InterruptGuard success=%s action_instance=%s"),
+							*GetNameSafe(GetOwner()),
+							bInterrupted ? TEXT("true") : TEXT("false"),
+							*CurrentContext.ActionInstanceName);
+						return bInterrupted;
+					}
+				}
+			}
+		}
+		UE_LOG(LogtwoheartsCombatTest, Warning, TEXT("[HitReaction] receiver=%s stage=InterruptGuard success=false detail=\"No active guard ability instance was found.\""), *GetNameSafe(GetOwner()));
+		return false;
+	}
+
+	case ETwoHeartsCombatActionType::HitReaction:
+		UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[HitReaction] receiver=%s stage=InterruptHitReaction detail=\"Already inside hit reaction.\""), *GetNameSafe(GetOwner()));
+		return true;
+
+	default:
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Display,
+			TEXT("[HitReaction] receiver=%s stage=InterruptFallback active_type=%s detail=\"Finishing unsupported active action directly through action context.\""),
+			*GetNameSafe(GetOwner()),
+			*StaticEnum<ETwoHeartsCombatActionType>()->GetNameStringByValue(static_cast<int64>(CurrentContext.ActionType)));
+		ActionContextComponent->FinishAction(ETwoHeartsCombatActionEndReason::Interrupted, TEXT("InterruptedByHitReaction"));
+		return true;
+	}
+}
+
+ETwoHeartsHitReactionDirectionType UTwoHeartsHostileAttackReceiverComponent::ResolveHitReactionDirectionType(const FVector& IncomingDirection) const
+{
+	const AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetOwner());
+	if (!Character)
+	{
+		return ETwoHeartsHitReactionDirectionType::None;
+	}
+
+	const FVector Forward = Character->GetActorForwardVector().GetSafeNormal2D();
+	const FVector Right = Character->GetActorRightVector().GetSafeNormal2D();
+	const FVector Direction = (-IncomingDirection).GetSafeNormal2D();
+	if (Direction.IsNearlyZero())
+	{
+		return ETwoHeartsHitReactionDirectionType::None;
+	}
+
+	const float ForwardDot = FVector::DotProduct(Forward, Direction);
+	const float RightDot = FVector::DotProduct(Right, Direction);
+	if (FMath::Abs(ForwardDot) >= FMath::Abs(RightDot))
+	{
+		return ForwardDot >= 0.0f ? ETwoHeartsHitReactionDirectionType::Front : ETwoHeartsHitReactionDirectionType::Back;
+	}
+
+	return RightDot >= 0.0f ? ETwoHeartsHitReactionDirectionType::Right : ETwoHeartsHitReactionDirectionType::Left;
+}
+
+float UTwoHeartsHostileAttackReceiverComponent::ResolveHitReactionDuration(const FTwoHeartsPlayerDamageResult& DamageResult) const
+{
+	switch (DamageResult.AttackMetadata.HitReactionType)
+	{
+	case ETwoHeartsHitReactionType::Heavy:
+		return HeavyHitReactionDurationSeconds;
+	case ETwoHeartsHitReactionType::GuardBreak:
+		return GuardBreakHitReactionDurationSeconds;
+	case ETwoHeartsHitReactionType::Light:
+	case ETwoHeartsHitReactionType::None:
+	default:
+		return LightHitReactionDurationSeconds;
+	}
+}
+
+float UTwoHeartsHostileAttackReceiverComponent::GetWorldTimeSecondsSafe() const
+{
+	const UWorld* World = GetWorld();
+	return World ? World->GetTimeSeconds() : 0.0f;
+}
+
+void UTwoHeartsHostileAttackReceiverComponent::HandleHitReactionRecovery()
+{
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[HitReaction] receiver=%s stage=RecoveryTimerFired attack=%s expected_recover_time=%.2f"),
+		*GetNameSafe(GetOwner()),
+		*CurrentHitReactionState.SourceAttackInstanceName,
+		CurrentHitReactionState.ExpectedRecoveryTimeSeconds);
+	FinishHitReaction(TEXT("AutoRecovered"));
 }

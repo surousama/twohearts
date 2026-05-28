@@ -45,6 +45,9 @@ struct FTwoHeartsAttackMetadata
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Attack Metadata")
 	ETwoHeartsHitReactionType HitReactionType = ETwoHeartsHitReactionType::Light;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Attack Metadata", meta=(ClampMin="0.0", UIMin="0.0"))
+	float BaseDamage = 10.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Attack Metadata")
 	FGameplayTagContainer DamageMechanicTags;
 

@@ -148,6 +148,7 @@ private:
 	bool bAdvanceStopInProgress = false;
 	bool bInterruptedByDodge = false;
 	bool bInterruptedByGuard = false;
+	bool bInterruptedByHitReaction = false;
 	ETwoHeartsCombatPhase CurrentCombatPhase = ETwoHeartsCombatPhase::None;
 	TObjectPtr<UAbilityTask_PlayMontageAndWait> ActiveMontageTask;
 	TObjectPtr<UAnimInstance> BoundAnimInstance;
