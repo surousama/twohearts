@@ -1,0 +1,10 @@
+{"file": ".trellis/spec/combat/index.md", "reason": "检查时需要确认实现没有偏离第二章战斗上游框架。"}
+{"file": ".trellis/spec/combat/system-framework.md", "reason": "检查攻击元数据是否真正服务受击 / 普攻 / 闪避 / 格挡统一语义。"}
+{"file": ".trellis/spec/implementation/index.md", "reason": "检查实现是否符合 UE5 + GAS + C++ 路线和文档回写要求。"}
+{"file": ".trellis/spec/implementation/ue5-gas-cpp-guidelines.md", "reason": "检查正式承载位置是否仍在 Combat 结构与 Ability / 组件，而非 Character 临时逻辑。"}
+{"file": ".trellis/spec/implementation/blueprint-boundary.md", "reason": "检查蓝图与 C++ 真相源是否清晰，没有把核心规则留在表现层。"}
+{"file": ".trellis/spec/implementation/document-maintenance.md", "reason": "检查 task 文档是否同步回写了实际完成内容、限制与验收结论。"}
+{"file": ".trellis/spec/roles/senior-programmer.md", "reason": "检查实现是否严格遵守上游边界，没有擅自扩大成完整数值或敌人系统。"}
+{"file": ".trellis/spec/testing/index.md", "reason": "检查阶段需要保留白盒观察口径与测试文档一致性。"}
+{"file": ".trellis/spec/testing/whitebox-testing-guidelines.md", "reason": "检查 HUD / 日志 / 白盒验证记录是否足够支撑后续 Guard 与伤害联调。"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "检查共享攻击元数据在 probe、receiver、ability、HUD 之间是否没有丢失或重复实现。"}

@@ -1,0 +1,9 @@
+{"file": ".trellis/spec/combat/index.md", "reason": "战斗系统总入口，确保攻击元数据不会偏离第二章基础战斗框架。"}
+{"file": ".trellis/spec/combat/system-framework.md", "reason": "本 task 直接服务受击、普通攻击、闪避、格挡之间的统一攻击语义边界。"}
+{"file": ".trellis/spec/implementation/index.md", "reason": "实现阶段入口，明确 UE5 + GAS + C++ 与文档回写约束。"}
+{"file": ".trellis/spec/implementation/ue5-gas-cpp-guidelines.md", "reason": "正式承载仍应放在 Ability / Combat 组件 / C++ 结构，不回退到 Character 临时状态机。"}
+{"file": ".trellis/spec/implementation/blueprint-boundary.md", "reason": "攻击元数据以 C++ 为真相源，蓝图只负责表现和配置补充。"}
+{"file": ".trellis/spec/implementation/document-maintenance.md", "reason": "实现完成后需要把代码落点、已知限制和验收结论回写 task 文档。"}
+{"file": ".trellis/spec/roles/senior-programmer.md", "reason": "下游资深程序需严格按已确认方案施工，不擅自扩大范围。"}
+{"file": ".trellis/spec/guides/stage-order-thinking-guide.md", "reason": "当前 task 是伤害 / 受击 / Guard 二期的前置，不能被后置功能抢顺序。"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "本 task 横跨 probe、receiver、ability、tags、HUD，需先看清共享数据如何跨层流动。"}
