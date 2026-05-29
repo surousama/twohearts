@@ -410,7 +410,7 @@ private:
 	void EnterHitReaction(const FTwoHeartsPlayerDamageResult& DamageResult);
 	void FinishHitReaction(const FString& EndReason);
 	bool InterruptCurrentActionForHitReaction();
-	ETwoHeartsHitReactionDirectionType ResolveHitReactionDirectionType(const FVector& IncomingDirection) const;
+	ETwoHeartsHitReactionDirectionType ResolveHitReactionDirectionType(const FTwoHeartsPlayerDamageResult& DamageResult, FVector& OutResolvedSourceDirection) const;
 	float ResolveHitReactionDuration(const FTwoHeartsPlayerDamageResult& DamageResult) const;
 	float GetWorldTimeSecondsSafe() const;
 

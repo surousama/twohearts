@@ -1136,8 +1136,8 @@ void UTwoHeartsHostileAttackReceiverComponent::EnterHitReaction(const FTwoHearts
 	UTwoHeartsCombatActionContextComponent* ActionContextComponent = Character ? Character->GetCombatActionContextComponent() : nullptr;
 
 	const float StartTimeSeconds = GetWorldTimeSecondsSafe();
-	const FVector IncomingDirection = DamageResult.AttackMetadata.AttackDirection.GetSafeNormal2D();
-	const ETwoHeartsHitReactionDirectionType DirectionType = ResolveHitReactionDirectionType(IncomingDirection);
+	FVector ResolvedSourceDirection = FVector::ZeroVector;
+	const ETwoHeartsHitReactionDirectionType DirectionType = ResolveHitReactionDirectionType(DamageResult, ResolvedSourceDirection);
 	const ETwoHeartsHitReactionType HitReactionType = DamageResult.AttackMetadata.HitReactionType;
 	const float BaseDurationSeconds = ResolveHitReactionDuration(DamageResult);
 	const float DurationSeconds = Character
@@ -1152,7 +1152,7 @@ void UTwoHeartsHostileAttackReceiverComponent::EnterHitReaction(const FTwoHearts
 	CurrentHitReactionState.SourceAttackInstanceName = DamageResult.AttackInstanceName;
 	CurrentHitReactionState.HitReactionType = HitReactionType;
 	CurrentHitReactionState.DirectionType = DirectionType;
-	CurrentHitReactionState.IncomingDirection = IncomingDirection;
+	CurrentHitReactionState.IncomingDirection = ResolvedSourceDirection;
 	CurrentHitReactionState.StartTimeSeconds = StartTimeSeconds;
 	CurrentHitReactionState.ExpectedRecoveryTimeSeconds = StartTimeSeconds + DurationSeconds;
 	CurrentHitReactionState.LastEndReason = TEXT("None");
@@ -1394,8 +1394,12 @@ bool UTwoHeartsHostileAttackReceiverComponent::InterruptCurrentActionForHitReact
 	}
 }
 
-ETwoHeartsHitReactionDirectionType UTwoHeartsHostileAttackReceiverComponent::ResolveHitReactionDirectionType(const FVector& IncomingDirection) const
+ETwoHeartsHitReactionDirectionType UTwoHeartsHostileAttackReceiverComponent::ResolveHitReactionDirectionType(
+	const FTwoHeartsPlayerDamageResult& DamageResult,
+	FVector& OutResolvedSourceDirection) const
 {
+	OutResolvedSourceDirection = FVector::ZeroVector;
+
 	const AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetOwner());
 	if (!Character)
 	{
@@ -1404,14 +1408,31 @@ ETwoHeartsHitReactionDirectionType UTwoHeartsHostileAttackReceiverComponent::Res
 
 	const FVector Forward = Character->GetActorForwardVector().GetSafeNormal2D();
 	const FVector Right = Character->GetActorRightVector().GetSafeNormal2D();
-	const FVector Direction = (-IncomingDirection).GetSafeNormal2D();
-	if (Direction.IsNearlyZero())
+
+	FVector SourceDirection = FVector::ZeroVector;
+	if (!DamageResult.AttackMetadata.SourceLocation.IsNearlyZero())
+	{
+		SourceDirection = (DamageResult.AttackMetadata.SourceLocation - Character->GetActorLocation()).GetSafeNormal2D();
+	}
+	else if (DamageResult.SourceActor)
+	{
+		SourceDirection = (DamageResult.SourceActor->GetActorLocation() - Character->GetActorLocation()).GetSafeNormal2D();
+	}
+	else
+	{
+		// Fallback for legacy callers that only filled attack facing.
+		SourceDirection = (-DamageResult.AttackMetadata.AttackDirection).GetSafeNormal2D();
+	}
+
+	if (SourceDirection.IsNearlyZero())
 	{
 		return ETwoHeartsHitReactionDirectionType::None;
 	}
 
-	const float ForwardDot = FVector::DotProduct(Forward, Direction);
-	const float RightDot = FVector::DotProduct(Right, Direction);
+	OutResolvedSourceDirection = SourceDirection;
+
+	const float ForwardDot = FVector::DotProduct(Forward, SourceDirection);
+	const float RightDot = FVector::DotProduct(Right, SourceDirection);
 	if (FMath::Abs(ForwardDot) >= FMath::Abs(RightDot))
 	{
 		return ForwardDot >= 0.0f ? ETwoHeartsHitReactionDirectionType::Front : ETwoHeartsHitReactionDirectionType::Back;
