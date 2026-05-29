@@ -71,6 +71,36 @@ namespace
 		}
 	}
 
+	const TCHAR* LexProbeHostileHitResultTypeToString(const ETwoHeartsHostileHitResultType ResultType)
+	{
+		switch (ResultType)
+		{
+		case ETwoHeartsHostileHitResultType::HitConfirmed:
+			return TEXT("HitConfirmed");
+		case ETwoHeartsHostileHitResultType::SignalInvalid:
+			return TEXT("SignalInvalid");
+		case ETwoHeartsHostileHitResultType::IgnoredNoHealth:
+			return TEXT("IgnoredNoHealth");
+		case ETwoHeartsHostileHitResultType::None:
+		default:
+			return TEXT("None");
+		}
+	}
+
+	const TCHAR* LexProbeHostileDamageResultTypeToString(const ETwoHeartsHostileDamageResultType ResultType)
+	{
+		switch (ResultType)
+		{
+		case ETwoHeartsHostileDamageResultType::DamageApplied:
+			return TEXT("DamageApplied");
+		case ETwoHeartsHostileDamageResultType::IgnoredNoHealth:
+			return TEXT("IgnoredNoHealth");
+		case ETwoHeartsHostileDamageResultType::None:
+		default:
+			return TEXT("None");
+		}
+	}
+
 	FString BuildProbeAttackMetadataDebugString(const FTwoHeartsAttackMetadata& AttackMetadata)
 	{
 		const FString DamageMechanicTags = AttackMetadata.DamageMechanicTags.IsEmpty()
@@ -161,6 +191,23 @@ void ATwoHeartsHostileAttackProbeCharacter::BeginPlay()
 		TriggerSphereComponent->OnComponentEndOverlap.AddDynamic(this, &ATwoHeartsHostileAttackProbeCharacter::HandleTriggerSphereEndOverlap);
 	}
 
+	if (PlayerAttackReceiverComponent)
+	{
+		PlayerAttackReceiverComponent->OnPlayerAttackSignalReceived.AddDynamic(this, &ATwoHeartsHostileAttackProbeCharacter::HandlePlayerAttackSignalReceived);
+		PlayerAttackReceiverComponent->OnHostileHitResultUpdated.AddDynamic(this, &ATwoHeartsHostileAttackProbeCharacter::HandleHostileHitResultUpdated);
+		PlayerAttackReceiverComponent->OnHostileDamageResultUpdated.AddDynamic(this, &ATwoHeartsHostileAttackProbeCharacter::HandleHostileDamageResultUpdated);
+		PlayerAttackReceiverComponent->OnZeroHealthReached.AddDynamic(this, &ATwoHeartsHostileAttackProbeCharacter::HandleZeroHealthReached);
+
+		UE_LOG(
+			LogtwoheartsCombatTest,
+			Display,
+			TEXT("[HostileAttackProbe] actor=%s event=HealthInitialized current=%.2f max=%.2f defeated=%s"),
+			*GetNameSafe(this),
+			PlayerAttackReceiverComponent->GetCurrentHealth(),
+			PlayerAttackReceiverComponent->GetMaxHealth(),
+			PlayerAttackReceiverComponent->IsDefeated() ? TEXT("true") : TEXT("false"));
+	}
+
 	UE_LOG(
 		LogtwoheartsCombatTest,
 		Display,
@@ -185,6 +232,12 @@ void ATwoHeartsHostileAttackProbeCharacter::OnConstruction(const FTransform& Tra
 
 bool ATwoHeartsHostileAttackProbeCharacter::TriggerProbeAttack()
 {
+	if (IsDefeated())
+	{
+		UE_LOG(LogtwoheartsCombatTest, Display, TEXT("[HostileAttackProbe] actor=%s event=TriggerIgnored reason=health_depleted"), *GetNameSafe(this));
+		return false;
+	}
+
 	if (bAttackActive)
 	{
 		UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[HostileAttackProbe] actor=%s event=TriggerIgnored reason=attack_already_active attack=%s"), *GetNameSafe(this), *CurrentAttackInstanceName);
@@ -225,6 +278,94 @@ void ATwoHeartsHostileAttackProbeCharacter::ResetProbeToIdle()
 	UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[HostileAttackProbe] actor=%s event=ResetToIdle"), *GetNameSafe(this));
 }
 
+void ATwoHeartsHostileAttackProbeCharacter::HandlePlayerAttackSignalReceived(const FTwoHeartsPlayerAttackSignal& Signal)
+{
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[HostileAttackProbe] actor=%s event=PlayerAttackSignalReceived attack=%s source=%s base_damage=%.2f hit_window=%s contact=%s"),
+		*GetNameSafe(this),
+		*Signal.AttackInstanceName,
+		*GetNameSafe(Signal.SourceActor),
+		Signal.AttackMetadata.BaseDamage,
+		Signal.bIsHitWindowActive ? TEXT("true") : TEXT("false"),
+		Signal.bHasContact ? TEXT("true") : TEXT("false"));
+}
+
+void ATwoHeartsHostileAttackProbeCharacter::HandleHostileHitResultUpdated(const FTwoHeartsHostileHitResult& HitResult)
+{
+	const float RemainingHealth = PlayerAttackReceiverComponent ? PlayerAttackReceiverComponent->GetCurrentHealth() : 0.0f;
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[HostileAttackProbe] actor=%s event=PlayerHitResolved result=%s attack=%s remaining_health=%.2f detail=\"%s\""),
+		*GetNameSafe(this),
+		LexProbeHostileHitResultTypeToString(HitResult.ResultType),
+		*HitResult.AttackInstanceName,
+		RemainingHealth,
+		*HitResult.Detail);
+}
+
+void ATwoHeartsHostileAttackProbeCharacter::HandleHostileDamageResultUpdated(const FTwoHeartsHostileDamageResult& DamageResult)
+{
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[HostileAttackProbe] actor=%s event=PlayerDamageResolved result=%s attack=%s damage=%.2f health=%.2f->%.2f zero=%s"),
+		*GetNameSafe(this),
+		LexProbeHostileDamageResultTypeToString(DamageResult.ResultType),
+		*DamageResult.AttackInstanceName,
+		DamageResult.AppliedDamage,
+		DamageResult.PreviousHealth,
+		DamageResult.CurrentHealth,
+		DamageResult.bReachedZeroHealth ? TEXT("true") : TEXT("false"));
+
+	if (bEnableScreenDebugOutput && GEngine)
+	{
+		const FString Label = DamageResult.ResultType == ETwoHeartsHostileDamageResultType::IgnoredNoHealth
+			? FString::Printf(TEXT("[Probe Hurt] ignored at 0 hp by %s"), *DamageResult.AttackInstanceName)
+			: FString::Printf(TEXT("[Probe Hurt] %s -%.0f => %.0f"), *DamageResult.AttackInstanceName, DamageResult.AppliedDamage, DamageResult.CurrentHealth);
+		const FColor Color = DamageResult.ResultType == ETwoHeartsHostileDamageResultType::IgnoredNoHealth ? FColor::Silver : FColor::Red;
+		GEngine->AddOnScreenDebugMessage(static_cast<uint64>(GetUniqueID()) + 17ULL, 1.5f, Color, Label);
+	}
+}
+
+void ATwoHeartsHostileAttackProbeCharacter::HandleZeroHealthReached(const FTwoHeartsHostileDamageResult& DamageResult)
+{
+	UE_LOG(
+		LogtwoheartsCombatTest,
+		Display,
+		TEXT("[HostileAttackProbe] actor=%s event=ZeroHealthShutdown attack=%s remaining_health=%.2f will_ignore_new_hits=true"),
+		*GetNameSafe(this),
+		*DamageResult.AttackInstanceName,
+		DamageResult.CurrentHealth);
+
+	if (bEnableScreenDebugOutput && GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(
+			static_cast<uint64>(GetUniqueID()) + 18ULL,
+			2.5f,
+			FColor::Red,
+			FString::Printf(TEXT("[Probe] defeated by %s"), *DamageResult.AttackInstanceName));
+	}
+
+	ResetProbeToIdle();
+	CurrentTargetActor = nullptr;
+	AttackTargetActor = nullptr;
+
+	if (TriggerSphereComponent)
+	{
+		TriggerSphereComponent->SetGenerateOverlapEvents(false);
+		TriggerSphereComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	if (HitSphereComponent)
+	{
+		HitSphereComponent->SetGenerateOverlapEvents(false);
+		HitSphereComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+}
+
 void ATwoHeartsHostileAttackProbeCharacter::HandleTriggerSphereBeginOverlap(
 	UPrimitiveComponent* OverlappedComponent,
 	AActor* OtherActor,
@@ -235,6 +376,12 @@ void ATwoHeartsHostileAttackProbeCharacter::HandleTriggerSphereBeginOverlap(
 {
 	if (!OtherActor || OtherActor == this)
 	{
+		return;
+	}
+
+	if (IsDefeated())
+	{
+		UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[HostileAttackProbe] actor=%s event=TriggerEnterIgnored other=%s reason=health_depleted"), *GetNameSafe(this), *GetNameSafe(OtherActor));
 		return;
 	}
 
@@ -474,6 +621,12 @@ void ATwoHeartsHostileAttackProbeCharacter::FinishAttack()
 
 void ATwoHeartsHostileAttackProbeCharacter::HandleRepeatAttackTimerElapsed()
 {
+	if (IsDefeated())
+	{
+		UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[HostileAttackProbe] actor=%s event=LoopTriggerIgnored reason=health_depleted"), *GetNameSafe(this));
+		return;
+	}
+
 	UE_LOG(LogtwoheartsCombatTest, Verbose, TEXT("[HostileAttackProbe] actor=%s event=LoopTriggerElapsed target=%s"), *GetNameSafe(this), *GetNameSafe(CurrentTargetActor));
 	TriggerProbeAttack();
 }
@@ -625,4 +778,9 @@ bool ATwoHeartsHostileAttackProbeCharacter::IsActorInsideTriggerSphere(const AAc
 	return Actor
 		&& TriggerSphereComponent
 		&& FVector::DistSquared(Actor->GetActorLocation(), TriggerSphereComponent->GetComponentLocation()) <= FMath::Square(TriggerRadius);
+}
+
+bool ATwoHeartsHostileAttackProbeCharacter::IsDefeated() const
+{
+	return PlayerAttackReceiverComponent && PlayerAttackReceiverComponent->IsDefeated();
 }

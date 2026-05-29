@@ -1,1 +1,5 @@
 {"_example": "请填写 {\"file\": \"<path>\", \"reason\": \"<why>\"}。 这里只放 spec 或 research 文件，不要放代码路径。 可运行 `python .trellis/scripts/get_context.py --mode packages` 查看可用 spec。 真正条目补齐后，可删除这一行。"}
+{"file": ".trellis/spec/implementation/blueprint-boundary.md", "reason": "C++负责核心状态与调试口径"}
+{"file": ".trellis/spec/implementation/ue5-gas-cpp-guidelines.md", "reason": "正式承载位置与禁止回退到Character临时状态"}
+{"file": ".trellis/spec/combat/current-stage.md", "reason": "当前第二章顺序要求与过渡边界"}
+{"file": ".trellis/spec/combat/system-framework.md", "reason": "战斗公共语义层与模块边界"}

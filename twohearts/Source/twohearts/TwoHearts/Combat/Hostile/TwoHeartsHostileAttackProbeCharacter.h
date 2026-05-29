@@ -36,6 +36,18 @@ public:
 
 protected:
 	UFUNCTION()
+	void HandlePlayerAttackSignalReceived(const FTwoHeartsPlayerAttackSignal& Signal);
+
+	UFUNCTION()
+	void HandleHostileHitResultUpdated(const FTwoHeartsHostileHitResult& HitResult);
+
+	UFUNCTION()
+	void HandleHostileDamageResultUpdated(const FTwoHeartsHostileDamageResult& DamageResult);
+
+	UFUNCTION()
+	void HandleZeroHealthReached(const FTwoHeartsHostileDamageResult& DamageResult);
+
+	UFUNCTION()
 	void HandleTriggerSphereBeginOverlap(
 		UPrimitiveComponent* OverlappedComponent,
 		AActor* OtherActor,
@@ -68,6 +80,7 @@ private:
 	FTwoHeartsHostileAttackSignal BuildSignal(ETwoHeartsHostileAttackSignalType SignalType, AActor* TargetActor, const FString& Detail, bool bHasContact) const;
 	void DrawDebugProbeState(const FColor& Color, const FString& Label) const;
 	bool IsActorInsideTriggerSphere(const AActor* Actor) const;
+	bool IsDefeated() const;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UTwoHeartsCombatActionContextComponent> CombatActionContextComponent;
