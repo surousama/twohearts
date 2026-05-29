@@ -893,6 +893,10 @@ bool AtwoheartsCharacter::ShouldEmitNormalAttackDebugLog(const TCHAR* EventName,
 		EventNameString == TEXT("PlaySegment") ||
 		EventNameString == TEXT("MontageNotifyBegin") ||
 		EventNameString == TEXT("MontageNotify") ||
+		EventNameString == TEXT("HitWindowOpened") ||
+		EventNameString == TEXT("HitWindowClosed") ||
+		EventNameString == TEXT("HitDelivered") ||
+		EventNameString == TEXT("HitDuplicateIgnored") ||
 		EventNameString == TEXT("AdvanceWindowOpened") ||
 		EventNameString == TEXT("AdvanceSegmentReady") ||
 		EventNameString == TEXT("AdvanceSegmentAttempt") ||
@@ -918,6 +922,10 @@ bool AtwoheartsCharacter::ShouldDisplayNormalAttackDebugEvent(const FNormalAttac
 		Event.EventName == TEXT("PlaySegment") ||
 		Event.EventName == TEXT("MontageNotifyBegin") ||
 		Event.EventName == TEXT("MontageNotify") ||
+		Event.EventName == TEXT("HitWindowOpened") ||
+		Event.EventName == TEXT("HitWindowClosed") ||
+		Event.EventName == TEXT("HitDelivered") ||
+		Event.EventName == TEXT("HitDuplicateIgnored") ||
 		Event.EventName == TEXT("AdvanceWindowOpened") ||
 		Event.EventName == TEXT("AdvanceSegmentReady") ||
 		Event.EventName == TEXT("AdvanceSegmentAttempt") ||

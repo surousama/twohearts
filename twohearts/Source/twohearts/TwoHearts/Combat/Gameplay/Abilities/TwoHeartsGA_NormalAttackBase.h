@@ -13,8 +13,10 @@ class AtwoheartsCharacter;
 class UAbilityTask_PlayMontageAndWait;
 class UAnimInstance;
 class UTwoHeartsCombatActionContextComponent;
+class UTwoHeartsPlayerAttackReceiverComponent;
 enum class ETwoHeartsCombatActionType : uint8;
 struct FBranchingPointNotifyPayload;
+struct FTwoHeartsPlayerAttackSignal;
 
 UCLASS(Abstract)
 class UTwoHeartsGA_NormalAttackBase : public UTwoHeartsGameplayAbility
@@ -75,6 +77,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Attack Metadata")
 	FTwoHeartsAttackMetadata AttackMetadataTemplate;
 
+	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Hit Delivery", meta=(ClampMin="0.0", UIMin="0.0"))
+	float HitDeliveryForwardDistance = 140.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Hit Delivery", meta=(ClampMin="1.0", UIMin="1.0"))
+	float HitDeliveryRadius = 85.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Hit Delivery")
+	FVector HitDeliveryLocalOffset = FVector(0.0f, 0.0f, 70.0f);
+
+	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Hit Delivery", meta=(ClampMin="0.01", UIMin="0.01"))
+	float HitDeliveryScanIntervalSeconds = 0.05f;
+
 	UPROPERTY(EditDefaultsOnly, Category="Normal Attack|Phase", meta=(ClampMin="0.0", ClampMax="1.0"))
 
 	float ActivePhaseFallbackNormalizedTime = 0.20f;
@@ -116,6 +130,9 @@ private:
 	UFUNCTION()
 	void HandleDeferredNextSegmentActivation();
 
+	UFUNCTION()
+	void HandleHitDeliveryScan();
+
 	bool CanQueueNextSegment() const;
 	bool StartSegmentPlayback();
 	void OpenNextSegmentAdvanceWindow(const FString& Reason, bool bCanConsumeLateBufferedInput);
@@ -140,6 +157,11 @@ private:
 	void ClearPhaseFallbackTimers();
 	void SchedulePhaseFallbacks(float SectionLength);
 	bool IsLogicEndedPhase() const;
+	void InitializeAttackInstance();
+	void OpenHitDeliveryWindow(const FString& Reason);
+	void CloseHitDeliveryWindow(const FString& Reason);
+	void ScanHitDeliveryTargets(const FString& Reason);
+	FTwoHeartsPlayerAttackSignal BuildPlayerAttackSignal(AActor* TargetActor, const FString& Detail, bool bWasDuplicateTarget) const;
 
 	bool bHasQueuedNextSegment = false;
 	bool bHasFinishedSegment = false;
@@ -161,5 +183,9 @@ private:
 	int32 PendingNextSegmentSourceSegment = 0;
 	bool bHasPendingLateBufferedInputRestore = false;
 	bool bHasOpenedNextSegmentAdvanceWindow = false;
+	bool bHitDeliveryWindowActive = false;
+	FString CurrentAttackInstanceName = TEXT("None");
 	FTwoHeartsBufferedCombatInput PendingLateBufferedInputToRestore;
+	FTimerHandle HitDeliveryScanTimerHandle;
+	TSet<TWeakObjectPtr<AActor>> DeliveredTargetsThisAttack;
 };

@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "TwoHearts/Combat/TwoHeartsAttackMetadata.h"
 #include "TwoHearts/Combat/Hostile/TwoHeartsHostileAttackReceiverComponent.h"
+#include "TwoHearts/Combat/Hostile/TwoHeartsPlayerAttackReceiverComponent.h"
 #include "TwoHeartsHostileAttackProbeCharacter.generated.h"
 
 
@@ -76,6 +77,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<USphereComponent> HitSphereComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UTwoHeartsPlayerAttackReceiverComponent> PlayerAttackReceiverComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hostile Attack Probe|Animation", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UAnimationAsset> IdleAnimation = nullptr;

@@ -9,6 +9,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
 #include "TwoHearts/Combat/Hostile/TwoHeartsHostileAttackReceiverComponent.h"
+#include "TwoHearts/Combat/Hostile/TwoHeartsPlayerAttackReceiverComponent.h"
 #include "TwoHearts/Combat/Gameplay/Tags/TwoHeartsGameplayTags.h"
 #include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -119,6 +120,7 @@ ATwoHeartsHostileAttackProbeCharacter::ATwoHeartsHostileAttackProbeCharacter()
 	HitSphereComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
 	HitSphereComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	HitSphereComponent->SetGenerateOverlapEvents(true);
+	PlayerAttackReceiverComponent = CreateDefaultSubobject<UTwoHeartsPlayerAttackReceiverComponent>(TEXT("PlayerAttackReceiverComponent"));
 
 	GetMesh()->SetRelativeLocation(FVector(0.0f, 0.0f, -96.0f));
 	GetMesh()->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));

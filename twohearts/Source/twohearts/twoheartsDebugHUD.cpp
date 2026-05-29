@@ -14,7 +14,7 @@
 
 namespace
 {
-	const TCHAR* LexHitReactionTypeToString(const ETwoHeartsHitReactionType HitReactionType)
+	const TCHAR* LexDebugHUDHitReactionTypeToString(const ETwoHeartsHitReactionType HitReactionType)
 	{
 		switch (HitReactionType)
 		{
@@ -30,7 +30,7 @@ namespace
 		}
 	}
 
-	const TCHAR* LexAttackTimingPhaseToString(const ETwoHeartsAttackTimingPhase TimingPhase)
+	const TCHAR* LexDebugHUDAttackTimingPhaseToString(const ETwoHeartsAttackTimingPhase TimingPhase)
 	{
 		switch (TimingPhase)
 		{
@@ -48,7 +48,7 @@ namespace
 		}
 	}
 
-	const TCHAR* LexGuardDisplacementResultToString(const ETwoHeartsGuardDisplacementResult ResultType)
+	const TCHAR* LexDebugHUDGuardDisplacementResultToString(const ETwoHeartsGuardDisplacementResult ResultType)
 	{
 		switch (ResultType)
 		{
@@ -64,7 +64,7 @@ namespace
 		}
 	}
 
-	const TCHAR* LexGuardDamageResultToString(const ETwoHeartsGuardDamageResult ResultType)
+	const TCHAR* LexDebugHUDGuardDamageResultToString(const ETwoHeartsGuardDamageResult ResultType)
 	{
 		switch (ResultType)
 		{
@@ -80,7 +80,7 @@ namespace
 		}
 	}
 
-	const TCHAR* LexHitReactionDirectionTypeToString(const ETwoHeartsHitReactionDirectionType DirectionType)
+	const TCHAR* LexDebugHUDHitReactionDirectionTypeToString(const ETwoHeartsHitReactionDirectionType DirectionType)
 	{
 		switch (DirectionType)
 		{
@@ -427,7 +427,7 @@ void ATwoheartsDebugHUD::DrawHUD()
 			DrawDebugLine(
 				FString::Printf(
 					TEXT("reaction=%s   base_damage=%.2f   guard=%s   dist=%.0f   angle=%.0f"),
-					LexHitReactionTypeToString(LastSignal.AttackMetadata.HitReactionType),
+					LexDebugHUDHitReactionTypeToString(LastSignal.AttackMetadata.HitReactionType),
 					LastSignal.AttackMetadata.BaseDamage,
 					LastSignal.AttackMetadata.bCanBeGuarded ? TEXT("YES") : TEXT("NO"),
 					LastSignal.AttackMetadata.GuardMaxDistance,
@@ -450,7 +450,7 @@ void ATwoheartsDebugHUD::DrawHUD()
 			DrawDebugLine(
 				FString::Printf(
 					TEXT("timing=%s / %s"),
-					LexAttackTimingPhaseToString(LastSignal.AttackMetadata.TimingPhase),
+					LexDebugHUDAttackTimingPhaseToString(LastSignal.AttackMetadata.TimingPhase),
 					*SignalTimingWindowName),
 				PanelX + 12.0f,
 				CurrentY,
@@ -535,7 +535,7 @@ void ATwoheartsDebugHUD::DrawHUD()
 			DrawDebugLine(
 				FString::Printf(
 					TEXT("reaction=%s   base_damage=%.2f   guard=%s   dist=%.0f   angle=%.0f"),
-					LexHitReactionTypeToString(LastHitResult.AttackMetadata.HitReactionType),
+					LexDebugHUDHitReactionTypeToString(LastHitResult.AttackMetadata.HitReactionType),
 					LastHitResult.AttackMetadata.BaseDamage,
 					LastHitResult.AttackMetadata.bCanBeGuarded ? TEXT("YES") : TEXT("NO"),
 					LastHitResult.AttackMetadata.GuardMaxDistance,
@@ -558,7 +558,7 @@ void ATwoheartsDebugHUD::DrawHUD()
 			DrawDebugLine(
 				FString::Printf(
 					TEXT("timing=%s / %s"),
-					LexAttackTimingPhaseToString(LastHitResult.AttackMetadata.TimingPhase),
+					LexDebugHUDAttackTimingPhaseToString(LastHitResult.AttackMetadata.TimingPhase),
 					*HitResultTimingWindowName),
 				PanelX + 12.0f,
 				CurrentY,
@@ -655,8 +655,8 @@ void ATwoheartsDebugHUD::DrawHUD()
 					FString::Printf(
 						TEXT("attack=%s   displacement=%s   damage=%s"),
 						*LastGuardOutcome.AttackInstanceName,
-						LexGuardDisplacementResultToString(LastGuardOutcome.DisplacementResult),
-						LexGuardDamageResultToString(LastGuardOutcome.DamageResult)),
+						LexDebugHUDGuardDisplacementResultToString(LastGuardOutcome.DisplacementResult),
+						LexDebugHUDGuardDamageResultToString(LastGuardOutcome.DamageResult)),
 					PanelX + 12.0f,
 					CurrentY,
 					TextColor);
@@ -708,8 +708,8 @@ void ATwoheartsDebugHUD::DrawHUD()
 					TEXT("active=%s   attack=%s   type=%s   direction=%s"),
 					HitReactionState.bIsActive ? TEXT("YES") : TEXT("NO"),
 					*HitReactionState.SourceAttackInstanceName,
-					LexHitReactionTypeToString(HitReactionState.HitReactionType),
-					LexHitReactionDirectionTypeToString(HitReactionState.DirectionType)),
+					LexDebugHUDHitReactionTypeToString(HitReactionState.HitReactionType),
+					LexDebugHUDHitReactionDirectionTypeToString(HitReactionState.DirectionType)),
 				PanelX + 12.0f,
 				CurrentY,
 				HitReactionColor);

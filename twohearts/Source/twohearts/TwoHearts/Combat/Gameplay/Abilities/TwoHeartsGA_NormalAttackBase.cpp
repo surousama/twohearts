@@ -6,9 +6,13 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimNotifies/AnimNotify.h"
+#include "Engine/OverlapResult.h"
+#include "Engine/World.h"
 #include "GameplayTagContainer.h"
+#include "WorldCollision.h"
 #include "TimerManager.h"
 #include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
+#include "TwoHearts/Combat/Hostile/TwoHeartsPlayerAttackReceiverComponent.h"
 #include "TwoHearts/Combat/Gameplay/Tags/TwoHeartsGameplayTags.h"
 #include "twohearts.h"
 #include "twoheartsCharacter.h"
@@ -53,6 +57,27 @@ FString BuildMontageSourceAnimSnapshot(const UAnimMontage* Montage, float Positi
 	}
 
 	return FString::Printf(TEXT("SourceAnim=[%s]"), *FString::Join(ActiveSegments, TEXT(" | ")));
+}
+
+ETwoHeartsAttackTimingPhase ResolveAttackTimingPhaseFromCombatPhase(const ETwoHeartsCombatPhase CombatPhase, const bool bHitDeliveryWindowActive)
+{
+	if (bHitDeliveryWindowActive || CombatPhase == ETwoHeartsCombatPhase::Active)
+	{
+		return ETwoHeartsAttackTimingPhase::HitWindow;
+	}
+
+	switch (CombatPhase)
+	{
+	case ETwoHeartsCombatPhase::Startup:
+		return ETwoHeartsAttackTimingPhase::Startup;
+	case ETwoHeartsCombatPhase::Recovery:
+		return ETwoHeartsAttackTimingPhase::Recovery;
+	case ETwoHeartsCombatPhase::LogicEnded:
+		return ETwoHeartsAttackTimingPhase::Finished;
+	case ETwoHeartsCombatPhase::None:
+	default:
+		return ETwoHeartsAttackTimingPhase::None;
+	}
 }
 }
 
@@ -99,11 +124,15 @@ void UTwoHeartsGA_NormalAttackBase::ActivateAbility(
 	PendingNextSegmentAbilityTag = FGameplayTag();
 	PendingNextSegmentSourceSegment = 0;
 	bHasOpenedNextSegmentAdvanceWindow = false;
+	bHitDeliveryWindowActive = false;
 	ClearPendingLateBufferedInputRestore();
+	DeliveredTargetsThisAttack.Reset();
+	InitializeAttackInstance();
 
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(DeferredNextSegmentActivationTimerHandle);
+		World->GetTimerManager().ClearTimer(HitDeliveryScanTimerHandle);
 	}
 
 	if (!StartSegmentPlayback())
@@ -151,6 +180,7 @@ void UTwoHeartsGA_NormalAttackBase::EndAbility(
 	bool bWasCancelled)
 {
 	ClearPhaseFallbackTimers();
+	CloseHitDeliveryWindow(TEXT("AbilityEnded"));
 	UnbindMontageNotifyDelegates();
 	ActiveMontageTask = nullptr;
 	FinishCombatActionContext(bWasCancelled);
@@ -285,7 +315,9 @@ void UTwoHeartsGA_NormalAttackBase::NotifyCombatPhaseByName(FName NotifyName)
 FTwoHeartsAttackMetadata UTwoHeartsGA_NormalAttackBase::BuildCurrentAttackMetadata() const
 {
 	FTwoHeartsAttackMetadata AttackMetadata = AttackMetadataTemplate;
-	AttackMetadata.AttackInstanceName = FString::Printf(TEXT("NormalAttack.Segment%d"), NormalAttackSegment);
+	AttackMetadata.AttackInstanceName = CurrentAttackInstanceName.IsEmpty()
+		? FString::Printf(TEXT("NormalAttack.Segment%d"), NormalAttackSegment)
+		: CurrentAttackInstanceName;
 	AttackMetadata.SourceActor = GetAbilityAvatarActor();
 	if (const AtwoheartsCharacter* Character = GetTwoHeartsCharacter())
 	{
@@ -293,14 +325,13 @@ FTwoHeartsAttackMetadata UTwoHeartsGA_NormalAttackBase::BuildCurrentAttackMetada
 		AttackMetadata.AttackDirection = Character->GetActorForwardVector().GetSafeNormal2D();
 	}
 
-	if (AttackMetadata.TimingPhase == ETwoHeartsAttackTimingPhase::None)
-	{
-		AttackMetadata.TimingPhase = ETwoHeartsAttackTimingPhase::HitWindow;
-	}
-	if (AttackMetadata.TimingWindowName.IsNone())
-	{
-		AttackMetadata.TimingWindowName = TEXT("PrimaryHitWindow");
-	}
+	AttackMetadata.TimingPhase = ResolveAttackTimingPhaseFromCombatPhase(CurrentCombatPhase, bHitDeliveryWindowActive);
+	AttackMetadata.TimingWindowName =
+		bHitDeliveryWindowActive ? TEXT("PrimaryHitWindow") :
+		CurrentCombatPhase == ETwoHeartsCombatPhase::Startup ? TEXT("Startup") :
+		CurrentCombatPhase == ETwoHeartsCombatPhase::Recovery ? TEXT("Recovery") :
+		CurrentCombatPhase == ETwoHeartsCombatPhase::LogicEnded ? TEXT("Finished") :
+		(AttackMetadata.TimingWindowName.IsNone() ? TEXT("PrimaryHitWindow") : AttackMetadata.TimingWindowName);
 
 	return AttackMetadata;
 }
@@ -386,6 +417,11 @@ void UTwoHeartsGA_NormalAttackBase::HandleFallbackEnterLogicEnded()
 void UTwoHeartsGA_NormalAttackBase::HandleFallbackOpenNextSegmentAdvanceWindow()
 {
 	OpenNextSegmentAdvanceWindow(TEXT("FallbackTime"), true);
+}
+
+void UTwoHeartsGA_NormalAttackBase::HandleHitDeliveryScan()
+{
+	ScanHitDeliveryTargets(TEXT("TimerTick"));
 }
 
 bool UTwoHeartsGA_NormalAttackBase::CanQueueNextSegment() const
@@ -894,6 +930,15 @@ void UTwoHeartsGA_NormalAttackBase::EnterCombatPhase(ETwoHeartsCombatPhase NewPh
 	SyncCombatActionContextOnPhaseEntered(NewPhase, Reason);
 	UpdateDebugState(true);
 
+	if (NewPhase == ETwoHeartsCombatPhase::Active)
+	{
+		OpenHitDeliveryWindow(Reason);
+	}
+	else if (NewPhase == ETwoHeartsCombatPhase::Recovery || NewPhase == ETwoHeartsCombatPhase::LogicEnded)
+	{
+		CloseHitDeliveryWindow(Reason);
+	}
+
 	const TCHAR* EventName = NewPhase == ETwoHeartsCombatPhase::LogicEnded ? TEXT("LogicEnded") : TEXT("EnterPhase");
 	RecordAbilityEvent(
 		EventName,
@@ -946,6 +991,7 @@ void UTwoHeartsGA_NormalAttackBase::ClearPhaseFallbackTimers()
 		World->GetTimerManager().ClearTimer(LogicEndedFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(NextSegmentAdvanceFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(DeferredNextSegmentActivationTimerHandle);
+		World->GetTimerManager().ClearTimer(HitDeliveryScanTimerHandle);
 	}
 }
 
@@ -980,6 +1026,176 @@ void UTwoHeartsGA_NormalAttackBase::SchedulePhaseFallbacks(float SectionLength)
 bool UTwoHeartsGA_NormalAttackBase::IsLogicEndedPhase() const
 {
 	return CurrentCombatPhase == ETwoHeartsCombatPhase::LogicEnded;
+}
+
+void UTwoHeartsGA_NormalAttackBase::InitializeAttackInstance()
+{
+	static int32 GlobalNormalAttackInstanceCounter = 0;
+	CurrentAttackInstanceName = FString::Printf(
+		TEXT("NormalAttack_%s_Segment%d_%04d"),
+		*GetNameSafe(GetAbilityAvatarActor()),
+		NormalAttackSegment,
+		++GlobalNormalAttackInstanceCounter);
+}
+
+void UTwoHeartsGA_NormalAttackBase::OpenHitDeliveryWindow(const FString& Reason)
+{
+	if (bHitDeliveryWindowActive)
+	{
+		return;
+	}
+
+	bHitDeliveryWindowActive = true;
+	RecordAbilityEvent(
+		TEXT("HitWindowOpened"),
+		FString::Printf(
+			TEXT("Attack %s opened hit delivery window. Reason=%s Radius=%.1f ForwardDistance=%.1f."),
+			*CurrentAttackInstanceName,
+			*Reason,
+			HitDeliveryRadius,
+			HitDeliveryForwardDistance));
+
+	ScanHitDeliveryTargets(TEXT("WindowOpened"));
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			HitDeliveryScanTimerHandle,
+			this,
+			&UTwoHeartsGA_NormalAttackBase::HandleHitDeliveryScan,
+			HitDeliveryScanIntervalSeconds,
+			true);
+	}
+}
+
+void UTwoHeartsGA_NormalAttackBase::CloseHitDeliveryWindow(const FString& Reason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(HitDeliveryScanTimerHandle);
+	}
+
+	if (!bHitDeliveryWindowActive)
+	{
+		return;
+	}
+
+	bHitDeliveryWindowActive = false;
+	RecordAbilityEvent(
+		TEXT("HitWindowClosed"),
+		FString::Printf(
+			TEXT("Attack %s closed hit delivery window. Reason=%s DeliveredTargets=%d."),
+			*CurrentAttackInstanceName,
+			*Reason,
+			DeliveredTargetsThisAttack.Num()));
+}
+
+void UTwoHeartsGA_NormalAttackBase::ScanHitDeliveryTargets(const FString& Reason)
+{
+	if (!bHitDeliveryWindowActive)
+	{
+		return;
+	}
+
+	AtwoheartsCharacter* Character = GetTwoHeartsCharacter();
+	UWorld* World = GetWorld();
+	if (!Character || !World)
+	{
+		return;
+	}
+
+	const FVector Forward = Character->GetActorForwardVector().GetSafeNormal2D();
+	const FVector ScanCenter = Character->GetActorLocation() + HitDeliveryLocalOffset + (Forward * HitDeliveryForwardDistance);
+	TArray<FOverlapResult> OverlapResults;
+	FCollisionObjectQueryParams ObjectQueryParams;
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_Pawn);
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(NormalAttackHitDelivery), false, Character);
+	World->OverlapMultiByObjectType(
+		OverlapResults,
+		ScanCenter,
+		FQuat::Identity,
+		ObjectQueryParams,
+		FCollisionShape::MakeSphere(HitDeliveryRadius),
+		QueryParams);
+
+	bool bDeliveredAnyTarget = false;
+	for (const FOverlapResult& OverlapResult : OverlapResults)
+	{
+		AActor* TargetActor = OverlapResult.GetActor();
+		if (!TargetActor || TargetActor == Character)
+		{
+			continue;
+		}
+
+		UTwoHeartsPlayerAttackReceiverComponent* ReceiverComponent = TargetActor->FindComponentByClass<UTwoHeartsPlayerAttackReceiverComponent>();
+		if (!ReceiverComponent)
+		{
+			continue;
+		}
+
+		if (DeliveredTargetsThisAttack.Contains(TargetActor))
+		{
+			RecordAbilityEvent(
+				TEXT("HitDuplicateIgnored"),
+				FString::Printf(
+					TEXT("Attack %s ignored duplicate target %s during hit window scan. Reason=%s."),
+					*CurrentAttackInstanceName,
+					*GetNameSafe(TargetActor),
+					*Reason));
+			continue;
+		}
+
+		ReceiverComponent->ReceivePlayerAttackSignal(
+			BuildPlayerAttackSignal(
+				TargetActor,
+				FString::Printf(TEXT("Normal attack hit delivery contacted target during %s scan."), *Reason),
+				false));
+		DeliveredTargetsThisAttack.Add(TargetActor);
+		bDeliveredAnyTarget = true;
+
+		RecordAbilityEvent(
+			TEXT("HitDelivered"),
+			FString::Printf(
+				TEXT("Attack %s delivered hit to target %s during hit window scan. Reason=%s DeliveredTargets=%d."),
+				*CurrentAttackInstanceName,
+				*GetNameSafe(TargetActor),
+				*Reason,
+				DeliveredTargetsThisAttack.Num()));
+	}
+
+	if (!bDeliveredAnyTarget)
+	{
+		RecordAbilityEvent(
+			TEXT("HitScanNoTarget"),
+			FString::Printf(
+				TEXT("Attack %s scan found no new valid target. Reason=%s Overlaps=%d."),
+				*CurrentAttackInstanceName,
+				*Reason,
+				OverlapResults.Num()),
+			true);
+	}
+}
+
+FTwoHeartsPlayerAttackSignal UTwoHeartsGA_NormalAttackBase::BuildPlayerAttackSignal(
+	AActor* TargetActor,
+	const FString& Detail,
+	bool bWasDuplicateTarget) const
+{
+	FTwoHeartsPlayerAttackSignal Signal;
+	Signal.SignalType = ETwoHeartsPlayerAttackSignalType::AttackContact;
+	Signal.AttackInstanceName = CurrentAttackInstanceName;
+	Signal.SourceActor = GetAbilityAvatarActor();
+	Signal.TargetActor = TargetActor;
+	Signal.TimestampSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	Signal.bIsHitWindowActive = bHitDeliveryWindowActive;
+	Signal.bHasContact = true;
+	Signal.bWasDuplicateTarget = bWasDuplicateTarget;
+	Signal.Detail = Detail;
+	Signal.AttackMetadata = BuildCurrentAttackMetadata();
+	Signal.SourceLocation = Signal.AttackMetadata.SourceLocation;
+	Signal.AttackDirection = Signal.AttackMetadata.AttackDirection;
+	return Signal;
 }
 
 void UTwoHeartsGA_NormalAttackBase::HandleDeferredNextSegmentActivation()
