@@ -1,1 +1,4 @@
-{"_example": "请填写 {\"file\": \"<path>\", \"reason\": \"<why>\"}。 这里只放 spec 或 research 文件，不要放代码路径。 可运行 `python .trellis/scripts/get_context.py --mode packages` 查看可用 spec。 真正条目补齐后，可删除这一行。"}
+{"file":".trellis/spec/workflow/index.md","reason":"需要遵守双心印 workflow 层的读取顺序、角色判定与质量门槛。"}
+{"file":".trellis/spec/workflow/conversation-rules.md","reason":"本任务直接修改低 token 对话与读取规则，需要以此为正式约束。"}
+{"file":".trellis/spec/guides/token-efficiency-thinking-guide.md","reason":"本任务的核心目标就是把低 token 实践落到可复用指南中。"}
+{"file":".trellis/spec/implementation/document-maintenance.md","reason":"改动 .trellis/.codex 运行时接线后，需要同步遵守文档维护与沉淀规则。"}

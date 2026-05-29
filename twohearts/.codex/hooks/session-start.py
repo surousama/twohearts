@@ -12,7 +12,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 import sys
 import warnings
 from io import StringIO
@@ -166,17 +165,6 @@ def read_file(path: Path, fallback: str = "") -> str:
         return fallback
 
 
-def _resolve_context_key(project_dir: Path, hook_input: dict) -> str | None:
-    scripts_dir = project_dir / ".trellis" / "scripts"
-    if str(scripts_dir) not in sys.path:
-        sys.path.insert(0, str(scripts_dir))
-    try:
-        from common.active_task import resolve_context_key  # type: ignore[import-not-found]
-    except Exception:
-        return None
-    return resolve_context_key(hook_input, platform="codex")
-
-
 def _resolve_active_task(trellis_dir: Path, hook_input: dict):
     scripts_dir = trellis_dir / "scripts"
     if str(scripts_dir) not in sys.path:
@@ -184,28 +172,6 @@ def _resolve_active_task(trellis_dir: Path, hook_input: dict):
     from common.active_task import resolve_active_task  # type: ignore[import-not-found]
 
     return resolve_active_task(trellis_dir.parent, hook_input, platform="codex")
-
-
-def run_script(script_path: Path, context_key: str | None = None) -> str:
-    try:
-        env = os.environ.copy()
-        env["PYTHONIOENCODING"] = "utf-8"
-        if context_key:
-            env["TRELLIS_CONTEXT_ID"] = context_key
-        cmd = [sys.executable, "-W", "ignore", str(script_path)]
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=5,
-            cwd=str(script_path.parent.parent.parent),
-            env=env,
-        )
-        return result.stdout if result.returncode == 0 else "No context available"
-    except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError):
-        return "No context available"
 
 
 def _normalize_task_ref(task_ref: str) -> str:
@@ -324,12 +290,13 @@ def _strip_breadcrumb_tag_blocks(content: str) -> str:
 
 
 def _build_workflow_toc(workflow_path: Path) -> str:
-    """Inject workflow guide: TOC + Phase Index + Phase 1/2/3 step details.
+    """Inject workflow guide: TOC + Phase Index only.
 
     Since v0.5.0-rc.0 the [workflow-state:STATUS] breadcrumb tag blocks
     live inside ## Phase Index. They're consumed by inject-workflow-state.py
     on each UserPromptSubmit, so strip them from the session-start payload
-    to avoid duplicating context.
+    to avoid duplicating context. Detailed step bodies stay on demand via
+    `python ./.trellis/scripts/get_context.py --mode phase --step <X.X>`.
     """
     content = read_file(workflow_path)
     if not content:
@@ -346,11 +313,108 @@ def _build_workflow_toc(workflow_path: Path) -> str:
             out_lines.append(line)
     out_lines += ["", "---", ""]
 
-    phases = _extract_range(content, "Phase Index", "Customizing Trellis (for forks)")
+    phases = _extract_range(content, "Phase Index", "Phase 1: Plan")
     if phases:
         out_lines.append(_strip_breadcrumb_tag_blocks(phases).rstrip())
 
     return "\n".join(out_lines).rstrip()
+
+
+def _build_compact_current_state(trellis_dir: Path) -> str:
+    """Build a compact session summary for SessionStart injection only.
+
+    This intentionally avoids the full `get_context.py` text payload because
+    new sessions need orientation, not the entire active-task tree, recent
+    commits list, or journal bookkeeping details.
+    """
+    repo_root = trellis_dir.parent
+    scripts_dir = trellis_dir / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+
+    try:
+        from common.paths import (  # type: ignore[import-not-found]
+            DIR_SPEC,
+            DIR_TASKS,
+            DIR_WORKFLOW,
+            DIR_WORKSPACE,
+            get_current_task,
+            get_current_task_source,
+            get_developer,
+            get_tasks_dir,
+        )
+        from common.session_context import (  # type: ignore[import-not-found]
+            _collect_root_git_info,
+        )
+        from common.tasks import iter_active_tasks, load_task  # type: ignore[import-not-found]
+        from common.packages_context import get_packages_section  # type: ignore[import-not-found]
+    except Exception:
+        return "No context available"
+
+    lines: list[str] = []
+    developer = get_developer(repo_root)
+    lines.append("## DEVELOPER")
+    lines.append(f"Name: {developer}" if developer else "(unknown)")
+    lines.append("")
+
+    root_git_info = _collect_root_git_info(repo_root)
+    lines.append("## GIT STATUS")
+    if not root_git_info.get("isRepo"):
+        lines.append("Root is not a Git repository.")
+    else:
+        lines.append(f"Branch: {root_git_info['branch']}")
+        if root_git_info["isClean"]:
+            lines.append("Working directory: Clean")
+        else:
+            lines.append(
+                f"Working directory: {root_git_info['uncommittedChanges']} uncommitted change(s)"
+            )
+    lines.append("")
+
+    lines.append("## CURRENT TASK")
+    current_task = get_current_task(repo_root)
+    if current_task:
+        lines.append(f"Path: {current_task}")
+        source_type, context_key, _ = get_current_task_source(repo_root)
+        lines.append(
+            f"Source: {source_type}" + (f":{context_key}" if context_key else "")
+        )
+        task_info = load_task(repo_root / current_task)
+        if task_info:
+            lines.append(f"Title: {task_info.title}")
+            lines.append(f"Status: {task_info.status}")
+    else:
+        lines.append("(none)")
+    lines.append("")
+
+    tasks = list(iter_active_tasks(get_tasks_dir(repo_root)))
+    lines.append("## ACTIVE TASK SUMMARY")
+    if tasks:
+        my_tasks = [t for t in tasks if developer and t.assignee == developer]
+        in_progress = sum(1 for t in tasks if t.status == "in_progress")
+        planning = sum(1 for t in tasks if t.status == "planning")
+        top_level = [t.dir_name for t in tasks if not t.parent][:3]
+        lines.append(f"Total active tasks: {len(tasks)}")
+        lines.append(f"Assigned to me: {len(my_tasks)}")
+        lines.append(f"in_progress: {in_progress}, planning: {planning}")
+        if top_level:
+            lines.append("Top-level tasks: " + ", ".join(top_level))
+    else:
+        lines.append("(no active tasks)")
+    lines.append("")
+
+    packages_text = get_packages_section(repo_root)
+    if packages_text:
+        lines.append(packages_text)
+        lines.append("")
+
+    lines.append("## PATHS")
+    if developer:
+        lines.append(f"Workspace: {DIR_WORKFLOW}/{DIR_WORKSPACE}/{developer}/")
+    lines.append(f"Tasks: {DIR_WORKFLOW}/{DIR_TASKS}/")
+    lines.append(f"Spec: {DIR_WORKFLOW}/{DIR_SPEC}/")
+
+    return "\n".join(lines).rstrip()
 
 
 def main() -> None:
@@ -370,8 +434,6 @@ def main() -> None:
     configure_project_encoding(project_dir)
 
     trellis_dir = project_dir / ".trellis"
-    context_key = _resolve_context_key(project_dir, hook_input)
-
     output = StringIO()
 
     output.write(SUB_AGENT_NOTICE)
@@ -387,8 +449,7 @@ Read and follow all instructions below carefully.
     output.write("\n\n")
 
     output.write("<current-state>\n")
-    context_script = trellis_dir / "scripts" / "get_context.py"
-    output.write(run_script(context_script, context_key))
+    output.write(_build_compact_current_state(trellis_dir))
     output.write("\n</current-state>\n\n")
 
     output.write("<workflow>\n")
@@ -414,14 +475,7 @@ Read and follow all instructions below carefully.
         "Do NOT spawn another sub-agent of the same kind; implement / check directly.\n\n"
     )
 
-    # guides/ inlined (cross-package thinking, broadly useful)
-    guides_index = trellis_dir / "spec" / "guides" / "index.md"
-    if guides_index.is_file():
-        output.write("## guides (inlined — cross-package thinking guides)\n")
-        output.write(read_file(guides_index))
-        output.write("\n\n")
-
-    # Other indexes — paths only
+    # Spec indexes — paths only
     paths: list[str] = []
     spec_dir = trellis_dir / "spec"
     if spec_dir.is_dir():
