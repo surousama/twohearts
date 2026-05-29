@@ -35,6 +35,15 @@
 8. 不要再建议使用 `powershell -ExecutionPolicy Bypass -File .\.trellis\scripts\enable_utf8.ps1` 作为“持久修复”；那只会影响子进程，不会把编码设置回写到当前终端
 9. 若当前在创建或改写 task，task 标题、`prd.md`、`info.md`、`research/`、提交确认提示等默认都使用中文；只有必要专有名词可保留英文
 
+## 低 token 工作规则
+
+1. 不重复读取 `workflow.md` 全文；已读过 `trellis-start` 后，优先使用 `get_context.py`、相关 `index.md` 与当前 task 的 `prd.md`
+2. 搜索代码时，优先先用 `rg --files` 缩小到候选文件，再对候选文件做 `rg -n`；不要一开始就对整棵源码树做大范围关键词扫描
+3. 读取大文件时，优先按命中函数、结构体或行段局部读取；不要默认整文件通读
+4. 只有纯读取、互不依赖的命令才允许并行；`git add` / `git commit`、归档 / 记录日志、前后依赖的构建步骤不要并行触发
+5. 若已知当前环境有稳定坑位，应直接采用低返工写法；例如 PowerShell 5.1 下不要使用 `&&`，受执行策略影响的读取脚本应直接用 `powershell -ExecutionPolicy Bypass -File ...`
+6. “省 token”不能成为跳过 spec、PRD、验收和编译验证的理由；只能优化读取顺序、搜索范围和命令写法，不能降低质量门槛
+
 ## 来源
 
 由旧文档 `../docs/a双心印prompt.md` 提炼。

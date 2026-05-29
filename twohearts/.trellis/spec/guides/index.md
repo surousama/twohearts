@@ -11,6 +11,7 @@
 | [代码复用思考指南](./code-reuse-thinking-guide.md) | 识别重复模式，减少重复实现 | 看到类似逻辑散落在多个模块时 |
 | [跨层思考指南](./cross-layer-thinking-guide.md) | 检查跨层数据流与职责边界 | 任务跨越输入、Ability、角色、表现层时 |
 | [阶段顺序思考指南](./stage-order-thinking-guide.md) | 判断当前是否走对开发顺序 | 想提前叠功能或补底座时 |
+| [低 token 工作思考指南](./token-efficiency-thinking-guide.md) | 压缩不必要的读取、搜索与返工开销 | 任务成本主要耗在流程、搜索、整文件读取或环境重试时 |
 
 ## 双心印额外提醒
 
