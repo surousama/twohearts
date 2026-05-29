@@ -1,1 +1,8 @@
-{"_example": "请填写 {\"file\": \"<path>\", \"reason\": \"<why>\"}。 这里只放 spec 或 research 文件，不要放代码路径。 可运行 `python .trellis/scripts/get_context.py --mode packages` 查看可用 spec。 真正条目补齐后，可删除这一行。"}
+{"file": ".trellis/spec/roles/senior-programmer.md", "reason": "按资深程序职责执行本 task，先闭合边界、代码落点与风险。"}
+{"file": ".trellis/spec/combat/current-stage.md", "reason": "确认第二章当前阶段顺序；本 task 属于当前应执行项，且若采用过渡实现必须显式标注。"}
+{"file": ".trellis/spec/combat/chapter2-quick-reference.md", "reason": "快速定位玩家受击、动作上下文、角色配置桥接与 hostile probe 高入口文件。"}
+{"file": ".trellis/spec/combat/chapter2-code-map.md", "reason": "按代码地图定位 Combat/Hostile/Character 模块，避免绕开模块边界临时拼接。"}
+{"file": ".trellis/spec/implementation/ue5-gas-cpp-guidelines.md", "reason": "确保正式状态与动作链继续落在 UE5 + GAS + C++，不另起平行受击真相源。"}
+{"file": ".trellis/spec/implementation/blueprint-boundary.md", "reason": "明确 C++ 与 Blueprint/Anim 的边界：逻辑状态归 C++，表现资源和时机配置可落在 Blueprint/Anim。"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "本 task 横跨 C++、角色配置桥接与 AnimBP/Montage 资源，需要保持跨层一致性。"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "优先复用现有 NormalAttack/Dodge 的 Montage 播放与配置桥接模式，避免重新发明一套受击链路。"}

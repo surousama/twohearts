@@ -676,8 +676,109 @@ void AtwoheartsCharacter::AttachWeaponVisualToSocket(FName SocketName, const FTr
 	WeaponVisualComponent->SetRelativeScale3D(RelativeTransform.GetScale3D());
 }
 
+const FTwoHeartsDirectionalHitReactionConfig& AtwoheartsCharacter::GetDirectionalHitReactionConfig(ETwoHeartsHitReactionType HitReactionType) const
+{
+	switch (HitReactionType)
+	{
+	case ETwoHeartsHitReactionType::Heavy:
+		return HitReactionConfig.Heavy;
+	case ETwoHeartsHitReactionType::GuardBreak:
+		return HitReactionConfig.GuardBreak;
+	case ETwoHeartsHitReactionType::Light:
+	case ETwoHeartsHitReactionType::None:
+	default:
+		return HitReactionConfig.Light;
+	}
+}
+
+const FTwoHeartsHitReactionMontageEntry& AtwoheartsCharacter::GetHitReactionMontageEntry(
+	const FTwoHeartsDirectionalHitReactionConfig& DirectionalConfig,
+	ETwoHeartsHitReactionDirectionType DirectionType) const
+{
+	const FTwoHeartsHitReactionMontageEntry* SelectedEntry = &DirectionalConfig.Fallback;
+
+	switch (DirectionType)
+	{
+	case ETwoHeartsHitReactionDirectionType::Front:
+		SelectedEntry = &DirectionalConfig.Front;
+		break;
+	case ETwoHeartsHitReactionDirectionType::Back:
+		SelectedEntry = &DirectionalConfig.Back;
+		break;
+	case ETwoHeartsHitReactionDirectionType::Left:
+		SelectedEntry = &DirectionalConfig.Left;
+		break;
+	case ETwoHeartsHitReactionDirectionType::Right:
+		SelectedEntry = &DirectionalConfig.Right;
+		break;
+	case ETwoHeartsHitReactionDirectionType::None:
+	default:
+		SelectedEntry = &DirectionalConfig.Fallback;
+		break;
+	}
+
+	return SelectedEntry->Montage ? *SelectedEntry : DirectionalConfig.Fallback;
+}
+
+UAnimMontage* AtwoheartsCharacter::GetHitReactionMontage(ETwoHeartsHitReactionType HitReactionType, ETwoHeartsHitReactionDirectionType DirectionType) const
+{
+	const FTwoHeartsDirectionalHitReactionConfig& DirectionalConfig = GetDirectionalHitReactionConfig(HitReactionType);
+	return GetHitReactionMontageEntry(DirectionalConfig, DirectionType).Montage;
+}
+
+float AtwoheartsCharacter::GetHitReactionRecoveryDuration(
+	ETwoHeartsHitReactionType HitReactionType,
+	ETwoHeartsHitReactionDirectionType DirectionType,
+	float MinimumDurationSeconds) const
+{
+	const FTwoHeartsDirectionalHitReactionConfig& DirectionalConfig = GetDirectionalHitReactionConfig(HitReactionType);
+	const FTwoHeartsHitReactionMontageEntry& MontageEntry = GetHitReactionMontageEntry(DirectionalConfig, DirectionType);
+
+	float ResolvedDurationSeconds = MinimumDurationSeconds;
+	if (MontageEntry.RecoveryDurationOverrideSeconds > 0.0f)
+	{
+		ResolvedDurationSeconds = FMath::Max(ResolvedDurationSeconds, MontageEntry.RecoveryDurationOverrideSeconds);
+	}
+	else if (MontageEntry.Montage)
+	{
+		ResolvedDurationSeconds = FMath::Max(ResolvedDurationSeconds, MontageEntry.Montage->GetPlayLength());
+	}
+
+	return ResolvedDurationSeconds;
+}
+
+bool AtwoheartsCharacter::PlayHitReactionMontage(ETwoHeartsHitReactionType HitReactionType, ETwoHeartsHitReactionDirectionType DirectionType)
+{
+	UAnimMontage* Montage = GetHitReactionMontage(HitReactionType, DirectionType);
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!AnimInstance || !Montage)
+	{
+		return false;
+	}
+
+	if (AnimInstance->Montage_IsPlaying(Montage))
+	{
+		AnimInstance->Montage_Stop(HitReactionConfig.MontageStopBlendOutSeconds, Montage);
+	}
+
+	return AnimInstance->Montage_Play(Montage) > 0.0f;
+}
+
+void AtwoheartsCharacter::StopHitReactionMontage(ETwoHeartsHitReactionType HitReactionType, ETwoHeartsHitReactionDirectionType DirectionType)
+{
+	UAnimMontage* Montage = GetHitReactionMontage(HitReactionType, DirectionType);
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!AnimInstance || !Montage || !AnimInstance->Montage_IsPlaying(Montage))
+	{
+		return;
+	}
+
+	AnimInstance->Montage_Stop(HitReactionConfig.MontageStopBlendOutSeconds, Montage);
+}
+
 UAnimMontage* AtwoheartsCharacter::GetDodgeMontageForDirection(const FString& DirectionName) const
 {
+
 	if (DirectionName == TEXT("Forward"))
 	{
 		return DodgeConfig.DodgeMontageForward ? DodgeConfig.DodgeMontageForward : DodgeConfig.DodgeMontageFallback;

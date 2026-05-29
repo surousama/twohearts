@@ -6,10 +6,12 @@
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "TwoHearts/Combat/TwoHeartsAttackMetadata.h"
 #include "TwoHearts/Combat/TwoHeartsCombatActionContextComponent.h"
 #include "TwoHearts/Combat/TwoHeartsCombatPhase.h"
 #include "TwoHearts/Combat/Gameplay/Abilities/TwoHeartsAbilityGrant.h"
 #include "twoheartsCharacter.generated.h"
+
 
 class UAbilitySystemComponent;
 class USpringArmComponent;
@@ -21,8 +23,10 @@ class UStaticMeshComponent;
 class UTwoHeartsCombatActionContextComponent;
 class UTwoHeartsHostileAttackReceiverComponent;
 enum class ETwoHeartsAbilityInputID : uint8;
+enum class ETwoHeartsHitReactionDirectionType : uint8;
 struct FInputActionValue;
 struct FTwoHeartsCombatInputEvaluation;
+
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -121,6 +125,57 @@ enum class ETwoHeartsGuardInputMode : uint8
 };
 
 USTRUCT(BlueprintType)
+struct FTwoHeartsHitReactionMontageEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hit Reaction")
+	TObjectPtr<UAnimMontage> Montage = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hit Reaction", meta=(ClampMin="0.0", UIMin="0.0"))
+	float RecoveryDurationOverrideSeconds = 0.0f;
+};
+
+USTRUCT(BlueprintType)
+struct FTwoHeartsDirectionalHitReactionConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hit Reaction")
+	FTwoHeartsHitReactionMontageEntry Fallback;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hit Reaction|Directional")
+	FTwoHeartsHitReactionMontageEntry Front;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hit Reaction|Directional")
+	FTwoHeartsHitReactionMontageEntry Back;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hit Reaction|Directional")
+	FTwoHeartsHitReactionMontageEntry Left;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hit Reaction|Directional")
+	FTwoHeartsHitReactionMontageEntry Right;
+};
+
+USTRUCT(BlueprintType)
+struct FTwoHeartsHitReactionConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hit Reaction")
+	FTwoHeartsDirectionalHitReactionConfig Light;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hit Reaction")
+	FTwoHeartsDirectionalHitReactionConfig Heavy;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hit Reaction")
+	FTwoHeartsDirectionalHitReactionConfig GuardBreak;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hit Reaction", meta=(ClampMin="0.0", UIMin="0.0"))
+	float MontageStopBlendOutSeconds = 0.08f;
+};
+
+USTRUCT(BlueprintType)
 struct FTwoHeartsGuardConfig
 {
 	GENERATED_BODY()
@@ -140,6 +195,7 @@ struct FTwoHeartsGuardConfig
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Guard", meta=(ClampMin="0.0", UIMin="0.0"))
 	float GuardSuccessCooldownSeconds = 0.20f;
 };
+
 
 USTRUCT(BlueprintType)
 struct FTwoHeartsPreInputWindowOverride
@@ -335,8 +391,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Dodge", meta=(AllowPrivateAccess="true"))
 	FTwoHeartsDodgeConfig DodgeConfig;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hit Reaction", meta=(AllowPrivateAccess="true"))
+	FTwoHeartsHitReactionConfig HitReactionConfig;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Guard", meta=(AllowPrivateAccess="true"))
 	FTwoHeartsGuardConfig GuardConfig;
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|PreInput", meta=(AllowPrivateAccess="true"))
 	FTwoHeartsPreInputConfig PreInputConfig;
@@ -485,8 +545,17 @@ public:
 	UFUNCTION(BlueprintPure, Category="Combat|Dodge")
 	UAnimMontage* GetDodgeMontageForDirection(const FString& DirectionName) const;
 
+	UFUNCTION(BlueprintPure, Category="Combat|Hit Reaction")
+	const FTwoHeartsHitReactionConfig& GetHitReactionConfig() const { return HitReactionConfig; }
+
+	UAnimMontage* GetHitReactionMontage(ETwoHeartsHitReactionType HitReactionType, ETwoHeartsHitReactionDirectionType DirectionType) const;
+	float GetHitReactionRecoveryDuration(ETwoHeartsHitReactionType HitReactionType, ETwoHeartsHitReactionDirectionType DirectionType, float MinimumDurationSeconds) const;
+	bool PlayHitReactionMontage(ETwoHeartsHitReactionType HitReactionType, ETwoHeartsHitReactionDirectionType DirectionType);
+	void StopHitReactionMontage(ETwoHeartsHitReactionType HitReactionType, ETwoHeartsHitReactionDirectionType DirectionType);
+
 	UFUNCTION(BlueprintPure, Category="Combat|Action Context")
 	UTwoHeartsCombatActionContextComponent* GetCombatActionContextComponent() const { return CombatActionContextComponent; }
+
 
 	UFUNCTION(BlueprintPure, Category="Combat|Hostile Attack")
 	UTwoHeartsHostileAttackReceiverComponent* GetHostileAttackReceiverComponent() const { return HostileAttackReceiverComponent; }
@@ -595,5 +664,8 @@ protected:
 	bool IsCharacterInMovingWeaponState() const;
 	void ApplyWeaponVisualState(ETwoHeartsWeaponVisualState NewState, bool bForceRefresh = false);
 	void AttachWeaponVisualToSocket(FName SocketName, const FTransform& RelativeTransform);
+	const FTwoHeartsDirectionalHitReactionConfig& GetDirectionalHitReactionConfig(ETwoHeartsHitReactionType HitReactionType) const;
+	const FTwoHeartsHitReactionMontageEntry& GetHitReactionMontageEntry(const FTwoHeartsDirectionalHitReactionConfig& DirectionalConfig, ETwoHeartsHitReactionDirectionType DirectionType) const;
 };
+
 

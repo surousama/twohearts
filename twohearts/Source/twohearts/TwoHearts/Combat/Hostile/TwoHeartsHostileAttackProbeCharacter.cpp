@@ -441,19 +441,21 @@ void ATwoHeartsHostileAttackProbeCharacter::InitializeCurrentAttackMetadata()
 	CurrentAttackMetadata.SourceActor = this;
 	CurrentAttackMetadata.SourceLocation = GetActorLocation();
 	CurrentAttackMetadata.AttackDirection = GetActorForwardVector().GetSafeNormal2D();
-	CurrentAttackMetadata.HitReactionType = ETwoHeartsHitReactionType::Light;
-	CurrentAttackMetadata.BaseDamage = 10.0f;
+	CurrentAttackMetadata.HitReactionType = HitReactionType;
+	CurrentAttackMetadata.BaseDamage = BaseDamage;
 	CurrentAttackMetadata.DamageMechanicTags.AddTag(FTwoHeartsGameplayTags::Attack_Mechanic_Physical());
 	CurrentAttackMetadata.DamageMechanicTags.AddTag(FTwoHeartsGameplayTags::Attack_Mechanic_HostileProbe());
 	CurrentAttackMetadata.bCanBeGuarded = bAttackCanBeGuarded;
+
 	CurrentAttackMetadata.GuardMaxDistance = GuardMaxDistance;
 	CurrentAttackMetadata.GuardMaxHeightDifference = GuardMaxHeightDifference;
 	CurrentAttackMetadata.GuardFacingHalfAngleDegrees = GuardFacingHalfAngleDegrees;
 	CurrentAttackMetadata.GuardSuccessDisplacementResult = GuardSuccessDisplacementResult;
 	CurrentAttackMetadata.GuardSuccessDamageResult = GuardSuccessDamageResult;
 	CurrentAttackMetadata.GuardPartialDamageMultiplier = GuardPartialDamageMultiplier;
-	CurrentAttackMetadata.bCanBeDodged = true;
+	CurrentAttackMetadata.bCanBeDodged = bAttackCanBeDodged;
 	CurrentAttackMetadata.TimingPhase = ETwoHeartsAttackTimingPhase::Startup;
+
 	CurrentAttackMetadata.TimingWindowName = TEXT("Startup");
 }
 

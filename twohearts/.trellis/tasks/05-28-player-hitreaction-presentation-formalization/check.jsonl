@@ -1,1 +1,8 @@
-{"_example": "请填写 {\"file\": \"<path>\", \"reason\": \"<why>\"}。 这里只放 spec 或 research 文件，不要放代码路径。 可运行 `python .trellis/scripts/get_context.py --mode packages` 查看可用 spec。 真正条目补齐后，可删除这一行。"}
+{"file": ".trellis/spec/roles/senior-programmer.md", "reason": "按资深程序职责复核实现是否遵守已确认边界，没有带着模糊需求下沉。"}
+{"file": ".trellis/spec/combat/current-stage.md", "reason": "检查本轮是否仍然符合第二章当前阶段顺序，没有越界提前建设后续系统。"}
+{"file": ".trellis/spec/combat/chapter2-quick-reference.md", "reason": "复核改动是否集中在玩家受击、动作上下文、角色配置桥接和 hostile probe 相关入口。"}
+{"file": ".trellis/spec/combat/chapter2-code-map.md", "reason": "检查模块边界是否合理，避免把正式逻辑塞回角色类或无关模块。"}
+{"file": ".trellis/spec/implementation/ue5-gas-cpp-guidelines.md", "reason": "复核正式承载是否仍在 UE5 + GAS + C++，没有把核心状态真相源回退给蓝图。"}
+{"file": ".trellis/spec/implementation/blueprint-boundary.md", "reason": "复核 C++ 与 Blueprint/Anim 分工是否清晰，配置与逻辑没有相互越界。"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "检查 C++ 状态、角色配置桥接与 AnimBP/Montage 表现层是否保持一致。"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "检查是否充分复用现有 Montage 播放与配置模式，避免多套近似实现并存。"}

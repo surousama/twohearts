@@ -119,10 +119,20 @@ private:
 	float RecoverySeconds = 0.45f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hostile Attack Probe|Rule", meta=(AllowPrivateAccess="true"))
+	ETwoHeartsHitReactionType HitReactionType = ETwoHeartsHitReactionType::Light;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hostile Attack Probe|Rule", meta=(ClampMin="0.0", UIMin="0.0", AllowPrivateAccess="true"))
+	float BaseDamage = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hostile Attack Probe|Rule", meta=(AllowPrivateAccess="true"))
 	bool bAttackCanBeGuarded = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hostile Attack Probe|Rule", meta=(AllowPrivateAccess="true"))
+	bool bAttackCanBeDodged = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hostile Attack Probe|Rule", meta=(ClampMin="0.0", UIMin="0.0", AllowPrivateAccess="true"))
 	float GuardMaxDistance = 220.0f;
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Hostile Attack Probe|Rule", meta=(ClampMin="0.0", UIMin="0.0", AllowPrivateAccess="true"))
 	float GuardMaxHeightDifference = 120.0f;

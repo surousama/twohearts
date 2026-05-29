@@ -1132,29 +1132,39 @@ void UTwoHeartsHostileAttackReceiverComponent::EnterHitReaction(const FTwoHearts
 		World->GetTimerManager().ClearTimer(HitReactionRecoveryTimerHandle);
 	}
 
-	UTwoHeartsCombatActionContextComponent* ActionContextComponent = nullptr;
-	if (const AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetOwner()))
-	{
-		ActionContextComponent = Character->GetCombatActionContextComponent();
-	}
+	AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetOwner());
+	UTwoHeartsCombatActionContextComponent* ActionContextComponent = Character ? Character->GetCombatActionContextComponent() : nullptr;
 
 	const float StartTimeSeconds = GetWorldTimeSecondsSafe();
-
-	const float DurationSeconds = ResolveHitReactionDuration(DamageResult);
 	const FVector IncomingDirection = DamageResult.AttackMetadata.AttackDirection.GetSafeNormal2D();
 	const ETwoHeartsHitReactionDirectionType DirectionType = ResolveHitReactionDirectionType(IncomingDirection);
+	const ETwoHeartsHitReactionType HitReactionType = DamageResult.AttackMetadata.HitReactionType;
+	const float BaseDurationSeconds = ResolveHitReactionDuration(DamageResult);
+	const float DurationSeconds = Character
+		? Character->GetHitReactionRecoveryDuration(HitReactionType, DirectionType, BaseDurationSeconds)
+		: BaseDurationSeconds;
+	UAnimMontage* HitReactionMontage = Character ? Character->GetHitReactionMontage(HitReactionType, DirectionType) : nullptr;
+	const bool bPlayedHitReactionMontage = Character && Character->PlayHitReactionMontage(HitReactionType, DirectionType);
 
 	CurrentHitReactionState.bIsActive = true;
 	CurrentHitReactionState.HitReactionInstanceName = FString::Printf(TEXT("HitReaction.%s"), *DamageResult.AttackInstanceName);
 	CurrentHitReactionState.SourceActor = DamageResult.SourceActor;
 	CurrentHitReactionState.SourceAttackInstanceName = DamageResult.AttackInstanceName;
-	CurrentHitReactionState.HitReactionType = DamageResult.AttackMetadata.HitReactionType;
+	CurrentHitReactionState.HitReactionType = HitReactionType;
 	CurrentHitReactionState.DirectionType = DirectionType;
 	CurrentHitReactionState.IncomingDirection = IncomingDirection;
 	CurrentHitReactionState.StartTimeSeconds = StartTimeSeconds;
 	CurrentHitReactionState.ExpectedRecoveryTimeSeconds = StartTimeSeconds + DurationSeconds;
 	CurrentHitReactionState.LastEndReason = TEXT("None");
-	CurrentHitReactionState.Detail = TEXT("Formal hit reaction entered from a confirmed player damage result.");
+	CurrentHitReactionState.Detail = HitReactionMontage
+		? (bPlayedHitReactionMontage
+			? FString::Printf(TEXT("Formal hit reaction entered and played montage=%s."), *GetNameSafe(HitReactionMontage))
+			: FString::Printf(TEXT("Formal hit reaction entered but montage=%s failed to play."), *GetNameSafe(HitReactionMontage)))
+		: FString::Printf(
+			TEXT("Formal hit reaction entered but no montage is configured for reaction=%s direction=%s."),
+			LexHitReactionTypeToString(HitReactionType),
+			LexHitReactionDirectionTypeToString(DirectionType));
+
 
 	if (ActionContextComponent)
 	{
@@ -1170,13 +1180,16 @@ void UTwoHeartsHostileAttackReceiverComponent::EnterHitReaction(const FTwoHearts
 	UE_LOG(
 		LogtwoheartsCombatTest,
 		Display,
-		TEXT("[HitReaction] receiver=%s event=Enter attack=%s reaction=%s direction=%s duration=%.2f source=%s"),
+		TEXT("[HitReaction] receiver=%s event=Enter attack=%s reaction=%s direction=%s duration=%.2f source=%s montage=%s played=%s"),
 		*GetNameSafe(GetOwner()),
 		*CurrentHitReactionState.SourceAttackInstanceName,
 		LexHitReactionTypeToString(CurrentHitReactionState.HitReactionType),
 		LexHitReactionDirectionTypeToString(CurrentHitReactionState.DirectionType),
 		DurationSeconds,
-		*GetNameSafe(CurrentHitReactionState.SourceActor));
+		*GetNameSafe(CurrentHitReactionState.SourceActor),
+		*GetNameSafe(HitReactionMontage),
+		bPlayedHitReactionMontage ? TEXT("true") : TEXT("false"));
+
 
 	if (UWorld* World = GetWorld())
 	{
@@ -1203,8 +1216,10 @@ void UTwoHeartsHostileAttackReceiverComponent::FinishHitReaction(const FString& 
 		World->GetTimerManager().ClearTimer(HitReactionRecoveryTimerHandle);
 	}
 
-	if (const AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetOwner()))
+	if (AtwoheartsCharacter* Character = Cast<AtwoheartsCharacter>(GetOwner()))
 	{
+		Character->StopHitReactionMontage(CurrentHitReactionState.HitReactionType, CurrentHitReactionState.DirectionType);
+
 		if (UTwoHeartsCombatActionContextComponent* ActionContextComponent = Character->GetCombatActionContextComponent())
 		{
 			const FTwoHeartsCombatActionContextSnapshot& CurrentContext = ActionContextComponent->GetCurrentContext();
@@ -1214,6 +1229,7 @@ void UTwoHeartsHostileAttackReceiverComponent::FinishHitReaction(const FString& 
 			}
 		}
 	}
+
 
 	CurrentHitReactionState.bIsActive = false;
 	CurrentHitReactionState.LastEndTimeSeconds = GetWorldTimeSecondsSafe();
