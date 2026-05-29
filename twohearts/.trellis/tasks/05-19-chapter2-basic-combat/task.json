@@ -38,7 +38,14 @@
     "05-28-player-hit-reaction-minimum-implementation",
     "05-28-guard-rule-foundation-upgrade",
     "05-28-guard-outcome-settlement-and-counter-hook",
-    "05-28-preinput-second-pass-generalization"
+    "05-28-preinput-second-pass-generalization",
+    "05-28-normal-attack-hit-delivery-foundation",
+    "05-28-player-hitreaction-presentation-formalization",
+    "05-28-hostile-hit-and-health-minimum-loop",
+    "05-28-guard-unguardable-and-guardbreak-rules",
+    "05-28-combat-sample-expansion-and-regression",
+    "05-28-full-guard-presentation-implementation",
+    "05-28-combat-attribute-truthsource-consolidation"
   ],
   "parent": null,
   "relatedFiles": [],
