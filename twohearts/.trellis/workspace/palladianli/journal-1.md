@@ -520,3 +520,37 @@ Implemented character-side weapon visual switching, configured weapon assets and
 ### Next Steps
 
 - None - task complete
+
+
+## Session 16: 普通攻击命中派发基础收尾
+
+**Date**: 2026-05-29
+**Task**: 普通攻击命中派发基础收尾
+**Branch**: `master`
+
+### Summary
+
+完成普通攻击命中派发基础，实现玩家普攻命中窗口、唯一攻击实例、目标去重与最小敌方接收端，并完成本地 UE 编译验证。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f901a5b` | (see git log) |
+| `5f5618e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
