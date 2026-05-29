@@ -8,6 +8,8 @@
 
 1. 涉及长期模块边界、战斗结构、状态和验收边界，先读 [system-framework.md](./system-framework.md)
 2. 涉及当前第二章阶段口径、先后顺序和是否适合开工，先读 [current-stage.md](./current-stage.md)
+3. 涉及第二章基础战斗代码定位、主程序拆 task 或资深程序快速入场，先读 [chapter2-code-map.md](./chapter2-code-map.md)
+4. 若只需要 30 秒快速定位入口，先读 [chapter2-quick-reference.md](./chapter2-quick-reference.md)
 
 ## 质量检查
 
@@ -19,3 +21,5 @@
 
 * [system-framework.md](./system-framework.md)
 * [current-stage.md](./current-stage.md)
+* [chapter2-code-map.md](./chapter2-code-map.md)
+* [chapter2-quick-reference.md](./chapter2-quick-reference.md)

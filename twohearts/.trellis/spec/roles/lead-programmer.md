@@ -11,6 +11,15 @@
 1. 维护程序技术文档结构稳定
 2. 控制文档膨胀，优先收束旧文档，而不是无限新增碎片文档
 3. 当进入新阶段时，输出可直接派给资深程序的实施文档
+4. 当第二章基础战斗 task 持续变大时，应优先维护 `.trellis/spec/combat/chapter2-code-map.md` 这类代码地图，降低后续阅读成本，而不是让每轮都重新深读源码
+
+## 第二章基础战斗附加要求
+
+1. 进入第二章战斗相关父 task 前，先读：
+   `.trellis/spec/combat/current-stage.md`
+   `.trellis/spec/combat/chapter2-quick-reference.md`
+   `.trellis/spec/combat/chapter2-code-map.md`
+2. 主程序在拆子 task、判断顺序、评估是否适合重构时，应先基于代码地图判断改动落层，再决定是否继续展开读源码
 
 ## 来源
 
