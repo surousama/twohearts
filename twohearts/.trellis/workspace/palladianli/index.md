@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 17
+- **Total Sessions**: 18
 - **Last Active**: 2026-05-29
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~589 | Active |
+| `journal-1.md` | ~622 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | 日期 | 标题 | 提交 | 分支 |
 |---|------|-------|---------|--------|
+| 18 | 2026-05-29 | 完成敌方受击与生命最小闭环 | `cd353bf` | `master` |
 | 17 | 2026-05-29 | 优化 Codex workflow token 开销 | `9e5829c` | `master` |
 | 16 | 2026-05-29 | 普通攻击命中派发基础收尾 | `f901a5b`, `5f5618e` | `master` |
 | 15 | 2026-05-28 | 预输入二期泛化收尾 | `d2df2e7`, `572f589`, `a2d9fe1` | `master` |

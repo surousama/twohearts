@@ -587,3 +587,36 @@ Implemented character-side weapon visual switching, configured weapon assets and
 ### Next Steps
 
 - None - task complete
+
+
+## Session 18: 完成敌方受击与生命最小闭环
+
+**Date**: 2026-05-29
+**Task**: 完成敌方受击与生命最小闭环
+**Branch**: `master`
+
+### Summary
+
+完成 HostileAttackProbe 敌方受击、生命扣减、0血停机与忽略口径闭环；补充跑测说明并通过日志验收。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cd353bf` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
