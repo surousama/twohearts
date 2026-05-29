@@ -554,3 +554,36 @@ Implemented character-side weapon visual switching, configured weapon assets and
 ### Next Steps
 
 - None - task complete
+
+
+## Session 17: 优化 Codex workflow token 开销
+
+**Date**: 2026-05-29
+**Task**: 优化 Codex workflow token 开销
+**Branch**: `master`
+
+### Summary
+
+收紧 workflow Phase Index 与 SessionStart 注入范围，去重 Codex agent prelude，并完成 codex-workflow-token-optimization 任务归档。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9e5829c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
