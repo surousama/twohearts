@@ -18,7 +18,9 @@
   "commit": null,
   "pr_url": null,
   "subtasks": [],
-  "children": [],
+  "children": [
+    "05-29-codex-workflow-token-optimization"
+  ],
   "parent": null,
   "relatedFiles": [
     ".trellis/spec/backend/",
